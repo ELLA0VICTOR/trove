@@ -25,19 +25,12 @@ function spherePoints(count: number) {
 }
 
 export function LetterGlobe() {
-  const { paused, theme } = useApp(),
+  const { paused } = useApp(),
     canvas = useRef<HTMLCanvasElement>(null),
     field = useRef<HTMLCanvasElement>(null);
-  const [intro, setIntro] = useState(() => {
-    try {
-      return (
-        !sessionStorage.getItem("trove-intro") &&
-        !matchMedia("(prefers-reduced-motion: reduce)").matches
-      );
-    } catch {
-      return false;
-    }
-  });
+  const [intro, setIntro] = useState(
+    () => !matchMedia("(prefers-reduced-motion: reduce)").matches,
+  );
   const finish = useRef<() => void>(() => {});
   useEffect(() => {
     const el = canvas.current,
@@ -102,11 +95,6 @@ export function LetterGlobe() {
     function closeIntro() {
       if (introDone) return;
       introDone = true;
-      try {
-        sessionStorage.setItem("trove-intro", "1");
-      } catch {
-        /* optional */
-      }
       document.documentElement.style.overflow = originalOverflow;
       if (root) root.inert = originalInert;
       el!.style.opacity = "1";
@@ -398,7 +386,7 @@ export function LetterGlobe() {
     };
     // Intro state deliberately does not recreate the engine during the handoff.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paused, theme]);
+  }, [paused]);
   return (
     <>
       <div className="letter-field">

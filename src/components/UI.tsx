@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { ArrowUpRight, Moon, Sun, X } from "lucide-react";
-import { useApp } from "../lib/app-context.tsx";
+import { ArrowUpRight, X } from "lucide-react";
 
 export function Button({
   children,
@@ -35,18 +34,6 @@ export function Button({
       disabled={disabled}
     >
       {children}
-    </button>
-  );
-}
-export function ThemeToggle() {
-  const { theme, toggleTheme } = useApp();
-  return (
-    <button
-      className="theme-toggle"
-      aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
-      onClick={toggleTheme}
-    >
-      {theme === "dark" ? <Sun size={21} /> : <Moon size={21} />}
     </button>
   );
 }

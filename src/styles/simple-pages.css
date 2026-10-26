@@ -1,0 +1,712 @@
+/* Small, task-focused app pages; no landing-page panels. */
+.consumer-app .app-main {
+  min-height: calc(100dvh - 116px);
+}
+.simple-page-header {
+  padding: 31px 0 27px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+.simple-page-header h1 {
+  font-size: 32px;
+  letter-spacing: -1px;
+  line-height: 1.2;
+}
+.simple-page-header .text-link {
+  font-size: 11px;
+  gap: 8px;
+}
+.simple-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+.simple-section-heading h2 {
+  font-size: 22px;
+  letter-spacing: -0.5px;
+}
+.simple-section-heading > span {
+  font-size: 10px;
+  color: var(--muted);
+}
+.simple-tabs {
+  display: flex;
+  gap: 3px;
+}
+.simple-tabs > button {
+  padding: 5px 13px;
+  border: 1px solid transparent;
+  color: var(--muted);
+  font-size: 10px;
+}
+.simple-tabs > button.active {
+  color: var(--spot);
+  border-color: var(--line);
+}
+.simple-empty {
+  padding: 35px 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.decision-replay {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 290px;
+  gap: 45px;
+  align-items: center;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding: 14px 45px 14px 0;
+  margin-bottom: 26px;
+}
+.decision-replay h2 {
+  font-size: 29px;
+  line-height: 1.13;
+  letter-spacing: -0.8px;
+}
+.decision-replay p {
+  color: var(--muted);
+  font-size: 11px;
+  margin: 15px 0 20px;
+}
+.decision-replay .button {
+  font-size: 10px;
+  min-height: 39px;
+  padding: 9px 14px;
+  gap: 20px;
+}
+.decisions-page .decision-orbit {
+  min-height: 220px;
+  height: 220px;
+  background: none;
+  mask-image: none;
+}
+.decisions-page .orbit-ring {
+  height: 185px;
+  width: 185px;
+}
+.decisions-page .decision-orbit > span:not(.pixel-icon) {
+  width: 36px;
+  height: 36px;
+  left: calc(50% + cos(var(--angle)) * 94px - 18px);
+  top: calc(50% + sin(var(--angle)) * 74px - 18px);
+}
+.decisions-page .decision-orbit .company-logo {
+  height: 36px;
+  width: 36px;
+  padding: 7px;
+}
+.decisions-page .decision-orbit > .pixel-icon {
+  width: 47px;
+  height: 47px;
+}
+.decision-history-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  gap: 20px;
+}
+.decision-history-heading h2 {
+  font-size: 21px;
+  letter-spacing: -0.4px;
+}
+.compact-decision-list {
+  border-top: 1px solid var(--line);
+}
+.compact-decision-row {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) 110px 18px;
+  gap: 17px;
+  align-items: center;
+  width: 100%;
+  padding: 17px 9px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+.compact-decision-row:hover {
+  background: var(--card);
+}
+.compact-decision-row .company-logo {
+  width: 38px;
+  height: 38px;
+}
+.compact-decision-copy {
+  min-width: 0;
+}
+.compact-decision-copy h3 {
+  font-size: 15px;
+  letter-spacing: -0.2px;
+}
+.compact-decision-copy > span {
+  font-size: 9px;
+  color: var(--muted);
+}
+.compact-decision-copy p {
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.compact-decision-row > strong {
+  font-weight: 400;
+  font-size: 15px;
+  text-align: right;
+}
+.compact-decision-row > svg {
+  color: var(--muted);
+}
+.decision-modal-company {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin: 15px 0 25px;
+}
+.decision-modal-company h2 {
+  margin: 0;
+  font-size: 28px;
+}
+.reason-heading {
+  font-size: 14px;
+  margin-top: 26px;
+}
+
+.learn-page {
+  max-width: 850px;
+  margin: 0 auto;
+}
+.learn-tabs {
+  display: flex;
+  gap: 24px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 25px;
+}
+.learn-tabs > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 0 13px;
+  font-size: 12px;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  color: var(--muted);
+}
+.learn-tabs > button[aria-selected="true"] {
+  color: var(--spot);
+  border-color: var(--spot);
+}
+.lesson-progress {
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  margin-bottom: 20px;
+}
+.lesson-progress > div:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 13px;
+  font-size: 11px;
+}
+.lesson-progress strong {
+  font-weight: 500;
+}
+.lesson-progress > div:first-child > span {
+  color: var(--muted);
+  font-size: 10px;
+}
+.lesson-progress-track {
+  height: 4px;
+  background: var(--line);
+  overflow: hidden;
+}
+.lesson-progress-track > span {
+  display: block;
+  height: 100%;
+  background: var(--spot);
+  transition: width 0.25s;
+}
+.lesson-list {
+  display: grid;
+  gap: 12px;
+}
+.lesson-row {
+  display: flex;
+  align-items: center;
+  gap: 17px;
+  text-align: left;
+  padding: 21px;
+  border: 1px solid var(--line);
+  width: 100%;
+  min-height: 90px;
+}
+.lesson-row:hover:not(:disabled) {
+  border-color: var(--spot);
+}
+.lesson-row.is-current {
+  border-color: var(--spot);
+  background: color-mix(in srgb, var(--spot) 9%, transparent);
+}
+.lesson-row:disabled {
+  opacity: 0.65;
+}
+.lesson-symbol {
+  width: 41px;
+  height: 41px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  color: var(--spot);
+  flex-shrink: 0;
+}
+.lesson-copy {
+  flex: 1;
+  min-width: 0;
+}
+.lesson-copy strong {
+  display: block;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 18px;
+  letter-spacing: -0.2px;
+}
+.lesson-copy small {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  margin-top: 3px;
+}
+.lesson-state {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+}
+.lesson-row.is-current .lesson-state,
+.lesson-row.is-complete .lesson-state {
+  color: var(--spot);
+}
+.learning-limit-note {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--muted);
+  font-size: 10px;
+  padding-top: 19px;
+}
+.learning-limit-note > svg {
+  color: var(--spot);
+  flex-shrink: 0;
+}
+.lesson-explanation {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.9;
+  margin: 20px 0 28px;
+}
+.simple-guide {
+  padding-top: 2px;
+}
+.simple-guide .simple-section-heading > span {
+  font-size: 9px;
+}
+.guide-starters {
+  padding: 24px 0 35px;
+}
+.guide-starters > p {
+  font-size: 13px;
+  margin-bottom: 25px;
+}
+.guide-starters > button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  width: 100%;
+  text-align: left;
+  padding: 15px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--muted);
+}
+.guide-starters > button:hover {
+  color: var(--spot);
+}
+.simple-guide .messages {
+  min-height: 0;
+  max-height: 450px;
+  margin: 15px 0 25px;
+  padding: 0;
+}
+.simple-guide .message {
+  padding: 15px 0;
+}
+.simple-guide .message p {
+  font-size: 12px;
+}
+.simple-guide .message .mini-label {
+  font-size: 9px;
+}
+.simple-guide .source-link {
+  font-size: 10px;
+}
+.simple-guide .guide-input {
+  margin-top: 12px;
+  padding: 9px;
+}
+.simple-guide .guide-input input {
+  font-size: 12px;
+}
+.guide-thinking,
+.guide-mode-note {
+  font-size: 10px;
+  color: var(--muted);
+  margin: 13px 0;
+}
+
+.parent-controls-page {
+  max-width: 1000px;
+  margin: 0 auto;
+}
+.parent-entry {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 55px 20px;
+  border-top: 1px solid var(--line);
+  gap: 23px;
+}
+.parent-entry > svg {
+  color: var(--spot);
+}
+.parent-entry h2 {
+  font-size: 23px;
+  letter-spacing: -0.5px;
+}
+.parent-entry .button {
+  min-height: 43px;
+  padding: 11px 18px;
+  font-size: 12px;
+  gap: 20px;
+}
+.parent-entry p {
+  font-size: 10px;
+  color: var(--muted);
+}
+.parent-control-summary {
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.parent-control-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 21px 0;
+  gap: 15px;
+  border-bottom: 1px solid var(--line);
+}
+.practice-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 12px;
+}
+.practice-state > svg {
+  color: var(--spot);
+}
+.practice-state.paused > svg {
+  color: var(--negative);
+}
+.parent-control-status .button {
+  font-size: 11px;
+  min-height: 38px;
+  padding: 9px 13px;
+  gap: 8px;
+}
+.parent-limit-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 20px;
+  align-items: center;
+  padding: 25px 0;
+}
+.parent-limit-grid > div > span {
+  display: block;
+  font-size: 10px;
+  color: var(--muted);
+  margin-bottom: 7px;
+}
+.parent-limit-grid strong {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 29px;
+  font-weight: 500;
+  letter-spacing: -0.7px;
+}
+.parent-limit-grid .text-link {
+  font-size: 11px;
+  gap: 8px;
+  justify-self: start;
+  justify-content: flex-start;
+  width: fit-content;
+}
+.parent-requests {
+  padding: 29px 0 0;
+}
+.requests-empty {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 28px 0 35px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.requests-empty > svg {
+  color: var(--spot);
+}
+.simple-request {
+  border: 1px solid var(--line);
+  padding: 22px;
+  margin-bottom: 15px;
+}
+.request-main {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.request-main > div {
+  flex: 1;
+  min-width: 0;
+}
+.request-main h3 {
+  font-size: 17px;
+}
+.request-main p {
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 3px;
+}
+.request-main > strong {
+  font-size: 21px;
+  font-weight: 400;
+}
+.request-reason {
+  font-size: 12px;
+  margin-top: 18px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.request-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  margin-top: 22px;
+}
+.request-bottom > span {
+  font-size: 9px;
+  color: var(--muted);
+}
+.request-buttons {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+}
+.request-buttons .button {
+  min-height: 39px;
+  font-size: 11px;
+  padding: 10px 13px;
+  gap: 8px;
+}
+.request-decline {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.request-bottom .request-approved {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  color: var(--spot);
+}
+.request-return {
+  margin-top: 14px;
+  font-size: 10px;
+}
+.parent-controls-note {
+  font-size: 9px;
+  color: var(--muted);
+  border-top: 1px solid var(--line);
+  padding-top: 18px;
+  margin-top: 20px;
+}
+.limits-form {
+  margin-top: 24px;
+}
+.limits-form > label {
+  margin-top: 20px;
+  display: block;
+}
+.limits-form .modal-actions {
+  margin-top: 26px;
+}
+@media (max-width: 1000px) {
+  .decision-replay {
+    grid-template-columns: minmax(0, 1fr) 220px;
+    gap: 25px;
+    padding-right: 0;
+  }
+}
+@media (max-width: 760px) {
+  .consumer-app .app-main {
+    padding-bottom: 105px;
+    min-height: calc(100dvh - 99px);
+  }
+  .consumer-app > .toast {
+    bottom: 90px;
+  }
+  .app-bottomnav {
+    grid-template-columns: repeat(5, 1fr);
+  }
+  .simple-page-header {
+    padding: 26px 0;
+    gap: 12px;
+  }
+  .simple-page-header h1 {
+    font-size: 28px;
+  }
+  .simple-page-header .text-link {
+    font-size: 9px;
+    gap: 6px;
+  }
+  .simple-page-header .text-link > svg {
+    width: 14px;
+  }
+  .decision-replay {
+    grid-template-columns: minmax(0, 1fr) 175px;
+    gap: 10px;
+    padding: 15px 0;
+  }
+  .decision-replay h2 {
+    font-size: 23px;
+  }
+  .decision-replay p {
+    font-size: 10px;
+  }
+  .decisions-page .decision-orbit {
+    transform: scale(0.75);
+    transform-origin: center;
+    min-height: 190px;
+    height: 190px;
+  }
+  .compact-decision-row {
+    grid-template-columns: 34px minmax(0, 1fr) 75px 12px;
+    gap: 11px;
+    padding: 15px 0;
+  }
+  .compact-decision-row .company-logo {
+    width: 32px;
+    height: 32px;
+    padding: 6px;
+  }
+  .compact-decision-copy h3 {
+    font-size: 14px;
+  }
+  .compact-decision-copy p {
+    font-size: 9px;
+  }
+  .compact-decision-copy > span {
+    font-size: 8px;
+  }
+  .compact-decision-row > strong {
+    font-size: 12px;
+  }
+  .compact-decision-row > svg {
+    width: 12px;
+  }
+  .learn-tabs {
+    gap: 22px;
+  }
+  .lesson-row {
+    padding: 17px 14px;
+    gap: 13px;
+  }
+  .lesson-symbol {
+    width: 35px;
+    height: 35px;
+  }
+  .lesson-symbol > svg {
+    width: 20px;
+  }
+  .lesson-copy strong {
+    font-size: 17px;
+  }
+  .lesson-copy small {
+    font-size: 10px;
+  }
+  .learning-limit-note {
+    font-size: 9px;
+    align-items: flex-start;
+  }
+  .lesson-state {
+    width: 20px;
+  }
+  .parent-limit-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 20px 15px;
+  }
+  .parent-limit-grid > .text-link {
+    grid-column: 1 / -1;
+  }
+  .parent-limit-grid strong {
+    font-size: 27px;
+  }
+  .request-bottom {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .request-buttons {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  .simple-request {
+    padding: 18px 15px;
+  }
+  .request-main h3 {
+    font-size: 16px;
+  }
+  .request-main > strong {
+    font-size: 18px;
+  }
+}
+@media (max-width: 450px) {
+  .decision-replay {
+    grid-template-columns: minmax(0, 1fr) 140px;
+  }
+  .decision-replay .button {
+    font-size: 9px;
+    gap: 10px;
+    padding: 9px 11px;
+  }
+  .decision-replay .button svg {
+    width: 13px;
+  }
+  .decision-replay p {
+    max-width: 170px;
+  }
+  .decisions-page .decision-orbit {
+    transform: scale(0.65);
+  }
+  .parent-controls-page .simple-page-header h1 {
+    font-size: 25px;
+  }
+}

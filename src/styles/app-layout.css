@@ -165,12 +165,6 @@
 .app-topbar-actions {
   gap: 20px;
 }
-.app-topbar .theme-toggle {
-  width: 35px;
-  height: 35px;
-  background: none;
-  color: var(--muted);
-}
 .practice-badge {
   display: inline-flex;
   align-items: center;
@@ -343,8 +337,8 @@
   justify-content: center;
   padding: 9px;
   background: #fff;
-  border: 1px solid #e5e5df;
-  color: #30332c;
+  border: 1px solid var(--line);
+  color: var(--foreground);
   overflow: hidden;
 }
 .company-logo img {
@@ -365,17 +359,20 @@
   padding: 5px;
 }
 .company-logo.brand-amd {
-  background: #141414;
-  border-color: #333;
+  background: #ffffff;
+  border-color: var(--line);
   padding: 6px;
 }
+.company-logo.brand-amd img {
+  filter: brightness(0);
+}
 .company-logo.brand-wmt {
-  background: #0053e2;
-  border-color: #0053e2;
+  background: var(--spot);
+  border-color: var(--spot);
 }
 .company-logo.brand-nvda {
-  background: #101410;
-  border-color: #303a2a;
+  background: #ffffff;
+  border-color: var(--line);
 }
 .decision-orbit .company-logo {
   width: 44px;
@@ -737,13 +734,13 @@
   .app-sidebar.is-open {
     display: flex;
     z-index: 60;
-    box-shadow: 15px 0 60px #0005;
+    box-shadow: 15px 0 60px #20342a1a;
   }
   .app-menu-backdrop {
     display: block;
     position: fixed;
     inset: 0;
-    background: #0008;
+    background: #20342a40;
     z-index: 55;
   }
   .sidebar-close {

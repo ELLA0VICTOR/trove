@@ -31,8 +31,6 @@ interface AppContextValue {
     method?: string,
   ) => Promise<AppSnapshot>;
   notify: (message: string) => void;
-  theme: string;
-  toggleTheme: () => void;
   paused: boolean;
   setPaused: (value: boolean) => void;
 }
@@ -42,24 +40,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [toast, setToast] = useState("");
-  const [theme, setTheme] = useState(() => {
-    try {
-      return localStorage.getItem("trove-theme") ?? "dark";
-    } catch {
-      return "dark";
-    }
-  });
   const [paused, setPaused] = useState(false),
     timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined),
     refreshPending = useRef<Promise<void> | null>(null);
   useEffect(() => {
-    document.documentElement.dataset.theme = theme;
+    document.documentElement.removeAttribute("data-theme");
     try {
-      localStorage.setItem("trove-theme", theme);
+      localStorage.removeItem("trove-theme");
     } catch {
       /* storage is optional */
     }
-  }, [theme]);
+  }, []);
   useEffect(() => {
     document.documentElement.dataset.motion = paused ? "paused" : "playing";
   }, [paused]);
@@ -108,8 +99,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         refresh,
         update,
         notify,
-        theme,
-        toggleTheme: () => setTheme((t) => (t === "dark" ? "light" : "dark")),
         paused,
         setPaused,
       }}

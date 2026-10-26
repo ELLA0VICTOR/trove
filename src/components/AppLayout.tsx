@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import {
   ArrowRight,
-  ArrowUpRight,
   BookOpen,
   ChevronRight,
   Compass,
@@ -13,11 +12,9 @@ import {
   PanelLeftOpen,
   ShieldCheck,
   Sprout,
-  UserRound,
   X,
 } from "lucide-react";
 import { Brand } from "./Brand.tsx";
-import { ThemeToggle } from "./UI.tsx";
 import { useApp } from "../lib/app-context.tsx";
 
 export function AppLayout() {
@@ -36,9 +33,10 @@ export function AppLayout() {
     { to: "/app/guide", label: "Learn", icon: BookOpen },
     { to: "/app/explore", label: "Explore", icon: Compass },
     { to: "/app/decisions", label: "Decisions", icon: ListOrdered },
+    { to: "/app/parent", label: "Parent", icon: ShieldCheck },
   ];
   const section = location.pathname.includes("parent")
-    ? "Parent guidance"
+    ? "Parent controls"
     : location.pathname.includes("replay")
       ? "Decision replay"
       : location.pathname.includes("evidence")
@@ -141,27 +139,6 @@ export function AppLayout() {
             </NavLink>
           ))}
         </nav>
-        <div className="sidebar-bottom">
-          <NavLink to="/app/parent" className="sidebar-parent">
-            <ShieldCheck size={18} />
-            Parent guidance
-            <ArrowUpRight size={14} />
-          </NavLink>
-          <Link to="/app/parent" className="sidebar-profile">
-            <span className="profile-symbol">
-              <UserRound size={22} strokeWidth={1.5} />
-            </span>
-            <span>
-              <strong>
-                {state?.role === "parent"
-                  ? "Parent preview"
-                  : (state?.learner ?? "Maya")}
-              </strong>
-              <small>Practice account</small>
-            </span>
-            <ChevronRight size={16} />
-          </Link>
-        </div>
       </aside>
       <div className="app-body" inert={menuOpen}>
         <header className="app-topbar">
@@ -199,7 +176,6 @@ export function AppLayout() {
               <span className="live-dot" />
               Practice mode
             </span>
-            <ThemeToggle />
           </div>
         </header>
         <nav className="app-bottomnav" aria-label="Mobile navigation">
@@ -235,18 +211,6 @@ export function AppLayout() {
             <Outlet />
           )}
         </main>
-        <footer className="app-footer">
-          <span>
-            <Sprout size={14} className="trove-sapling" /> Small decisions.
-            Lasting growth.
-          </span>
-          <div>
-            <Link to="/app/guide">
-              <BookOpen size={13} /> Your learning guide
-            </Link>
-            <Link to="/app/evidence">Local demo</Link>
-          </div>
-        </footer>
       </div>
       {toast && (
         <div className="toast" role="status">

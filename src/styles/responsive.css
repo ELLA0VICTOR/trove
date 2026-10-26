@@ -386,10 +386,6 @@
   .header-actions {
     gap: 9px;
   }
-  .theme-toggle {
-    width: 37px;
-    height: 37px;
-  }
   .button.compact {
     padding: 8px 13px;
     min-height: 37px;
@@ -678,10 +674,6 @@
   .app-header-actions {
     margin-left: auto;
     gap: 14px;
-  }
-  .app-header-actions > .theme-toggle {
-    height: 29px;
-    width: 29px;
   }
   .profile-link {
     gap: 5px;

@@ -8,13 +8,7 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Brand, PixelIcon, Sapling } from "../components/Brand.tsx";
-import {
-  Button,
-  Eyebrow,
-  PixelReadout,
-  Reveal,
-  ThemeToggle,
-} from "../components/UI.tsx";
+import { Button, Eyebrow, PixelReadout, Reveal } from "../components/UI.tsx";
 import { LetterGlobe } from "../components/LetterGlobe.tsx";
 import { useApp } from "../lib/app-context.tsx";
 
@@ -51,7 +45,6 @@ export function Landing() {
           <a href="#parents">For parents</a>
         </nav>
         <div className="header-actions">
-          <ThemeToggle />
           <Button to="/app" className="compact">
             Try now
           </Button>

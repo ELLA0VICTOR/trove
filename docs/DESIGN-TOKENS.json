@@ -1,5 +1,5 @@
 {
-  "status": "Verified reference inventory with current blue accent selection; runtime colors are in src/index.css.",
+  "status": "Historical NEAR reference inventory plus the active single white-and-green palette. Runtime values are in src/index.css.",
   "source": "https://nearhackathon.com/",
   "inspectedOn": "2026-10-26",
   "reference": {
@@ -170,14 +170,17 @@
     "pauseOffscreenAndWhenPageHidden": true
   },
   "activeAccentSelection": {
-    "dark": {
-      "spot": "#0091FD",
-      "brandGreen": "#8EE573"
-    },
-    "light": {
-      "spot": "#005FB0",
-      "brandGreen": "#2D6D3C"
-    },
-    "decision": "Use the NEAR reference blue palette across the site, preserving green only for the sapling identity and existing third-party company marks."
+    "mode": "fixed",
+    "background": "#FFFFFF",
+    "foreground": "#20342A",
+    "card": "#FFFFFF",
+    "surface": "#F3F8F4",
+    "muted": "#62736A",
+    "line": "#DCE6DF",
+    "border": "#CBDACF",
+    "spot": "#19764C",
+    "brandGreen": "#19764C",
+    "onSpot": "#FFFFFF",
+    "decision": "One fixed white-and-green palette across landing and app; no light/dark mode. Layouts and animations are preserved."
   }
 }

@@ -10,9 +10,13 @@ The requirements below are the user's direction. Screen composition, proposed co
 
 ## User requirements
 
+Current palette instruction: change colors only. Use white backgrounds, forest-green accents (`#19764C`), dark green-charcoal text (`#20342A`), and pale green supporting surfaces. Apply this to both landing and app pages. Use a single fixed palette with no mode selector or stored light/dark preference. Keep the layouts, typography, interactions, and animations intact. Earlier color selections below are historical.
+
+Current accent refinement: retain solid forest green for active navigation, selected filters, company price, allocation controls, and build status. Keep the account summary, lesson progress/rows, company search, and parent controls on white. Remove the sidebar profile badge. Holdings rows turn forest green with white text on hover or keyboard focus; their resting state stays white. Keep the unboxed decision orbit and other approved accents. Do not add promotional copy or restructure the pages.
+
 October 26 follow-up: the user approved the landing page and requested **no changes there**. The main app now follows the attached Cresco reference for arrangement only: a side navigation, prominent company search, simple filters, and two-column horizontal company cards with official brand marks and price-history sparklines. Trove's existing colors, type, and square visual language remain. Narrow screens use direct bottom navigation plus an accessible menu for parent guidance. No emoji or generated image assets are used for the new app layout.
 
-Latest October 26 revision: the user retained the sidebar but asked for a conventional account-focused portfolio and NEAR's original blue palette. The current accent is `#0091FD` in dark mode and `#005FB0` in light mode; the sapling identity remains green. The landing layout and motion remain intact, with its accent colors updated. Home now shows four account metrics, a full-width line chart without a gradient, and holdings. The large learning panel and promotional lesson block have been removed from Home; learning is reached through Learn and Decisions. The desktop sidebar can hide completely, with that view preference saved across reloads.
+Earlier October 26 palette revision (superseded below): the user retained the sidebar but asked for a conventional account-focused portfolio and NEAR's original blue palette. The current accent is `#0091FD` in dark mode and `#005FB0` in light mode; the sapling identity remains green. The landing layout and motion remain intact, with its accent colors updated. Home now shows four account metrics, a full-width line chart without a gradient, and holdings. The large learning panel and promotional lesson block have been removed from Home; learning is reached through Learn and Decisions. The desktop sidebar can hide completely, with that view preference saved across reloads.
 
 - Use [nearhackathon.com](https://nearhackathon.com/) as the close visual and motion reference, including the exact font families, overall theme, proportions, spacing, graphic treatment, and interaction style.
 - Aim for screenshot-level fidelity in the shared visual language. Adapt the content, branding, and sections to Trove's actual product.
@@ -70,7 +74,9 @@ No need to reproduce NEAR's judges, partner directory, prize claims, developer r
 
 Current structure: a spacious consumer product with a clear desktop side navigation, an obvious learner/parent identity context, and one clear primary task on each page. This follows the user's later Cresco arrangement reference. Typography, spacing, borders, greens, cream highlights, and small pixel details continue from the landing page. The large globe is a landing moment; it does not dominate app screens.
 
-Current top-level navigation: **Home**, **Learn**, **Explore**, **Decisions**. Parent guidance has a separate labelled link and family/profile context. Mobile uses the same four main destinations in a bottom navigation bar, with parent guidance available through the menu.
+Current top-level navigation: **Home**, **Learn**, **Explore**, **Decisions**, **Parent**. All five appear in the desktop navigation and mobile bottom navigation. The sidebar remains collapsible.
+
+Latest simplification: keep the app task-focused. Learn follows the supplied lesson-list arrangement using the two currently implemented lessons, actual completion state, and unlocking; Ask Trove is a separate tab. Decisions keeps the smaller company orbit on the main background without a shaded feature box, and uses compact clickable history rows. Parent controls shows only the explicit local-preview entry, requests, limits, and pause/resume. Remove poetic page headings, decorative parent progress counters, long instructions, and the marketing footer. Preserve the landing page and portfolio layout.
 
 ### Welcome and first visit
 

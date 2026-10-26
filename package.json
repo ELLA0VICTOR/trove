@@ -25,6 +25,7 @@
     "@protobuf-ts/grpc-transport": "^2.11.1",
     "@tailwindcss/vite": "^4.3.3",
     "hono": "^4.13.14",
+    "lightweight-charts": "^5.2.1",
     "lucide-react": "^1.61.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, ArrowUpRight, Plus } from "lucide-react";
 import { useApp } from "../lib/app-context.tsx";
@@ -12,26 +12,35 @@ import {
   USD_SCALE,
 } from "../../shared/model.ts";
 import { Button } from "../components/UI.tsx";
-import { PortfolioChart } from "../components/PortfolioChart.tsx";
 import { OrderDialog } from "./Explore.tsx";
 import type { Quote } from "../../shared/model.ts";
 import { CompanyLogo } from "../components/CompanyLogo.tsx";
 import { Sparkline } from "../components/Sparkline.tsx";
 
+const PortfolioChart = lazy(() =>
+  import("../components/PortfolioChart.tsx").then((module) => ({
+    default: module.PortfolioChart,
+  })),
+);
+
 export function Home() {
   const { state } = useApp(),
     [period, setPeriod] = useState(60),
     [approvedQuote, setApprovedQuote] = useState<Quote | null>(null);
+  const series = useMemo(
+    () =>
+      state
+        ? portfolioSeries(state.holdings, state.cash, state.instruments).slice(
+            -period,
+          )
+        : [],
+    [state, period],
+  );
   if (!state) return null;
   const value = portfolioValue(state, state.instruments),
     cash = BigInt(state.cash),
     invested = value - cash;
   const gain = value - 1000n * USD_SCALE;
-  const series = portfolioSeries(
-    state.holdings,
-    state.cash,
-    state.instruments,
-  ).slice(-period);
   const hasLocalDecisions = state.decisions.some(
     (decision) => decision.origin === "local",
   );
@@ -102,6 +111,7 @@ export function Home() {
           <h2>Value over time</h2>
           <div className="performance-periods" aria-label="Chart period">
             {[
+              [5, "1W"],
               [20, "1M"],
               [40, "2M"],
               [60, "All"],
@@ -117,7 +127,15 @@ export function Home() {
             ))}
           </div>
         </div>
-        <PortfolioChart points={series} />
+        <Suspense
+          fallback={
+            <div className="chart-loading" role="status">
+              Loading chart...
+            </div>
+          }
+        >
+          <PortfolioChart points={series} />
+        </Suspense>
         <p className="performance-note">
           {hasLocalDecisions
             ? "Current holdings valued across sample history; this is not your transaction history."

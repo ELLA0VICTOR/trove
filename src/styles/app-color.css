@@ -1,0 +1,101 @@
+/* Reuse the landing page's forest green for meaningful app regions. */
+.consumer-app {
+  --panel-green: var(--spot);
+}
+
+.consumer-app :is(.allocation-panel, .company-price, .evidence-status) {
+  --foreground: #ffffff;
+  --muted: #e3f3e9;
+  --line: #ffffff38;
+  --border: #ffffff60;
+  --spot: #ffffff;
+  --on-spot: var(--panel-green);
+  --surface: #ffffff14;
+  --card: #ffffff14;
+  --negative: #ffe0d9;
+  background-color: var(--panel-green);
+  color: var(--foreground);
+  border-color: var(--panel-green);
+}
+
+.consumer-app :is(.allocation-panel, .company-price) {
+  background-image: radial-gradient(#ffffff12 0.65px, transparent 0.65px);
+  background-size: 16px 16px;
+}
+
+.consumer-app .app-sidebar nav > a.active {
+  color: #ffffff;
+  background: var(--panel-green);
+  border-color: var(--panel-green);
+}
+
+.consumer-app .catalog-search input::placeholder {
+  opacity: 1;
+}
+
+.consumer-app .catalog-search:focus-within {
+  outline-color: var(--panel-green);
+  outline-offset: 3px;
+}
+
+.consumer-app :is(.app-sidebar nav > a.active):focus-visible {
+  outline-color: var(--panel-green);
+}
+
+.consumer-app
+  :is(
+    .performance-periods button,
+    .period-tabs button,
+    .simple-tabs > button
+  ).active {
+  color: #ffffff;
+  background: var(--panel-green);
+  border-color: var(--panel-green);
+}
+
+.consumer-app .compact-decision-list {
+  border-top-color: var(--panel-green);
+}
+
+.consumer-app .lesson-row.is-current {
+  background: var(--background);
+  border-color: var(--line);
+}
+
+.consumer-app .company-price {
+  padding: 20px 22px;
+}
+
+.consumer-app .stock-card:hover {
+  border-color: var(--panel-green);
+  background: #f3f8f4;
+}
+
+.consumer-app .portfolio-chart-tooltip {
+  color: #ffffff;
+  background: var(--panel-green);
+  border-color: var(--panel-green);
+}
+
+.consumer-app .portfolio-chart-tooltip strong {
+  color: #ffffff;
+}
+
+.consumer-app .holding-row {
+  transition:
+    background-color 0.18s,
+    color 0.18s,
+    border-color 0.18s;
+}
+
+.consumer-app .holding-row:is(:hover, :focus-visible) {
+  background: #f3f8f4;
+  border-color: var(--panel-green);
+}
+
+@media (max-width: 760px) {
+  .consumer-app .app-bottomnav a.active {
+    color: #ffffff;
+    background: var(--panel-green);
+  }
+}

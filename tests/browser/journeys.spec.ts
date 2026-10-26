@@ -76,14 +76,19 @@ test("a first visit creates one consistent sample session", async ({
   expect(new Set(familyIds)).toEqual(new Set([snapshot.id]));
 });
 
-test("intro can be skipped and hands control back to the page", async ({
-  page,
-}) => {
+test("intro replays after refresh and can be skipped", async ({ page }) => {
   await page.goto("/");
   await expect(
     page.getByRole("dialog", { name: "Trove introduction" }),
   ).toBeVisible();
   await page.keyboard.press("Escape");
+  await expect(page.locator(".character-intro")).toHaveCount(0);
+  await expect(page.locator("#root")).not.toHaveAttribute("inert");
+  await page.reload();
+  await expect(
+    page.getByRole("dialog", { name: "Trove introduction" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: /Skip intro/ }).click();
   await expect(page.locator(".character-intro")).toHaveCount(0);
   await expect(page.locator("#root")).not.toHaveAttribute("inert");
   await page.getByRole("link", { name: "Try now", exact: true }).click();
@@ -148,20 +153,85 @@ test("a learning attempt changes the next task without changing spending authori
   page,
 }) => {
   await page.goto("/app/guide");
-  await page.getByRole("button", { name: "Try a thought" }).click();
+  await expect(
+    page.getByRole("button", { name: "Start lesson: Time horizon" }),
+  ).toBeDisabled();
+  await page.getByRole("button", { name: "Start lesson: Shared risk" }).click();
+  await page.getByRole("button", { name: "Check understanding" }).click();
   await page
     .getByRole("button", {
       name: /Different names can still share the same risks/,
     })
     .click();
-  await page.getByRole("button", { name: "Let’s think about it" }).click();
-  await expect(page.getByText("That’s a thought worth keeping.")).toBeVisible();
-  await page.getByRole("button", { name: "Take the lesson with you" }).click();
+  await page.getByRole("button", { name: "Check answer" }).click();
+  await expect(page.getByText("Correct", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Done", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "A long-term goal. A short-term move." }),
-  ).toBeVisible();
+    page.getByRole("button", { name: "Start lesson: Time horizon" }),
+  ).toBeEnabled();
+  await expect(
+    page.getByRole("progressbar", { name: "Lessons completed" }),
+  ).toHaveAttribute("aria-valuenow", "1");
   const snapshot = await (await page.request.get("/api/state")).json();
   expect(snapshot.policy.revision).toBe(1);
+});
+
+test("parent navigation leads directly to working limits and pause controls", async ({
+  page,
+}) => {
+  await page.goto("/app");
+  await page
+    .getByRole("navigation", { name: "Your Trove" })
+    .getByRole("link", { name: "Parent", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Parent controls" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Enter parent preview" }).click();
+  await page.getByRole("button", { name: "Edit limits" }).click();
+  await page.getByLabel("Per investment ($)").fill("75");
+  await page.getByLabel("Daily allowance ($)").fill("200");
+  await page.getByRole("button", { name: "Save limits" }).click();
+  await expect(page.locator(".parent-limit-grid")).toContainText("$75.00");
+  await expect(page.locator(".parent-limit-grid")).toContainText("$200.00");
+  await page.getByRole("button", { name: "Pause practice" }).click();
+  await expect(
+    page.getByRole("button", { name: "Resume practice" }),
+  ).toBeVisible();
+  const paused = await (await page.request.get("/api/state")).json();
+  expect(paused.policy.paused).toBe(true);
+  expect(paused.policy.perTrade).toBe("75000000");
+  await page.getByRole("button", { name: "Resume practice" }).click();
+  await page.getByRole("link", { name: "Back to Maya", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Your portfolio" }),
+  ).toBeVisible();
+  const learner = await (await page.request.get("/api/state")).json();
+  expect(learner.role).toBe("learner");
+  expect(learner.policy.paused).toBe(false);
+});
+
+test("a decision reflection stays linked to its original choice", async ({
+  page,
+}) => {
+  await page.goto("/app/decisions");
+  await page.locator(".compact-decision-row").first().click();
+  await page.getByRole("button", { name: "Add a reflection" }).click();
+  await page
+    .getByRole("textbox", { name: "Reflection", exact: true })
+    .fill("I understand that company names alone do not spread risk.");
+  await page
+    .getByRole("button", { name: "Save reflection", exact: true })
+    .click();
+  const snapshot = await (await page.request.get("/api/state")).json();
+  const memory = snapshot.memories.find(
+    (item: { text: string }) =>
+      item.text === "I understand that company names alone do not spread risk.",
+  );
+  expect(memory.decisionId).toBe(snapshot.decisions[0].id);
+  expect(snapshot.decisions[0].reason).toBe(
+    "I chose five different companies, so I think I have spread out my risk.",
+  );
 });
 
 test("desktop sidebar can hide and restore without losing the account or chart", async ({
@@ -193,26 +263,35 @@ test("desktop sidebar can hide and restore without losing the account or chart",
     })
     .focus();
   await page.keyboard.press("ArrowLeft");
-  await expect(page.locator(".portfolio-chart-tooltip")).toBeVisible();
+  await expect(page.locator(".portfolio-chart-legend")).toHaveAttribute(
+    "data-inspecting",
+    "true",
+  );
   await page.keyboard.press("Escape");
-  await expect(page.locator(".portfolio-chart-tooltip")).toHaveCount(0);
+  await expect(page.locator(".portfolio-chart-legend")).toHaveAttribute(
+    "data-inspecting",
+    "false",
+  );
 });
 test("a corrected memory changes the local guide response", async ({
   page,
 }) => {
   await page.goto("/app/guide");
-  await page.getByRole("button", { name: "See or correct a memory" }).click();
+  await page
+    .getByRole("button", { name: "Saved thoughts", exact: true })
+    .click();
   await page
     .getByRole("button", { name: "Correct this thought" })
     .first()
     .click();
   await page
-    .getByRole("textbox", { name: "WHAT SHOULD THE GUIDE UNDERSTAND INSTEAD?" })
+    .getByRole("textbox", { name: "Correction", exact: true })
     .fill("I now understand the shared technology exposure.");
   await page
     .getByRole("button", { name: "Save correction", exact: true })
     .click();
   await page.getByRole("button", { name: "Close dialog" }).click();
+  await page.getByRole("tab", { name: "Ask Trove" }).click();
   await page
     .getByRole("button", { name: "Have I really spread my risk?" })
     .click();
@@ -236,15 +315,37 @@ test("replay allocation controls change only the comparison", async ({
   const snapshot = await (await page.request.get("/api/state")).json();
   expect(snapshot.sequence).toBe(0);
 });
-test("theme persists and reduced motion bypasses the intro", async ({
+test("fixed white and green palette ignores old themes and respects reduced motion", async ({
   page,
 }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.addInitScript(() => localStorage.setItem("trove-theme", "dark"));
   await page.goto("/");
   await expect(page.locator(".character-intro")).toHaveCount(0);
-  await page.getByRole("button", { name: "Switch to light theme" }).click();
+  await expect(
+    page.getByRole("button", { name: /Switch to .* theme/ }),
+  ).toHaveCount(0);
+  await expect(page.locator("html")).toHaveCSS(
+    "background-color",
+    "rgb(255, 255, 255)",
+  );
   await page.reload();
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await expect(page.locator("html")).not.toHaveAttribute("data-theme");
+  expect(
+    await page
+      .locator("html")
+      .evaluate((element) =>
+        getComputedStyle(element).getPropertyValue("--spot").trim(),
+      ),
+  ).toBe("#19764c");
+  await page.goto("/app");
+  await expect(
+    page.getByRole("button", { name: /Switch to .* theme/ }),
+  ).toHaveCount(0);
+  await expect(page.locator("html")).toHaveCSS(
+    "background-color",
+    "rgb(255, 255, 255)",
+  );
 });
 test("consumer pages fit a narrow mobile viewport without runtime errors", async ({
   page,
