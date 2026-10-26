@@ -1,0 +1,206 @@
+@import "@fontsource/ibm-plex-mono/latin-400.css";
+@import "@fontsource/ibm-plex-mono/latin-500.css";
+@import "@fontsource/ibm-plex-mono/latin-600.css";
+@import "tailwindcss";
+:root {
+  font-family: "IBM Plex Mono", monospace;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  --background: #161a15;
+  --foreground: #e7dfca;
+  --card: #1c211a;
+  --surface: #20271d;
+  --muted: #b0b29d;
+  --line: #454d3d;
+  --border: #4a5241;
+  --spot: #8ee573;
+  --on-spot: #181c16;
+  --cream: #e7dfca;
+  --ink: #161a15;
+  --negative: #e5a89d;
+  color: var(--foreground);
+  background: var(--background);
+  color-scheme: dark;
+}
+:root[data-theme="light"] {
+  --background: #e9e1cd;
+  --foreground: #322e25;
+  --card: #eee7d6;
+  --surface: #e1d7c0;
+  --muted: #655d4f;
+  --line: #bdb199;
+  --border: #b7ac94;
+  --spot: #2d6d3c;
+  --on-spot: #fff7e9;
+  --negative: #a24636;
+  color-scheme: light;
+}
+* {
+  box-sizing: border-box;
+}
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 25px;
+}
+body {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.7;
+  transition:
+    background 0.25s,
+    color 0.25s;
+}
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+button,
+a,
+input,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+button {
+  cursor: pointer;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+}
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+a {
+  color: inherit;
+  text-decoration: none;
+}
+h1,
+h2,
+h3,
+h4,
+p,
+blockquote {
+  margin: 0;
+}
+h1,
+h2,
+h3,
+h4 {
+  font-family: Arial, Helvetica, sans-serif;
+  font-weight: 700;
+  line-height: 1.07;
+}
+h1 {
+  letter-spacing: -3.5px;
+}
+h2 {
+  letter-spacing: -1.8px;
+}
+h3 {
+  letter-spacing: -0.65px;
+}
+svg {
+  flex-shrink: 0;
+}
+::selection {
+  color: var(--background);
+  background: var(--spot);
+}
+:focus-visible {
+  outline: 2px solid var(--spot);
+  outline-offset: 5px;
+}
+input:focus-visible,
+textarea:focus-visible {
+  outline-offset: 0;
+}
+input,
+textarea {
+  border-radius: 0;
+}
+input[type="range"] {
+  accent-color: var(--spot);
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+.skip-link {
+  position: fixed;
+  top: -80px;
+  left: 20px;
+  z-index: 1100;
+  background: var(--spot);
+  color: var(--on-spot);
+  padding: 12px 20px;
+}
+.skip-link:focus {
+  top: 10px;
+}
+.accent,
+.gain {
+  color: var(--spot);
+}
+.muted {
+  color: var(--muted);
+}
+.loss {
+  color: var(--negative);
+}
+.eyebrow {
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.65px;
+  margin-bottom: 24px;
+  line-height: 1.6;
+}
+.mini-label {
+  font-size: 10px;
+  letter-spacing: 0.3px;
+  line-height: 1.6;
+}
+.fine-print {
+  font-size: 10px;
+  line-height: 1.8;
+  color: var(--muted);
+}
+.data-note {
+  border-top: 1px solid var(--line);
+  margin-top: 44px;
+  padding-top: 20px;
+  font-size: 10px;
+  color: var(--muted);
+}
+:root[data-motion="paused"] *,
+:root[data-motion="paused"] *::before,
+:root[data-motion="paused"] *::after {
+  animation-play-state: paused !important;
+}
+:root[data-motion="paused"] .will-reveal {
+  opacity: 1;
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  .will-reveal {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
