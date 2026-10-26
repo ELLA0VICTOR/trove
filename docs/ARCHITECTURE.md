@@ -6,19 +6,19 @@ Prepared October 26, 2026. Target live architecture, not an audited system. A lo
 
 Preserve the existing React + TypeScript + Vite application. Add Tailwind for the approved design. Use a small TypeScript Node API, PostgreSQL, a durable job worker, and a pure calculation module. The API is required because Tatum credentials, the memory delegate, model credentials, and sponsorship secrets cannot live in the browser.
 
-| Layer | Recommended implementation |
-| --- | --- |
-| Browser | Existing React/Vite/TypeScript; Tailwind; React Router; TanStack Query for remote state. Canvas/SVG for the approved graphics. |
-| API | Hono with its Node adapter, Zod request/response validation, same-origin `/api` routes. |
-| Database | PostgreSQL through Drizzle and `pg`; migrations, foreign keys, unique event/idempotency constraints, transactional outbox. |
-| Worker | Node process polling durable job rows with row locks, leases, bounded retries, and provider-specific cooldowns. No Redis dependency required initially. |
-| Financial domain | Pure TypeScript BigInt arithmetic and matching bounded Move arithmetic; deterministic replay independent of the model. |
-| Practice contract | Sui Move on Testnet, with role/actor checks and an explicit quote-attestor trust model. |
-| Chain provider | `@mysten/sui/grpc` using Tatum's native TLS gRPC gateway on the server. |
-| Memory | `@mysten-incubation/memwal`, managed relayer on Mainnet, called from the server. |
-| Coach | Anthropic TypeScript SDK behind a narrow provider interface; model configured after verifying access/capabilities. Structured output plus application validation. |
-| Identity/signing | Preferred Enoki + new `@mysten/dapp-kit-react`; conventional wallet support as a development/reviewer alternative. |
-| Market data | Marketstack v2 daily observations as the initial adapter target, subject to coverage, entitlement, and public-display checks. |
+| Layer             | Recommended implementation                                                                                                                                                                                                  |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Browser           | Existing React/Vite/TypeScript; Tailwind; React Router; TanStack Query for remote state. Canvas/SVG for the approved graphics.                                                                                              |
+| API               | Hono with its Node adapter, Zod request/response validation, same-origin `/api` routes.                                                                                                                                     |
+| Database          | PostgreSQL through Drizzle and `pg`; migrations, foreign keys, unique event/idempotency constraints, transactional outbox.                                                                                                  |
+| Worker            | Node process polling durable job rows with row locks, leases, bounded retries, and provider-specific cooldowns. No Redis dependency required initially.                                                                     |
+| Financial domain  | Pure TypeScript BigInt arithmetic and matching bounded Move arithmetic; deterministic replay independent of the model.                                                                                                      |
+| Practice contract | Sui Move on Testnet, with role/actor checks and an explicit quote-attestor trust model.                                                                                                                                     |
+| Chain provider    | `@mysten/sui/grpc` using Tatum's native TLS gRPC gateway on the server.                                                                                                                                                     |
+| Memory            | `@mysten-incubation/memwal`, managed relayer on Mainnet, called from the server.                                                                                                                                            |
+| Coach             | OpenAI Responses API behind a narrow provider interface; `gpt-6-luna`, strict structured output, validated citations and durable local cost reservations. Existing OpenAI credit is used; no Anthropic account is required. |
+| Identity/signing  | Preferred Enoki + new `@mysten/dapp-kit-react`; conventional wallet support as a development/reviewer alternative.                                                                                                          |
+| Market data       | Marketstack v2 daily observations as the initial adapter target, subject to coverage, entitlement, and public-display checks.                                                                                               |
 
 Native gRPC avoids assuming that Tatum supports the browser SDK's default gRPC-web transport. Use `@protobuf-ts/grpc-transport` + `@grpc/grpc-js` with TLS and `x-api-key` metadata. Do not automatically fall back to an unrelated provider while claiming a Tatum-verified result.
 
@@ -76,14 +76,14 @@ Enoki's live-app and sponsorship entitlements are an integration preflight. A lo
 
 Recommended objects and records:
 
-| Component | Responsibility |
-| --- | --- |
-| `PracticeAccount` | One account per learner, shared between authorized parent and learner operations; cash, positions, cost basis, next sequence, revision, policy, daily spending window. |
-| Parent capability | Bound to one account and guardian; required with actor checks for privileged changes. |
-| Quote attestor capability | Operator-controlled, separate from parent authority; can issue narrowly scoped paper-price tickets, not change a parent's rules. |
-| Quote ticket | Binds account, actor, instrument, side, reviewed amount, price, observation/dataset identity, expiry, and expected revision/sequence. Consumed atomically. |
-| One-time approval | Exact action/bounds and named bypass, revision and expiry; consumed atomically. Does not override non-bypassable checks. |
-| Events | Action committed, policy changed, approval consumed, and supported corporate action applied. No private free-text explanation onchain. |
+| Component                 | Responsibility                                                                                                                                                         |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PracticeAccount`         | One account per learner, shared between authorized parent and learner operations; cash, positions, cost basis, next sequence, revision, policy, daily spending window. |
+| Parent capability         | Bound to one account and guardian; required with actor checks for privileged changes.                                                                                  |
+| Quote attestor capability | Operator-controlled, separate from parent authority; can issue narrowly scoped paper-price tickets, not change a parent's rules.                                       |
+| Quote ticket              | Binds account, actor, instrument, side, reviewed amount, price, observation/dataset identity, expiry, and expected revision/sequence. Consumed atomically.             |
+| One-time approval         | Exact action/bounds and named bypass, revision and expiry; consumed atomically. Does not override non-bypassable checks.                                               |
+| Events                    | Action committed, policy changed, approval consumed, and supported corporate action applied. No private free-text explanation onchain.                                 |
 
 Use a bounded, configured instrument registry and position count. Every privileged function must enforce authorization; a shared object is publicly referencable and carries no automatic parent/learner protection.
 
@@ -190,29 +190,33 @@ Use unique constraints for actor + idempotency key, chain digest, action sequenc
 
 Use explicit states, not a single `success` boolean:
 
-| Process | States |
-| --- | --- |
+| Process         | States                                                                                     |
+| --------------- | ------------------------------------------------------------------------------------------ |
 | Practice action | draft, previewed, awaiting signature, submitted, confirmed, refused, cancelled, unresolved |
-| Memory | queued, accepted, running, uploaded, confirmed, failed, unresolved |
-| Approval | requested, approved, declined, expired, invalidated, consumed |
-| Market snapshot | valid, stale-for-mode, incomplete, unsupported |
+| Memory          | queued, accepted, running, uploaded, confirmed, failed, unresolved                         |
+| Approval        | requested, approved, declined, expired, invalidated, consumed                              |
+| Market snapshot | valid, stale-for-mode, incomplete, unsupported                                             |
 
 On a lost submission response, reconcile the known digest/sequence through Tatum before preparing another action. On a lost memory acceptance response, retry the unchanged payload with its stable operation key. Neither domain promises global exactly-once delivery; idempotency and reconciliation prevent duplicated effects.
 
 ## API outline
 
-| Area | Endpoint responsibilities |
-| --- | --- |
-| Session | Issue/consume challenge, return current authorized identity, logout. |
-| Family | Create family, issue/redeem invite, list authorized members. |
-| Markets | Catalog, company details, validated chart snapshots, freshness metadata. |
+| Area             | Endpoint responsibilities                                                                                      |
+| ---------------- | -------------------------------------------------------------------------------------------------------------- |
+| Session          | Issue/consume challenge, return current authorized identity, logout.                                           |
+| Family           | Create family, issue/redeem invite, list authorized members.                                                   |
+| Markets          | Catalog, company details, validated chart snapshots, freshness metadata.                                       |
 | Practice account | Read Tatum-backed state, preview action, build/review transaction, sponsor permitted bytes, reconcile receipt. |
-| Decisions | List authorized decisions, exact decision story, append reflection/correction. |
-| Replay | Validate selected allocations, calculate against a frozen dataset, return traceable results. |
-| Coach | Load scoped evidence, return validated response and source references; no execution tools. |
-| Learning | Present curated exercise selected from history, record response and progress evidence. |
-| Parent | Read shared progress, propose/build policy change, handle exact approval requests. |
-| Memory | Show authorized memory status/source handles; correct/remove through appropriate lifecycle. |
-| Reviewer | Redacted integration evidence and repeatable demo path; no production secrets or private learner content. |
+| Decisions        | List authorized decisions, exact decision story, append reflection/correction.                                 |
+| Replay           | Validate selected allocations, calculate against a frozen dataset, return traceable results.                   |
+| Coach            | Load scoped evidence, return validated response and source references; no execution tools.                     |
+| Learning         | Present curated exercise selected from history, record response and progress evidence.                         |
+| Parent           | Read shared progress, propose/build policy change, handle exact approval requests.                             |
+| Memory           | Show authorized memory status/source handles; correct/remove through appropriate lifecycle.                    |
+| Reviewer         | Redacted integration evidence and repeatable demo path; no production secrets or private learner content.      |
 
 Define these as typed contracts before connecting UI events. Use unambiguous types for Mainnet memory-account IDs and Testnet practice-account IDs; identical-looking `0x...` strings are not interchangeable.
+
+## Current implemented slice
+
+The local implementation now uses built-in SQLite and salted scrypt username/password accounts, hashed expiring sessions, and single-use family invitations. This does not require Enoki/Google keys. Parent consent gates Mainnet memory writes; guest sample history stays local. Confirmed active records are recalled by server-derived family scope and checked against local canonical history before OpenAI sees them. A persistent reply cache and cost ledger control generation. Ten demo-learning memories and fresh-session correction-aware coaching were verified. These are the current implementation choices; PostgreSQL deployment, wallet/zkLogin signing, Move account enforcement and production account recovery described above remain future work.

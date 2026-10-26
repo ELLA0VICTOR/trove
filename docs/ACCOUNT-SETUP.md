@@ -49,7 +49,7 @@ npm run check:integrations -- --service walrus
 
 The Tatum check requests a checkpoint on each configured network. The Walrus check performs authenticated recall in a separate preflight namespace; zero results is fine. It prints no remembered text and creates no memory. A relayer health response alone would not validate the delegate, so we do not count it as successful authentication.
 
-Each command reads the saved `.env.local` afresh. You do not need to restart the app for these commands. The sample app itself does not consume these keys yet. Share only a success/failure summary, never the file contents. Provider reads can consume account quotas.
+Each command reads the saved `.env.local` afresh. You do not need to restart the app for these commands. The app now consumes the memory and coach keys only for authenticated, consented family activity; guests remain local. Share only a success/failure summary, never the file contents. Provider reads can consume account quotas.
 
 ## 3. Real stock prices — configure after those two
 
@@ -65,16 +65,39 @@ The explicit check below retrieves a bounded AAPL history window and can use quo
 npm run check:integrations -- --service market
 ```
 
-## 4. AI coach — configure when ready for metered calls
+## 4. AI coach — use the existing OpenAI credits
 
-1. Open the [Claude Console API-key page](https://platform.claude.com/settings/keys), create a developer account if needed, and create a key for Trove.
-2. Paste it into `ANTHROPIC_API_KEY`. See [Anthropic's API quick start](https://platform.claude.com/docs/en/get-started).
-3. Leave `COACH_MODEL` blank until we choose an available structured-output model and a small API budget. A chat subscription is not the configuration this SDK uses; it needs developer API access.
+The user has an OpenAI API key with approximately $5 credit. Use that existing account; no Anthropic account is needed. In `.env.local`, replace only the OpenAI key placeholder:
 
-`npm run setup:check` makes no model call. The model preflight requires an explicit `--model-call` flag; leave that for the next integration step.
+```dotenv
+OPENAI_API_KEY=REPLACE_ME_OPENAI_API_KEY
+COACH_MODEL=gpt-6-luna
+COACH_BUDGET_USD=1.00
+```
+
+The [OpenAI API-key page](https://platform.openai.com/api-keys) manages keys. Keep this server key outside `VITE_` variables and out of chat. The [official deprecation notice](https://developers.openai.com/api/docs/deprecations) lists certain GPT-4o/4o-mini/4.1/4.1-mini snapshots for API removal on January 14, 2027. The documented replacement, [GPT-6 Luna](https://developers.openai.com/api/docs/models/gpt-6-luna), supports structured outputs and `reasoning.effort: none`.
+
+Standard text pricing checked October 26, 2026 is $0.10 per million input tokens and $0.50 per million output tokens. For example, 1,500 input plus 300 output tokens would cost approximately **$0.0003**, or $0.30 for 1,000 such calls, excluding other services and changes in usage/prices. This is an arithmetic estimate, not measured Trove traffic. [Official pricing](https://developers.openai.com/api/docs/pricing).
+
+Run the offline check, then the model metadata check:
+
+```cmd
+npm run setup:check
+npm run check:integrations -- --service coach
+```
+
+The second command retrieves model metadata for the configured key; it does not generate an answer. Metadata access does not prove credit availability or answer quality. A real inference check requires adding the explicit `--model-call` flag. After the user replaced the key, one bounded check passed on October 26, 2026; recorded estimated usage was $0.000056. The consumer guide still needs to be connected to authorized memory.
+
+The prepared adapter uses the Responses API with a 384-token output cap, bounded question/context size, at most six memory excerpts, no paid tools, no automatic retry or model upgrade, and `store: false`. A persistent local ledger reserves a conservative estimated cost before each generation and settles against reported token usage. Unknown timeout costs retain their reservation. The user increased the lifetime local allowance from $0.25 to **$1.00** on October 26, 2026. Existing usage still counts; the allowance does not reset when the process restarts. Unused credit is not spent simply because it exists. The ledger is `.trove/coach-usage.sqlite`, ignored by Git. Keep it intact so the limit remains meaningful.
+
+The allowance covers Trove calls through this adapter, not other applications using the same key. Prices and token reservations are local estimates, not an OpenAI account-level billing guarantee. The guest sample retains its deterministic guide. A signed-in learner whose parent enables remembering uses the live, source-checked guide. `store: false` disables response storage; it is not a claim of zero provider retention. See [Responses migration/storage guidance](https://developers.openai.com/api/docs/guides/migrate-to-responses).
 
 ## Leave these alone for now
 
-Leave `DATABASE_URL`, `ENOKI_SECRET_KEY`, `VITE_ENOKI_PUBLIC_KEY`, and `VITE_GOOGLE_CLIENT_ID` blank. Local SQLite already works. We will configure genuine family login and deployment storage as a separate implementation step; those unused entries are not prerequisites for the first Tatum/Walrus checks.
+Leave `DATABASE_URL`, `ENOKI_SECRET_KEY`, `VITE_ENOKI_PUBLIC_KEY`, and `VITE_GOOGLE_CLIENT_ID` blank. Local SQLite already works. Local parent/learner username-password sign-in now works without these entries. They are reserved for future wallet/Google login and production storage; those unused entries are not prerequisites for the first Tatum/Walrus checks.
 
 No stock trading account, real investment deposit, wallet seed phrase, or owner-wallet private key is needed in this environment file.
+
+## Using the connected app
+
+Restart `npm run dev` after configuration changes. Use Sign in to create a parent account, invite a separate learner, and explicitly enable remembering in Account settings. New authenticated practice activity syncs to Mainnet; guest history is not uploaded. Saved thoughts displays confirmation, and Ask Trove uses the confirmed context. A generated non-personal demo family is available locally in ignored `.trove/demo-access.json`; do not publish its credentials.

@@ -10,7 +10,9 @@ import { MemoryOutbox } from "./jobs/memory-outbox.ts";
 export class DemoStore {
   db: DatabaseSync;
   readonly memoryOutbox: MemoryOutbox;
-  constructor(filename: string) {
+  readonly liveMemory: boolean;
+  constructor(filename: string, options: { liveMemory?: boolean } = {}) {
+    this.liveMemory = options.liveMemory ?? false;
     if (filename !== ":memory:")
       mkdirSync(dirname(filename), { recursive: true });
     this.db = new DatabaseSync(filename);
@@ -18,14 +20,56 @@ export class DemoStore {
       "PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000; CREATE TABLE IF NOT EXISTS families (id TEXT PRIMARY KEY, state TEXT NOT NULL); CREATE TABLE IF NOT EXISTS quotes (id TEXT PRIMARY KEY, family TEXT NOT NULL, payload TEXT NOT NULL, decision TEXT);",
     );
     this.memoryOutbox = new MemoryOutbox(this.db);
+    this.db.exec(
+      "CREATE TABLE IF NOT EXISTS account_profiles(family TEXT PRIMARY KEY,memory_enabled INTEGER NOT NULL DEFAULT 0)",
+    );
+    this.db.exec(
+      "CREATE TABLE IF NOT EXISTS coaching_cache(family TEXT NOT NULL,cache_key TEXT NOT NULL,token TEXT NOT NULL,reply TEXT,until_at INTEGER NOT NULL,PRIMARY KEY(family,cache_key))",
+    );
   }
   get(id: string): DemoState {
     const row = this.db
       .prepare("SELECT state FROM families WHERE id = ?")
       .get(id) as { state: string } | undefined;
-    if (row) return JSON.parse(row.state);
+    if (row) return this.hydrate(JSON.parse(row.state));
     const state = seedState(id);
     this.set(state);
+    return state;
+  }
+  profile(family: string) {
+    return this.db
+      .prepare("SELECT memory_enabled FROM account_profiles WHERE family=?")
+      .get(family) as { memory_enabled: number } | undefined;
+  }
+  private hydrate(state: DemoState) {
+    const jobs = this.memoryOutbox.forScope(this.memoryScope(state.id));
+    const byId = new Map(
+      jobs
+        .filter((job) => !job.withdrawn)
+        .map((job) => [JSON.parse(job.payload).eventId as string, job]),
+    );
+    for (const memory of state.memories) {
+      const job = byId.get(memory.id);
+      if (job && job.state !== "held") memory.syncStatus = job.state;
+      else delete memory.syncStatus;
+      if (job?.state === "confirmed" && job.blob_id)
+        memory.blobId = job.blob_id;
+      else delete memory.blobId;
+    }
+    for (const decision of state.decisions.filter(
+      (item) => item.origin === "local",
+    )) {
+      const memory = state.memories.find(
+        (item) => item.decisionId === decision.id && item.kind === "decision",
+      );
+      const job = memory ? byId.get(memory.id) : undefined;
+      decision.memoryStatus =
+        job?.state === "confirmed"
+          ? "confirmed"
+          : job && ["pending", "accepted"].includes(job.state)
+            ? "queued"
+            : "local";
+    }
     return state;
   }
   set(state: DemoState) {
@@ -45,12 +89,16 @@ export class DemoStore {
             ...(record.decisionId ? { decisionId: record.decisionId } : {}),
             ...(record.supersedes ? { supersedes: record.supersedes } : {}),
           })),
+        this.liveMemory && this.profile(state.id)?.memory_enabled === 1,
       );
       this.db
         .prepare(
           "INSERT INTO families(id,state) VALUES (?,?) ON CONFLICT(id) DO UPDATE SET state=excluded.state",
         )
         .run(state.id, JSON.stringify(state));
+      this.db
+        .prepare("DELETE FROM coaching_cache WHERE family=?")
+        .run(state.id);
     };
     if (this.db.isTransaction) persist();
     else this.atomic(persist);
@@ -58,16 +106,19 @@ export class DemoStore {
   memoryScope(family: string) {
     // Explicitly local-only identity. These sample namespaces must never be
     // bulk-enabled for publication when genuine authentication is introduced.
-    return `local_${createHash("sha256").update(`trove-local-v1:${family}`).digest("hex")}`;
+    return `${this.profile(family) ? "account" : "local"}_${createHash("sha256").update(`trove-local-v1:${family}`).digest("hex")}`;
   }
   memoryStatus(family: string) {
     const state = this.get(family);
     const jobs = this.memoryOutbox.forScope(this.memoryScope(family));
     return {
-      mode: "local-only" as const,
-      dispatchEnabled: false,
-      submissionEligible: false,
-      confirmedMainnet: 0,
+      mode: this.profile(family) ? "account" : "local-only",
+      dispatchEnabled:
+        this.liveMemory && this.profile(family)?.memory_enabled === 1,
+      submissionEligible: Boolean(this.profile(family)),
+      confirmedMainnet: jobs.filter(
+        (job) => job.state === "confirmed" && !job.withdrawn,
+      ).length,
       heldLocally: jobs.filter((job) => job.state === "held").length,
       sampleExcluded: state.memories.filter(
         (record) => record.origin === "sample",
@@ -85,6 +136,9 @@ export class DemoStore {
           recordedAt: record.recordedAt,
           decisionId: record.decisionId,
           status: job.state,
+          jobId: job.job_id ?? undefined,
+          blobId: job.blob_id ?? undefined,
+          withdrawn: Boolean(job.withdrawn),
         };
       }),
     };

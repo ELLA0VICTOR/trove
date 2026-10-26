@@ -1,4 +1,109 @@
 import { test, expect } from "@playwright/test";
+
+test("family sign-in and learner invitations preserve separate roles and returning history", async ({
+  page,
+  browser,
+}) => {
+  const suffix = Date.now().toString(36);
+  const parent = `parent_${suffix}`,
+    learner = `learner_${suffix}`,
+    password = "browser-test-password";
+  await page.goto("/app");
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  let dialog = page.getByRole("dialog");
+  await dialog
+    .getByRole("button", { name: "Create family", exact: true })
+    .click();
+  await dialog.getByLabel("Username", { exact: true }).fill(parent);
+  await dialog.getByLabel("Password", { exact: true }).fill(password);
+  await dialog
+    .getByRole("button", { name: "Create family account", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: parent, exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: parent, exact: true }).click();
+  dialog = page.getByRole("dialog");
+  await dialog
+    .getByRole("button", { name: "Create learner invitation" })
+    .click();
+  const code = await dialog
+    .getByLabel("Invitation code (valid for 24 hours)")
+    .inputValue();
+  expect(code).toHaveLength(32);
+  // Memory remains off in this browser test: it must never upload test records.
+  await expect(
+    dialog.getByRole("button", { name: "Enable remembering" }),
+  ).toBeDisabled();
+  await page.keyboard.press("Escape");
+  const context = await browser.newContext();
+  try {
+    const child = await context.newPage();
+    await child.goto("http://127.0.0.1:5173/app");
+    await child.getByRole("button", { name: "Sign in", exact: true }).click();
+    const join = child.getByRole("dialog");
+    await join
+      .getByRole("button", { name: "Join a family", exact: true })
+      .click();
+    await join.getByLabel("Invitation code", { exact: true }).fill(code);
+    await join.getByLabel("Username", { exact: true }).fill(learner);
+    await join.getByLabel("Password", { exact: true }).fill(password);
+    await join
+      .getByRole("button", { name: "Join family", exact: true })
+      .click();
+    await expect(
+      child.getByRole("button", { name: learner, exact: true }),
+    ).toBeVisible();
+    expect(
+      (
+        await child.request.post("http://127.0.0.1:5173/api/preview-role", {
+          data: { role: "parent" },
+        })
+      ).status(),
+    ).toBe(403);
+    await child.request.post("http://127.0.0.1:5173/api/memories", {
+      data: {
+        kind: "reflection",
+        text: "I want to understand how industries differ.",
+      },
+    });
+    await child.getByRole("button", { name: learner, exact: true }).click();
+    await child
+      .getByRole("dialog")
+      .getByRole("button", { name: "Sign out", exact: true })
+      .click();
+    const login = child.getByRole("dialog");
+    await login.getByLabel("Username", { exact: true }).fill(learner);
+    await login.getByLabel("Password", { exact: true }).fill(password);
+    await login
+      .getByRole("button", { name: "Sign in", exact: true })
+      .last()
+      .click();
+    await expect(
+      child.getByRole("button", { name: learner, exact: true }),
+    ).toBeVisible();
+    const snapshot = await (
+      await child.request.get("http://127.0.0.1:5173/api/state")
+    ).json();
+    expect(snapshot.role).toBe("learner");
+    expect(snapshot.memories[0].text).toBe(
+      "I want to understand how industries differ.",
+    );
+    expect(snapshot.session.memoryEnabled).toBe(false);
+    await child.setViewportSize({ width: 390, height: 844 });
+    await child.getByRole("button", { name: learner, exact: true }).click();
+    expect(
+      await child.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+  } finally {
+    await context.close();
+  }
+  expect((await (await page.request.get("/api/state")).json()).role).toBe(
+    "parent",
+  );
+});
 test.beforeEach(async ({ page }) => {
   await page.request.get("/api/state");
   await page.request.post("/api/reset", { data: {} });

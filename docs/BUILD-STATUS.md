@@ -1,58 +1,54 @@
 # Trove build status
 
-Updated October 26, 2026. The user authorized implementation, then confirmed: **“Not yet—continue the local build”** when asked about provider accounts. This is the current implementation record; the earlier research and architecture describe the intended live product.
+Updated October 26, 2026. This is the current implementation record; architecture/research documents also describe future production work.
 
-## Working local product
+## Working application
 
-Trove helps a young person understand their own investing decisions, with a parent setting practice boundaries. It includes:
+The approved landing design and white/forest-green consumer layout remain. Home, Learn, Explore, Decisions, Replay, Parent, and About this build work with practice funds and authored sample prices. Company logos and interactive portfolio charts remain intact.
 
-- An original green sapling identity, one fixed white/forest-green palette with dark green-charcoal text, self-hosted IBM Plex Mono, fullscreen character introduction, rotating letter globe spelling GROWTH, pixel readouts/icons, scroll reveals, and responsive consumer pages.
-- The app retains forest-green active navigation, filters, company-price, allocation, and status accents. Account metrics, lesson progress/rows, search, and parent controls stay white. Holdings rows now match Explore's pale-green hover/focus color with dark text, and the sidebar profile badge is removed. Charts and the decision orbit stay on white. Financial and learning behavior is unchanged.
-- A persistent sample family, $1,000 initial practice capital, twelve instruments, authored daily observations, holdings, company search/detail, reviewed buys and sells, and original decision reasons.
-- The portfolio chart uses separately loaded Lightweight Charts 5.2.1, with zoom/pan, crosshairs, date/value readings, a period-start reference line, area/line views, zoom/reset buttons, and 1W/1M/2M/All sample periods. Values remain the same authored sample series. Attribution and license notices are included; the library supplies rendering and interaction, not market data.
-- The updated app uses side navigation, simpler page headings, full-width company/industry search, filters, two-column horizontal company cards, and compact trend charts in exploration and holdings. Company marks are local assets sourced from official websites; fund tiles use their provider marks. Source URLs are recorded in `public/brands/sources.json`. The latest portfolio revision shows total value, invested value, cash, return, a full-width chart, and holdings without a large learning promotion. Desktop navigation can be hidden and restored, with its setting retained across reloads. The approved landing structure and motion remain; its palette follows the user's latest white-and-green instruction. Theme switching and stored mode selection have been removed.
-- Integer accounting, immutable two-minute quote previews, duplicate execution protection, policy revisions, daily gross-buy limits, pause controls, and exact one-time parent approvals. Reset invalidates earlier quotes.
-- A deterministic local guide using active learning records; reflections and corrections remain distinct from original decision history. A correct concentration exercise advances to a time-horizon exercise without granting more financial authority.
-- Local decision reasons, reflections, corrections, and lesson results now enter a held memory journal atomically with the state change. Sample seeds are excluded, repeated execution creates one record, and payloads cannot change under the same event ID. Corrected/deleted/reset local records are removed from this never-dispatched journal. `/api/memory/status` exposes family-scoped metadata without thought text. Uploads stay disabled and these records do not count toward the Mainnet requirement.
-- Learn presents the two implemented lessons as progress-backed rows, with the sample guide under an Ask Trove tab. Decisions uses compact history rows and the company orbit directly on the page background. Parent is a primary navigation destination with requests, editable limits, and pause/resume. Decorative app headings, parent growth statistics, and the app's marketing footer have been removed. Decision reflections retain a link to the original choice.
-- Two allocation paths compared over the same sample period and initial capital, including residual cash. Replay controls never transact or change actual holdings.
-- An inspectable build-status page and explicit local/sample labels throughout the app.
+The guest sample stays separate from saved accounts. Its preview role switch applies only to guest data and cannot enter an authenticated family's records. Existing guest history is never uploaded.
 
-The local API binds to loopback. A random HttpOnly SameSite cookie identifies a sample family; **the parent/learner switch is an explicit preview, not authentication**. The local database is `.trove/local.sqlite`. SQLite is used for this account-free local stage; the live architecture still calls for authenticated accounts, production persistence, and contract enforcement.
+Saved families now have separate parent and learner usernames/passwords, salted scrypt password hashes, random HttpOnly SameSite sessions stored as hashes, seven-day session expiry, login/registration limits, logout invalidation, and hashed single-use 24-hour learner invitations. Roles come from membership, not a dropdown. The first version supports one parent and one learner per family. New families start with $1,000 practice cash and no preloaded positions.
 
-Prices are generated fixtures, not retrieved historical prices. Sample observations span July 6–September 25, 2026. Current practice actions record both their actual recording time and their sample market date. The holdings chart marks the current mix across the sample period; after a new action its footnote explicitly explains that it is not a reconstructed account ledger.
+Parent limits, pause/resume, stale-policy checks, exact one-time approvals, integer accounting, two-minute reviewed quotes, and duplicate execution protection remain enforced by the local API. These are not yet Sui contract permissions. Parents cannot execute learner choices; learners cannot edit parent controls or enable memory sharing.
 
-## Prepared, inactive provider infrastructure
+## Connected memory and coaching
 
-| File                                 | Prepared behavior                                                                                                                                         | Actual validation                                                                                                                                                       |
-| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `server/integrations/walrus.ts`      | Mainnet managed-relayer client, bounded typed records, server-derived learner scope, stable operation keys, job polling, blob confirmation, scoped recall | Compiles against installed SDK; no authenticated call                                                                                                                   |
-| `server/jobs/memory-outbox.ts`       | Persisted payload/key, held local records, accepted job IDs, leases, retries, rate-limit cooldown, terminal failures, confirmed blob IDs                  | Local activity attached transactionally in non-dispatchable held state; five worker recovery tests plus seven journal lifecycle/atomicity tests; no live worker started |
-| `server/integrations/tatum.ts`       | Authenticated native Sui gRPC checkpoint, object, and receipt reads; explicit network                                                                     | Compiles against installed SDK; no authenticated call                                                                                                                   |
-| `server/integrations/marketstack.ts` | Bounded daily-history import, consistency checks, timestamps, explicit raw-close basis                                                                    | Compiles; no credentialed import or data entitlement established                                                                                                        |
-| `server/integrations/coach.ts`       | Structured educational response, untrusted-memory boundary, bounded timeout, cited-source validation                                                      | Compiles; no paid model calls or quality evaluation                                                                                                                     |
-| `scripts/check-integrations.ts`      | Manual provider preflight, with explicit flags for memory writes/model calls                                                                              | Without credentials, correctly reports services as unconfigured/unexercised                                                                                             |
+A parent explicitly enables remembering in Account settings. This covers that family's existing and new practice reasons, reflections, corrections and lesson results. The managed relayer processes plaintext before encrypted storage; namespaces and API authorization provide application isolation, not separate family-owned encryption keys. The operator holds the configured delegate.
 
-Adding keys does **not** automatically turn this sample into the live product. The adapters must be connected to genuine authenticated learner accounts, transaction receipts, and memory lifecycle rules, then validated together. Diagnostic memory writes are excluded from submission counts. The user requested private placeholder configuration and dashboard instructions; these are now in ignored `.env.local` and [ACCOUNT-SETUP.md](ACCOUNT-SETUP.md). `setup:check` is offline and never prints values; targeted provider preflight skips placeholders and supports separate Tatum network keys and authenticated Walrus recall. Credentials remain unconfigured.
+Domain changes and memory jobs are persisted atomically. The worker uses stable operation keys, persisted accepted job IDs, leases with fencing, backoff, and confirmed blob IDs. Accepted jobs are not counted as confirmed. Guest jobs remain held. Removing/correcting a thought excludes it from future coaching; never-dispatched payloads are removed, while attempted/confirmed jobs retain withdrawal metadata. This is not remote erasure. Pausing prevents new submission requests and live coaching; already in-flight jobs can finish and are reconciled.
 
-## Validation
+The live OpenAI guide retrieves from the authorized Walrus namespace, matches results against active canonical records and confirmed blob receipts, excludes superseded/removed/wrong-scope/changed records, and prioritizes the current correction. Pending thoughts block stale coaching. Citation and correction checks run before a reply is shown. Provider failure returns an explicit error rather than fabricated recall or a silent local substitute.
 
-- 34 accounting/API/configuration/outbox/journal tests: exact parsing/rounding, 2,000 immediate round trips, replay assumptions, invalid inputs, stale/expired/duplicate orders, family scope, approvals, reset invalidation, learning and correction recency, honest integration status, job recovery, atomic journal failure rollback, immutable payload identity, correction association, deletion, real database reopen, held-record dispatch prevention, and secret-free setup output.
-- Fourteen Chromium browser journeys: first-session consistency, keyboard intro exit, persisted practice purchase, exact parent approval, lesson progression, correction-aware guide, replay isolation, fixed palette/reduced motion, mobile layout/runtime checks, company discovery with loaded brand assets and keyboard-accessible mobile navigation, persistent desktop sidebar hiding/restoration with keyboard chart inspection, parent navigation/limit edits/pause/resume, a decision-linked reflection that preserves the original reason, and financial-chart keyboard/zoom/pan/style/date-range controls without account mutations.
-- Desktop captures at 1440×1000 and mobile captures at 390×844 were inspected. Automated consumer layout checks also cover 360px width. Captures and raw results are in ignored `.artifacts/qa/`; Playwright failure traces belong in ignored `test-results/`.
-- TypeScript project checks and the Vite production build. The provider SDKs are server-only; their credentials and clients do not enter the browser bundle.
+A durable five-minute reply cache avoids another model call for an unchanged question/context. Concurrent duplicates are coalesced by a persisted claim; changed thoughts invalidate results. Family/global request limits, bounded excerpts, 384 output tokens, no paid tools, no automatic model retries/fallbacks, and a persistent user-approved $1 allowance bound usage. This allowance estimates this adapter's usage, not all spending on the OpenAI key.
 
-These checks establish local behavior, not live provider reliability, production security, audited contracts, coach effectiveness, or measured learning outcomes. No target frame rate, perfect score, or winning outcome is claimed.
+The API reads ignored .env.local through the development command. Adding keys alone does not upload guest records; authenticated membership and parent consent are required. TROVE_LIVE_SERVICES=0 disables live services for an offline run.
 
-## Remaining live implementation
+## Actual external validation
 
-The audit, build order, actual data limitations, and judging evidence targets are recorded in [FUNCTIONALITY-CHECKLIST.md](FUNCTIONALITY-CHECKLIST.md).
+- Tatum Testnet and Mainnet checkpoint reads passed provider preflight.
+- Marketstack returned 43 AAPL daily observations in a bounded history check. These observations are not yet the app's dataset.
+- A non-personal demonstration ran through the actual account/domain API: four practice choices, two concept checks with initial mistakes and successful follow-ups, reflections, and a correction.
+- **Ten distinct active learning records reached Walrus Mainnet done status with blob IDs.** These are explicitly synthetic demo practice activity over authored market observations, not real investment actions or measured human learning.
+- OpenAI retrieved and cited the actual stored correction, then did so again after logout and a fresh authenticated session. Repeating the unchanged question used the cache.
+- Total OpenAI ledger estimate at that checkpoint: **$0.0002884 across three generation requests**, including the earlier standalone preflight. No automatic retry made another model call.
+- The first integrated guide attempt returned 503 before a generation request; a subsequent deliberate read/guide attempt succeeded without recreating any memory writes. This is observed behavior, not a claim of uninterrupted provider reliability.
 
-1. Provision the Tatum, Walrus account/delegate, market data, AI, and authenticated wallet/login configuration. Verify permitted usage, data rights, costs, and a patched supported Node runtime.
-2. Implement and test the Sui practice contract and genuine parent/learner authority; deploy to Testnet, execute and reconcile through Tatum. No Move contract is included yet.
-3. Connect confirmed decisions to the durable memory worker, establish actual Mainnet writes/recall, correction/version/deletion policy, authorized retrieval, and at least ten useful confirmed memories.
-4. Connect real market observations with complete corporate-action handling and comparable replay assumptions; wire the live grounded coach and run the planned evaluation.
-5. Finish genuine account persistence, fresh-session retrieval, recovery, and service failure tests.
-6. Prepare the public repository, working hosted demo, published blog, and video; recheck the event checklist before any authorized publication or submission.
+Sanitized local proof is in .artifacts/integrations/confirmed-memory-loop-2026-10-26.json. Private generated demo credentials are in .trove/demo-access.json; both directories are ignored by Git. About this build reports the current family's actual confirmed count rather than a global hardcoded number.
 
-**Current confirmed Mainnet memories: 0. Live chain transactions: 0. Deployment/submission: none.**
+## Verification
+
+- 55 accounting, API, account, memory journal/worker, scoped learning and cost-control tests. Tests cover cross-family cookie/ID attempts, parent/learner authority, invitations, login/logout/expiry, consent, atomic rollback, immutable payloads, retries, stale leases, correction priority, missing memory, concurrent explanations, cache invalidation and budget persistence.
+- 15 Chromium journeys, including family creation, an independent learner session, invitation redemption, role refusal, returning history, plus the existing portfolio/learning/approval/replay/mobile journeys.
+- TypeScript and production build checks. These checks do not constitute a security audit or prove educational effectiveness.
+
+## Remaining implementation
+
+1. Import/cache entitled real market observations into the app, with consistent corporate-action handling, date alignment and explicit daily-price freshness. The current portfolio plot still values the current mix across a sample period, not a reconstructed transaction ledger.
+2. Implement/test/deploy the Sui Testnet practice contract, genuine wallet-signing authority, exact approval and price-attestor boundaries, and Tatum reconciliation. Checkpoint preflight alone is not the final Tatum product integration.
+3. Complete remote memory renewal/removal/expiry lifecycle, operational diagnostics and recovery, and broader multi-family isolation/failure evaluation. Account sharing currently has one parent and one learner.
+4. Expand and evaluate the learning loop beyond the two implemented concepts. Run held-out history/no-history/correction and injection cases within the $1 allowance; report outcomes and failures honestly.
+5. Prepare production storage, HTTPS/origin configuration, account recovery/password reset and deployment hardening. Username/password local sign-in works without Enoki/Google configuration; preferred wallet/Google login remains optional future work.
+6. Finish the hosted demo, public sanitized repository, published blog and short video. No publishing, submission or winner claim has been made.
+
+**Current demonstrated Mainnet learning records: 10. Sui practice transactions: 0. Real stock purchases: none.**

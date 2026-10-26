@@ -92,12 +92,17 @@ export function preview(
     quote.violations.push("This would go above your daily practice allowance.");
   return quote;
 }
-export function execute(store: DemoStore, family: string, quoteId: string) {
+export function execute(
+  store: DemoStore,
+  family: string,
+  quoteId: string,
+  actorRole?: "learner" | "parent",
+) {
   return store.atomic(() => {
     const { quote, decision: existing } = store.getQuote(family, quoteId);
     const state = rolledState(store.get(family));
     if (existing) return state;
-    if (state.role !== "learner")
+    if ((actorRole ?? state.role) !== "learner")
       throw new DomainError(
         "Switch to the learner preview to make a practice investment.",
       );

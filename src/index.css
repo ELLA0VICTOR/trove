@@ -195,3 +195,84 @@ input[type="range"] {
     transform: none !important;
   }
 }
+
+/* Account access uses the established consumer controls. */
+.account-toggle {
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.auth-tabs {
+  margin: 24px 0;
+  flex-wrap: wrap;
+}
+.account-setting {
+  padding: 24px 0;
+  border-top: 1px solid var(--line);
+}
+.account-setting h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 14px;
+}
+.account-setting p {
+  font-size: 12px;
+  color: var(--muted);
+}
+.consent-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  cursor: pointer;
+}
+.consent-check input {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  accent-color: var(--spot);
+  margin-top: 4px;
+}
+.invite-code {
+  margin-top: 20px;
+}
+.memory-sync {
+  color: var(--spot);
+}
+@media (max-width: 760px) {
+  .account-toggle {
+    max-width: 86px;
+    font-size: 12px;
+  }
+  .app-topbar-actions {
+    gap: 10px;
+  }
+}
+
+.evidence-receipts {
+  margin-bottom: 32px;
+}
+.evidence-receipts summary {
+  cursor: pointer;
+  color: var(--spot);
+}
+.evidence-receipts > div {
+  display: grid;
+  grid-template-columns: 100px minmax(0, 1fr) auto;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+}
+.evidence-receipts code {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 600px) {
+  .evidence-receipts > div {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .evidence-receipts > div > span {
+    grid-column: 1 / -1;
+  }
+}

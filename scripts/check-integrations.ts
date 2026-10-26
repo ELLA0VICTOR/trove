@@ -1,9 +1,16 @@
 import { TatumSuiGateway } from "../server/integrations/tatum.ts";
 import { WalrusMemoryGateway } from "../server/integrations/walrus.ts";
-import { CoachGateway } from "../server/integrations/coach.ts";
+import {
+  CoachGateway,
+  checkCoachModelAccess,
+} from "../server/integrations/coach.ts";
 import { MarketstackGateway } from "../server/integrations/marketstack.ts";
 import { randomUUID } from "node:crypto";
 import { configuredValue } from "../server/config.ts";
+import { CoachBudget, COACH_MODEL } from "../server/jobs/coach-budget.ts";
+import { DatabaseSync } from "node:sqlite";
+import { mkdirSync } from "node:fs";
+import { resolve } from "node:path";
 
 const env = process.env;
 const key = (name: string) => configuredValue(env, name);
@@ -28,10 +35,17 @@ const results: { service: string; status: string; detail: unknown }[] = [];
 async function check(service: string, operation: () => Promise<unknown>) {
   try {
     results.push({ service, status: "checked", detail: await operation() });
-  } catch {
+  } catch (error) {
+    const httpStatus = (error as { httpStatus?: unknown })?.httpStatus;
     results.push({
       service,
       status: "failed",
+      ...(typeof httpStatus === "number" &&
+      Number.isInteger(httpStatus) &&
+      httpStatus >= 100 &&
+      httpStatus <= 599
+        ? { httpStatus }
+        : {}),
       detail:
         "The check failed. Inspect service credentials, entitlements, runtime and network; secret-bearing errors are not printed.",
     });
@@ -148,24 +162,48 @@ if (
       "Requires credentials and explicit --write-memory. No diagnostic writes occur by default.",
   });
 
+let coachModelAccessible = false;
+if (selected("coach") && key("OPENAI_API_KEY") && key("COACH_MODEL"))
+  await check("OpenAI model access (no generation)", async () => {
+    const result = await checkCoachModelAccess(
+      key("OPENAI_API_KEY")!,
+      key("COACH_MODEL")!,
+    );
+    coachModelAccessible = true;
+    return result;
+  });
+
 if (
   selected("coach") &&
+  coachModelAccessible &&
   process.argv.includes("--model-call") &&
-  key("ANTHROPIC_API_KEY") &&
+  key("OPENAI_API_KEY") &&
   key("COACH_MODEL")
 )
-  await check("Explicit model call", () =>
-    new CoachGateway(key("ANTHROPIC_API_KEY")!, key("COACH_MODEL")!).explain(
-      "Explain why five companies can still share risk.",
-      [],
-    ),
-  );
+  await check("Explicit budgeted OpenAI call", async () => {
+    mkdirSync(resolve(".trove"), { recursive: true });
+    const db = new DatabaseSync(resolve(".trove/coach-usage.sqlite"));
+    try {
+      const budget = new CoachBudget(db, key("COACH_BUDGET_USD") ?? "1.00");
+      const reply = await new CoachGateway(
+        key("OPENAI_API_KEY")!,
+        key("COACH_MODEL")!,
+        budget,
+      ).explain("Explain why five companies can still share risk.", []);
+      return {
+        reply,
+        budget: budget.summary(),
+        note: "Local estimates use the documented standard uncached text rates; other apps using this key are not tracked.",
+      };
+    } finally {
+      db.close();
+    }
+  });
 else if (selected("coach"))
   results.push({
     service: "Live coach",
     status: "not exercised",
-    detail:
-      "Requires credentials, a chosen model, and explicit --model-call. Calls are metered.",
+    detail: `Requires OPENAI_API_KEY, ${COACH_MODEL}, and explicit --model-call. Default local allowance is $1.00; no inference occurs by default.`,
   });
 console.log(JSON.stringify(results, null, 2));
 if (results.some((result) => result.status === "failed")) process.exitCode = 1;

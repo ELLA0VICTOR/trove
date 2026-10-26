@@ -1,5 +1,7 @@
 import { Hono } from "hono";
-import { getCookie, setCookie } from "hono/cookie";
+import type { Context } from "hono";
+import { getCookie, setCookie, deleteCookie } from "hono/cookie";
+import { bodyLimit } from "hono/body-limit";
 import { secureHeaders } from "hono/secure-headers";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
@@ -8,11 +10,82 @@ import { InputError, parseDollars } from "../shared/model.ts";
 import { localGuide, nextExercise } from "../shared/learning.ts";
 import { DomainError, execute, preview } from "./domain.ts";
 import { DemoStore } from "./store.ts";
+import { Accounts, AccessError } from "./auth.ts";
+import type { Member } from "./auth.ts";
+import { LearningUnavailable } from "./learning-service.ts";
+import type { LiveLearning } from "./learning-service.ts";
+import type { DemoState } from "../shared/model.ts";
 
 const textSchema = z.string().trim().min(1).max(1500);
-export function createApp(store: DemoStore) {
-  const app = new Hono<{ Variables: { family: string } }>();
+type Environment = { Variables: { family: string; member: Member | null } };
+export function createApp(
+  store: DemoStore,
+  options: { learning?: LiveLearning } = {},
+) {
+  const accounts = new Accounts(store);
+  const app = new Hono<Environment>();
+  const stateFor = (c: Context<Environment>) => {
+    const state = store.get(c.get("family"));
+    return { ...state, role: c.get("member")?.role ?? state.role };
+  };
+  const snapshot = (
+    state: DemoState,
+    c: Context<Environment>,
+    member = c.get("member"),
+  ) => ({
+    ...state,
+    role: member?.role ?? state.role,
+    instruments,
+    session: {
+      mode: member ? ("account" as const) : ("sample" as const),
+      role: member?.role ?? state.role,
+      username: member?.username,
+      memoryEnabled: store.profile(state.id)?.memory_enabled === 1,
+      servicesReady: Boolean(
+        options.learning?.ready && options.learning?.coachReady,
+      ),
+    },
+  });
+  const requireMember = (c: Context<Environment>, role?: Member["role"]) => {
+    const member = c.get("member");
+    if (!member || (role && member.role !== role))
+      throw new AccessError(
+        role === "parent"
+          ? "Sign in with the parent account to use this control."
+          : "Sign in to your account first.",
+      );
+    return member;
+  };
+  const learnerAction = (c: Context<Environment>) => {
+    const member = c.get("member");
+    if (member && member.role !== "learner")
+      throw new AccessError(
+        "Sign in with the learner account to record a practice choice.",
+      );
+    if (member)
+      accounts.limit(`learning-writes:${member.family}`, 120, 86400_000);
+  };
+  const signIn = (
+    c: Context<Environment>,
+    result: { token: string; member: Member },
+  ) => {
+    setCookie(c, "trove_session", result.token, {
+      httpOnly: true,
+      sameSite: "Strict",
+      path: "/",
+      maxAge: 7 * 86400,
+      secure: c.req.url.startsWith("https:"),
+    });
+    return c.json(snapshot(store.get(result.member.family), c, result.member));
+  };
   app.use("*", secureHeaders());
+  app.use(
+    "/api/*",
+    bodyLimit({
+      maxSize: 16_384,
+      onError: (c) => c.json({ error: "This request is too large." }, 413),
+    }),
+  );
   app.use("/api/*", async (c, next) => {
     const origin = c.req.header("origin");
     if (
@@ -26,9 +99,29 @@ export function createApp(store: DemoStore) {
       ].includes(origin)
     )
       return c.json({ error: "This request origin is not allowed." }, 403);
+    if (
+      !["GET", "HEAD"].includes(c.req.method) &&
+      c.req.header("sec-fetch-site") === "cross-site"
+    )
+      return c.json({ error: "This request origin is not allowed." }, 403);
     c.header("Cache-Control", "no-store");
+    const token = getCookie(c, "trove_session");
+    const member = accounts.resolve(token);
+    c.set("member", member);
+    if (token && !member && !c.req.path.startsWith("/api/auth/")) {
+      deleteCookie(c, "trove_session", { path: "/" });
+      return c.json(
+        { error: "Your session expired. Please sign in again." },
+        401,
+      );
+    }
+    if (member) {
+      c.set("family", member.family);
+      await next();
+      return;
+    }
     let family = getCookie(c, "trove_demo");
-    if (!family || !/^[a-f0-9-]{36}$/.test(family)) {
+    if (!family || !/^[a-f0-9-]{36}$/.test(family) || store.profile(family)) {
       family = randomUUID();
       setCookie(c, "trove_demo", family, {
         httpOnly: true,
@@ -41,6 +134,8 @@ export function createApp(store: DemoStore) {
     await next();
   });
   app.onError((error, c) => {
+    if (error instanceof AccessError || error instanceof LearningUnavailable)
+      return c.json({ error: error.message }, error.status);
     if (error instanceof InputError)
       return c.json({ error: error.message }, 400);
     if (error instanceof z.ZodError)
@@ -58,23 +153,75 @@ export function createApp(store: DemoStore) {
       500,
     );
   });
-  app.get("/api/state", (c) =>
-    c.json({ ...store.get(c.get("family")), instruments }),
+  app.post("/api/auth/register", async (c) =>
+    signIn(c, await accounts.register(await c.req.json())),
   );
+  app.post("/api/auth/login", async (c) =>
+    signIn(
+      c,
+      await accounts.login(await c.req.json(), getCookie(c, "trove_session")),
+    ),
+  );
+  app.post("/api/auth/join", async (c) =>
+    signIn(c, await accounts.join(await c.req.json())),
+  );
+  app.post("/api/auth/logout", (c) => {
+    const token = getCookie(c, "trove_session");
+    if (token) accounts.logout(token);
+    deleteCookie(c, "trove_session", { path: "/" });
+    const family = randomUUID();
+    setCookie(c, "trove_demo", family, {
+      httpOnly: true,
+      sameSite: "Strict",
+      path: "/",
+      maxAge: 30 * 86400,
+    });
+    return c.json(snapshot(store.get(family), c, null));
+  });
+  app.post("/api/account/invite", (c) =>
+    c.json(accounts.invite(requireMember(c, "parent"))),
+  );
+  app.post("/api/account/memory", async (c) => {
+    const member = requireMember(c, "parent");
+    const { enabled } = z
+      .object({ enabled: z.boolean() })
+      .parse(await c.req.json());
+    if (enabled && !options.learning?.ready)
+      throw new LearningUnavailable(
+        "Walrus Memory is not configured on this server yet.",
+      );
+    store.atomic(() => {
+      store.db
+        .prepare("UPDATE account_profiles SET memory_enabled=? WHERE family=?")
+        .run(enabled ? 1 : 0, member.family);
+      store.set(store.get(member.family));
+    });
+    return c.json(snapshot(store.get(member.family), c));
+  });
+  app.get("/api/state", (c) => c.json(snapshot(stateFor(c), c)));
   app.post("/api/preview-role", async (c) => {
+    if (c.get("member"))
+      throw new AccessError(
+        "Account roles come from sign-in and cannot be switched in preview.",
+      );
     const input = z
       .object({ role: z.enum(["learner", "parent"]) })
       .parse(await c.req.json());
-    const state = store.get(c.get("family"));
+    const state = stateFor(c);
     state.role = input.role;
     store.set(state);
-    return c.json({ ...state, instruments });
+    return c.json(snapshot(state, c));
   });
   app.post("/api/reset", (c) => {
+    if (c.get("member"))
+      throw new AccessError(
+        "Reset applies only to the guest sample, not a saved family account.",
+      );
     const state = store.reset(c.get("family"));
-    return c.json({ ...state, instruments });
+    return c.json(snapshot(state, c));
   });
   app.post("/api/orders/preview", async (c) => {
+    learnerAction(c);
     const input = z
       .object({
         symbol: z.string().max(8),
@@ -83,7 +230,7 @@ export function createApp(store: DemoStore) {
         reason: z.string().max(1500).default(""),
       })
       .parse(await c.req.json());
-    const quote = preview(store.get(c.get("family")), input);
+    const quote = preview(stateFor(c), input);
     store.putQuote(c.get("family"), quote);
     return c.json(quote);
   });
@@ -91,9 +238,15 @@ export function createApp(store: DemoStore) {
     const { quoteId } = z
       .object({ quoteId: z.uuid() })
       .parse(await c.req.json());
-    return c.json({ ...execute(store, c.get("family"), quoteId), instruments });
+    return c.json(
+      snapshot(
+        execute(store, c.get("family"), quoteId, c.get("member")?.role),
+        c,
+      ),
+    );
   });
   app.post("/api/approvals", async (c) => {
+    learnerAction(c);
     const { quoteId } = z
       .object({ quoteId: z.uuid() })
       .parse(await c.req.json());
@@ -102,7 +255,7 @@ export function createApp(store: DemoStore) {
       throw new DomainError(
         "This order preview expired. Please review a fresh one.",
       );
-    const state = store.get(c.get("family"));
+    const state = stateFor(c);
     if (!state.approvals.some((a) => a.quote.id === quoteId))
       state.approvals.unshift({
         id: randomUUID(),
@@ -111,13 +264,13 @@ export function createApp(store: DemoStore) {
         createdAt: new Date().toISOString(),
       });
     store.set(state);
-    return c.json({ ...state, instruments });
+    return c.json(snapshot(state, c));
   });
   app.post("/api/approvals/:id", async (c) => {
     const { approve } = z
       .object({ approve: z.boolean() })
       .parse(await c.req.json());
-    const state = store.get(c.get("family"));
+    const state = stateFor(c);
     if (state.role !== "parent")
       return c.json(
         { error: "This control belongs to the parent preview." },
@@ -137,7 +290,7 @@ export function createApp(store: DemoStore) {
       );
     approval.state = approve ? "approved" : "declined";
     store.set(state);
-    return c.json({ ...state, instruments });
+    return c.json(snapshot(state, c));
   });
   app.post("/api/policy", async (c) => {
     const input = z
@@ -147,7 +300,7 @@ export function createApp(store: DemoStore) {
         paused: z.boolean(),
       })
       .parse(await c.req.json());
-    const state = store.get(c.get("family"));
+    const state = stateFor(c);
     if (state.role !== "parent")
       return c.json(
         { error: "This control belongs to the parent preview." },
@@ -167,9 +320,10 @@ export function createApp(store: DemoStore) {
       revision: state.policy.revision + 1,
     };
     store.set(state);
-    return c.json({ ...state, instruments });
+    return c.json(snapshot(state, c));
   });
   app.post("/api/memories", async (c) => {
+    learnerAction(c);
     const input = z
       .object({
         kind: z.enum(["reflection", "correction"]),
@@ -178,7 +332,7 @@ export function createApp(store: DemoStore) {
         supersedes: z.string().max(60).optional(),
       })
       .parse(await c.req.json());
-    const state = store.get(c.get("family"));
+    const state = stateFor(c);
     if (
       input.decisionId &&
       !state.decisions.some((d) => d.id === input.decisionId)
@@ -209,33 +363,47 @@ export function createApp(store: DemoStore) {
       origin: "local",
     });
     store.set(state);
-    return c.json({ ...state, instruments });
+    return c.json(snapshot(state, c));
   });
   app.delete("/api/memories/:id", (c) => {
-    const state = store.get(c.get("family"));
+    learnerAction(c);
+    const state = stateFor(c);
     state.memories = state.memories.filter((m) => m.id !== c.req.param("id"));
     store.set(state);
-    return c.json({ ...state, instruments });
+    return c.json(snapshot(state, c));
   });
   app.post("/api/guide", async (c) => {
     const { question } = z
       .object({ question: textSchema })
       .parse(await c.req.json());
-    return c.json(
-      localGuide(store.get(c.get("family")), instruments, question),
-    );
+    const member = c.get("member");
+    if (member) {
+      if (member.role !== "learner")
+        throw new AccessError(
+          "Ask Trove is available from the learner account.",
+        );
+      accounts.limit(`coach:${member.family}`, 6, 60_000);
+      accounts.limit("coach:global", 30, 60_000);
+      if (store.profile(member.family)?.memory_enabled) {
+        if (!options.learning?.coachReady)
+          throw new LearningUnavailable(
+            "The live guide is not configured yet.",
+          );
+        return c.json(await options.learning.explain(member.family, question));
+      }
+    }
+    return c.json(localGuide(stateFor(c), instruments, question));
   });
   app.get("/api/exercise", (c) => {
-    const { correct: _, ...exercise } = nextExercise(
-      store.get(c.get("family")),
-    );
+    const { correct: _, ...exercise } = nextExercise(stateFor(c));
     return c.json(exercise);
   });
   app.post("/api/exercise", async (c) => {
+    learnerAction(c);
     const { answer, concept } = z
       .object({ answer: z.number().int().min(0).max(2), concept: z.string() })
       .parse(await c.req.json());
-    const state = store.get(c.get("family")),
+    const state = stateFor(c),
       exercise = nextExercise(state);
     if (concept !== exercise.concept)
       throw new DomainError(
@@ -262,7 +430,7 @@ export function createApp(store: DemoStore) {
     return c.json({
       correct,
       explanation: exercise.explanation,
-      state: { ...state, instruments },
+      state: snapshot(state, c),
     });
   });
   app.get("/api/integrations", (c) =>
@@ -270,11 +438,25 @@ export function createApp(store: DemoStore) {
       mode: "local-demo",
       marketData: "authored-sample",
       chain: { connected: false, network: "testnet", provider: "Tatum" },
-      memory: { connected: false, network: "mainnet", confirmed: 0 },
+      memory: {
+        connected: Boolean(options.learning?.ready),
+        network: "mainnet",
+        confirmed: store.memoryStatus(c.get("family")).confirmedMainnet,
+      },
       localMemory: store.memoryStatus(c.get("family")),
-      coach: { mode: "deterministic-local", connected: false },
+      coach: {
+        mode:
+          c.get("member") &&
+          store.profile(c.get("family"))?.memory_enabled &&
+          options.learning?.coachReady
+            ? "live"
+            : "deterministic-local",
+        connected: Boolean(options.learning?.coachReady),
+      },
       storage: "local-sqlite",
-      authentication: "sample-role-preview",
+      authentication: c.get("member")
+        ? "password-session"
+        : "sample-role-preview",
     }),
   );
   app.get("/api/memory/status", (c) =>

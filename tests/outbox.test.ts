@@ -110,3 +110,30 @@ test("authentication failures stop retries and rate limits respect the cooldown"
   );
   assert.equal(queue.get(secondKey)!.next_at, 30_000);
 });
+
+test("an expired worker lease cannot overwrite the newer worker's accepted job", async () => {
+  const queue = new MemoryOutbox(new DatabaseSync(":memory:"));
+  const key = queue.enqueue(record);
+  let release!: (id: string) => void;
+  const first = queue.processOne(
+    {
+      submit: async () =>
+        new Promise((resolve) => {
+          release = resolve;
+        }),
+      status: async () => ({ state: "waiting" }),
+    },
+    0,
+  );
+  await queue.processOne(
+    {
+      submit: async () => "newer-job",
+      status: async () => ({ state: "waiting" }),
+    },
+    60_001,
+  );
+  release("stale-worker-job");
+  await first;
+  assert.equal(queue.get(key)!.job_id, "newer-job");
+  assert.equal(queue.get(key)!.state, "accepted");
+});

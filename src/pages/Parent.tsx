@@ -14,11 +14,13 @@ import { useApp } from "../lib/app-context.tsx";
 import { money, USD_SCALE } from "../../shared/model.ts";
 import { Button, Modal } from "../components/UI.tsx";
 import { CompanyLogo } from "../components/CompanyLogo.tsx";
+import { AccountDialog } from "../components/AccountDialog.tsx";
 
 export function Parent() {
   const { state, update, busy, notify } = useApp(),
     navigate = useNavigate(),
     [editing, setEditing] = useState(false),
+    [accountOpen, setAccountOpen] = useState(false),
     [now, setNow] = useState(Date.now());
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 10_000);
@@ -33,7 +35,8 @@ export function Parent() {
   async function returnToLearner(event: React.MouseEvent<HTMLAnchorElement>) {
     event.preventDefault();
     try {
-      if (parent) await update("/preview-role", { role: "learner" });
+      if (parent && state!.session?.mode !== "account")
+        await update("/preview-role", { role: "learner" });
       navigate("/app");
     } catch {
       /* Provider displays failure. */
@@ -60,22 +63,39 @@ export function Parent() {
           onClick={(event) => void returnToLearner(event)}
         >
           <ArrowLeft size={15} />
-          Back to {state.learner}
+          {state.session?.mode === "account"
+            ? "Portfolio"
+            : `Back to ${state.learner}`}
         </Link>
       </header>
       {!parent ? (
         <section className="parent-entry">
           <ShieldCheck size={36} strokeWidth={1.4} />
-          <h2>Parent preview</h2>
+          <h2>
+            {state.session?.mode === "account"
+              ? "Parent account required"
+              : "Parent preview"}
+          </h2>
           <Button
             disabled={busy}
             onClick={() =>
-              void update("/preview-role", { role: "parent" }).catch(() => {})
+              state.session?.mode === "account"
+                ? setAccountOpen(true)
+                : void update("/preview-role", { role: "parent" }).catch(
+                    () => {},
+                  )
             }
           >
-            Enter parent preview <ChevronRight size={16} />
+            {state.session?.mode === "account"
+              ? "Open account"
+              : "Enter parent preview"}{" "}
+            <ChevronRight size={16} />
           </Button>
-          <p>Local demo. Sign-in is not connected.</p>
+          <p>
+            {state.session?.mode === "account"
+              ? "Sign out and sign in with the parent account to manage limits."
+              : "Guest sample. Sign in to create a saved family account."}
+          </p>
         </section>
       ) : (
         <>
@@ -234,6 +254,7 @@ export function Parent() {
         </>
       )}
       {editing && <LimitsDialog onClose={() => setEditing(false)} />}
+      {accountOpen && <AccountDialog onClose={() => setAccountOpen(false)} />}
     </div>
   );
 }

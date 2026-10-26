@@ -34,6 +34,7 @@ export interface Memory {
   active: boolean;
   origin: "sample" | "local";
   blobId?: string;
+  syncStatus?: string;
 }
 export interface Policy {
   perTrade: string;
@@ -87,12 +88,21 @@ export interface DemoState {
 }
 export interface AppSnapshot extends DemoState {
   instruments: Instrument[];
+  session?: {
+    mode: "sample" | "account";
+    username?: string;
+    role: "parent" | "learner";
+    memoryEnabled: boolean;
+    servicesReady: boolean;
+  };
 }
 export interface GuideReply {
   text: string;
   sources: string[];
   concept: string;
   mode: "local" | "live";
+  evidence?: { id: string; kind: string; blobId: string }[];
+  cached?: boolean;
 }
 
 export const USD_SCALE = 1_000_000n;

@@ -2,7 +2,11 @@
 
 Audited October 26, 2026. This is an implementation checklist, not an estimated judging score. The [official event](https://recall-tatum-walrus.vercel.app/) weights integration 30%, technical quality 30%, creativity 20%, and presentation 20%. It requires at least ten Mainnet Walrus memories, Tatum where relevant, a demo, a public repository, and a published blog post.
 
-## What works now
+## Current integration milestone
+
+Saved family sign-in, single-use learner invitations, parent consent, the Mainnet memory worker, scoped confirmed retrieval, correction-aware OpenAI replies, fresh-session recall and durable caching now work. Ten explicitly synthetic demo-learning records are confirmed on Mainnet. Total OpenAI estimate at the verified checkpoint was $0.0002884 including the earlier standalone test. Guest history remains local; prices remain authored samples and Sui practice transactions remain zero. See BUILD-STATUS.md for actual verification and limitations.
+
+## Earlier local baseline
 
 | Area               | Actual behavior                                                                                                                                                                                                      | Limit                                                                                                                              |
 | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
@@ -35,4 +39,4 @@ Audited October 26, 2026. This is an implementation checklist, not an estimated 
 | Creativity — 20%        | Personal reasoning → outcome/replay → corrected understanding → a relevant next exercise. Demonstrate why this is more useful than a generic investing chatbot or a quiz app.   |
 | Presentation — 20%      | A simple user journey plus inspectable proof of what is live, what was remembered, and what changed because of it. Finished visuals do not substitute for integration evidence. |
 
-No percentage score or winning result can be guaranteed. Current live evidence remains **0 confirmed Mainnet memories and 0 live practice transactions**.
+No percentage score or winning result can be guaranteed. Current demonstrated evidence is **10 active confirmed Mainnet learning records and 0 Sui practice transactions**.

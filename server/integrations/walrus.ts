@@ -20,6 +20,10 @@ export interface MemoryGateway {
   status(
     jobId: string,
   ): Promise<{ state: "waiting" | "confirmed" | "failed"; blobId?: string }>;
+  destroy?(): void;
+}
+export interface MemoryReader extends MemoryGateway {
+  recall(query: string): Promise<{ record: MemoryEnvelope; blobId?: string }[]>;
 }
 export class WalrusMemoryGateway implements MemoryGateway {
   private client: MemWal;
@@ -66,8 +70,7 @@ export class WalrusMemoryGateway implements MemoryGateway {
     const result = await this.client.getRememberStatus(jobId);
     if (result.status === "done" && result.blob_id)
       return { state: "confirmed", blobId: result.blob_id };
-    if (result.status === "failed" || result.status === "not_found")
-      return { state: "failed" };
+    if (result.status === "failed") return { state: "failed" };
     return { state: "waiting" };
   }
   async recall(query: string) {

@@ -16,11 +16,13 @@ import {
 } from "lucide-react";
 import { Brand } from "./Brand.tsx";
 import { useApp } from "../lib/app-context.tsx";
+import { AccountDialog } from "./AccountDialog.tsx";
 
 export function AppLayout() {
   const { state, error, refresh, toast } = useApp(),
     location = useLocation(),
     [menuOpen, setMenuOpen] = useState(false),
+    [accountOpen, setAccountOpen] = useState(false),
     [sidebarHidden, setSidebarHidden] = useState(() => {
       try {
         return localStorage.getItem("trove-sidebar-hidden") === "1";
@@ -48,6 +50,17 @@ export function AppLayout() {
           )?.label ?? "Home");
   useEffect(() => {
     void refresh();
+  }, []);
+  useEffect(() => {
+    const resumed = () => {
+      if (!document.hidden) void refresh();
+    };
+    window.addEventListener("focus", resumed);
+    document.addEventListener("visibilitychange", resumed);
+    return () => {
+      window.removeEventListener("focus", resumed);
+      document.removeEventListener("visibilitychange", resumed);
+    };
   }, []);
   useEffect(() => {
     try {
@@ -172,6 +185,14 @@ export function AppLayout() {
             <strong>{section}</strong>
           </div>
           <div className="app-topbar-actions">
+            <button
+              className="text-link account-toggle"
+              onClick={() => setAccountOpen(true)}
+            >
+              {state?.session?.mode === "account"
+                ? state.session.username
+                : "Sign in"}
+            </button>
             <span className="practice-badge">
               <span className="live-dot" />
               Practice mode
@@ -188,7 +209,10 @@ export function AppLayout() {
         </nav>
         <div className="sample-strip">
           <span>
-            <span className="live-dot" /> SAMPLE EXPERIENCE{" "}
+            <span className="live-dot" />{" "}
+            {state?.session?.mode === "account"
+              ? "PRACTICE ACCOUNT"
+              : "SAMPLE EXPERIENCE"}{" "}
             <span className="sample-separator">/</span> Practice funds ·
             authored sample prices
           </span>
@@ -208,7 +232,9 @@ export function AppLayout() {
               )}
             </div>
           ) : (
-            <Outlet />
+            <Outlet
+              key={`${state.id}:${state.session?.username ?? state.role}`}
+            />
           )}
         </main>
       </div>
@@ -217,6 +243,7 @@ export function AppLayout() {
           {toast}
         </div>
       )}
+      {accountOpen && <AccountDialog onClose={() => setAccountOpen(false)} />}
     </div>
   );
 }

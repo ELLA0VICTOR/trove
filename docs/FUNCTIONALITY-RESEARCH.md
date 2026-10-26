@@ -95,7 +95,7 @@ This is a reason to avoid reusing old Cresco/Pyth assumptions without checking t
 
 ## 7. Coach and server stack
 
-Anthropic's API supports structured responses and strict tool schemas. They constrain output shape, not factual truth, source validity, or permission to execute. Trove still needs source/exercise validation and deterministic numerical rendering. Configure an available model after checking its capabilities and budget; no model access or cost measurement was performed. [Structured outputs](https://platform.claude.com/docs/en/build-with-claude/structured-outputs), [model availability](https://platform.claude.com/docs/en/models/overview).
+The initial research considered Anthropic. The user's existing OpenAI credits now determine the implementation: OpenAI Responses with `gpt-6-luna`, strict structured output, source-ID checks, no reasoning effort, bounded context/output, and a durable initial $0.25 local allowance. Structured output constrains shape, not factual truth or permission to execute. Live quality and actual account access still need validation. [Current model](https://developers.openai.com/api/docs/models/gpt-6-luna), [structured outputs](https://developers.openai.com/api/docs/guides/structured-outputs), [pricing](https://developers.openai.com/api/docs/pricing). See [account setup](ACCOUNT-SETUP.md#4-ai-coach--use-the-existing-openai-credits).
 
 Hono has an official Node adapter. Drizzle supports PostgreSQL through `pg`. These fit a TypeScript API with a durable outbox without moving the frontend away from Vite. Choose stable compatible package versions and inspect the installed API rather than following an example that happens to use an RC release. [Hono Node guide](https://hono.dev/docs/getting-started/nodejs), [Drizzle PostgreSQL](https://orm.drizzle.team/docs/get-started/postgresql-new).
 
@@ -107,16 +107,16 @@ Docker's executable is present; its daemon and a PostgreSQL instance were not te
 
 Published npm versions observed, not installed/pinned integration results:
 
-| Package | Observed version |
-| --- | --- |
-| `@mysten-incubation/memwal` | 0.1.10 |
-| `@mysten/sui` | 2.37.0 |
-| `@mysten/enoki` | 1.3.1 |
-| `@mysten/dapp-kit-react` | 2.1.41 |
-| `@anthropic-ai/sdk` | 1.3.0 |
-| `hono` | 4.13.14 |
-| `drizzle-orm` | 0.45.4 |
-| `zod` | 4.6.7 |
+| Package                     | Observed version |
+| --------------------------- | ---------------- |
+| `@mysten-incubation/memwal` | 0.1.10           |
+| `@mysten/sui`               | 2.37.0           |
+| `@mysten/enoki`             | 1.3.1            |
+| `@mysten/dapp-kit-react`    | 2.1.41           |
+| `@anthropic-ai/sdk`         | 1.3.0            |
+| `hono`                      | 4.13.14          |
+| `drizzle-orm`               | 0.45.4           |
+| `zod`                       | 4.6.7            |
 
 Metadata and SDK declarations are archived in `.artifacts/functionality-research/`. API compatibility and peer resolution must be verified during installation; npm latest is not by itself a reason to upgrade a working dependency.
 

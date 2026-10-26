@@ -4,7 +4,7 @@ Learn investing through your own decisions—and remember what they taught you.
 
 Trove is a family practice-investing product for the Consumer Finance Apps track of Tatum × Walrus Total Recall. A young person makes practice choices, saves their reasons, revisits the same market period, and develops understanding inside parent-set boundaries.
 
-**Current version: working local sample.** Practice funds, authored sample prices, a deterministic guide, and a clearly labelled parent preview work without provider accounts. Walrus Mainnet, Tatum/Sui, live market data, live AI, and real sign-in are not connected. [Exact implementation status](docs/BUILD-STATUS.md).
+**Current version: local family practice app with connected memory and coaching.** The guest sample works without keys. Signed-in families can enable Walrus Mainnet memory and a budgeted OpenAI guide with parent consent. Ten useful demo learning records, confirmed recall, correction-aware coaching, and fresh-session retrieval have been exercised. App prices remain authored samples; Sui practice contracts and real market-data import are not connected. [Exact implementation status](docs/BUILD-STATUS.md).
 
 ## Run locally
 
@@ -32,6 +32,16 @@ The local database is created at `.trove/local.sqlite` and is ignored by Git. Yo
 
 See the [demo walkthrough](docs/DEMO-GUIDE.md) for a repeatable sequence.
 
+## Saved family and remembered guide
+
+1. Open the app and choose **Sign in > Create family**. Choose a parent username and a password of at least 12 characters.
+2. Open your account name and create a **learner invitation**. The learner chooses **Join a family** in a separate browser/session and creates separate credentials.
+3. From the parent account, explicitly enable **Remember learning** after reading the storage notice. No guest sample history is promoted.
+4. As the learner, make a practice choice with a reason, save reflections/corrections, or complete a lesson. **Saved thoughts** shows syncing and Mainnet confirmation.
+5. Use **Learn > Ask Trove** after sync. The remembered guide retrieves confirmed active records and cites saved thoughts. Sign out/in to restore the same family in a fresh session.
+
+The demonstration uses authored sample markets and practice money; a Mainnet memory is not a real stock purchase. The server still binds to loopback. Public deployment, wallet signing, production persistence and account recovery remain work. Set `TROVE_LIVE_SERVICES=0` for a fully offline server.
+
 ## Checks
 
 ```cmd
@@ -45,7 +55,7 @@ Browser tests start the local services if needed and reuse an existing local dev
 
 ## Live integration preparation
 
-Follow [the account setup guide](docs/ACCOUNT-SETUP.md) for dashboard links and the exact values to copy. An ignored `.env.local` with placeholders is prepared for this checkout; `.env.example` is the blank template for new checkouts. Keep server secrets outside `VITE_` variables. Merely adding credentials does not enable the live application; read [integration setup](docs/INTEGRATION-SETUP.md) and the [remaining work](docs/BUILD-STATUS.md#remaining-live-implementation).
+Follow [the account setup guide](docs/ACCOUNT-SETUP.md) for dashboard links and the exact values to copy. An ignored `.env.local` with placeholders is prepared for this checkout; `.env.example` is the blank template for new checkouts. Keep server secrets outside `VITE_` variables. Guest data stays local; signed-in families must explicitly enable remembering. For the remaining live work, read [integration setup](docs/INTEGRATION-SETUP.md) and the [remaining work](docs/BUILD-STATUS.md#remaining-live-implementation).
 
 ```cmd
 npm run setup:check
@@ -55,17 +65,19 @@ npm run check:integrations -- --service walrus
 
 `setup:check` is offline and never prints values. Placeholder or missing credentials are skipped by provider preflight. With real credentials, the selected preflight makes Tatum checkpoint reads, authenticated Walrus recall, or a market-history request. Walrus diagnostic writes require the explicit `--write-memory` argument; metered model calls require `--model-call`. Neither runs by default. Diagnostic writes do not count as meaningful learner memories. In a new checkout, copy `.env.example` to `.env.local` once before filling it in; do not overwrite a populated file.
 
+The prepared AI adapter uses OpenAI `gpt-6-luna` through the Responses API. Set `OPENAI_API_KEY`, keep `COACH_MODEL=gpt-6-luna`, and start with `COACH_BUDGET_USD=1.00`. `check:integrations -- --service coach` only checks model metadata; generation requires the extra `--model-call` flag. A persistent local cost ledger, bounded excerpts, 384 output tokens, and no automatic retries/fallbacks help protect the user's $5 credit. The allowance tracks this adapter's estimated usage, not other apps or provider-wide billing. The guest guide is deterministic. The signed-in, consented learner guide uses confirmed Walrus evidence and OpenAI.
+
 ## Code map
 
-| Location         | Purpose                                                                                      |
-| ---------------- | -------------------------------------------------------------------------------------------- |
-| `src/pages`      | Landing, portfolio, exploration, decisions, guide, replay, parent preview, evidence          |
-| `src/components` | Original letter-globe canvas, sapling/pixel graphics, charts, accessible controls            |
-| `src/styles`     | Shared visual language and responsive layouts                                                |
-| `shared`         | Integer accounting, frozen replay, sample observations, deterministic learning rules         |
-| `server`         | Local Hono API, SQLite store, execution guards, inactive provider adapters and memory outbox |
-| `tests`          | Accounting, API, job recovery, and browser journeys                                          |
-| `docs`           | Product/design briefs, research, architecture, setup, build status, demo guide               |
+| Location         | Purpose                                                                                                      |
+| ---------------- | ------------------------------------------------------------------------------------------------------------ |
+| `src/pages`      | Landing, portfolio, exploration, decisions, guide, replay, parent preview, evidence                          |
+| `src/components` | Original letter-globe canvas, sapling/pixel graphics, charts, accessible controls                            |
+| `src/styles`     | Shared visual language and responsive layouts                                                                |
+| `shared`         | Integer accounting, frozen replay, sample observations, deterministic learning rules                         |
+| `server`         | Local Hono API, SQLite store, execution guards, scoped provider adapters, live memory worker and cost ledger |
+| `tests`          | Accounting, API, job recovery, and browser journeys                                                          |
+| `docs`           | Product/design briefs, research, architecture, setup, build status, demo guide                               |
 
 The visual direction follows the user's [NEAR Hackathon reference](https://nearhackathon.com/), adapted to Trove's green identity and family learning product. The canvas, SVG sapling, pixel graphics, and application UI are implemented in this repository. IBM Plex Mono is self-hosted under its [SIL Open Font License](public/licenses/ibm-plex-mono.txt). This is not a NEAR hackathon submission.
 

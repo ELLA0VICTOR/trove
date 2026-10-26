@@ -43,6 +43,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [paused, setPaused] = useState(false),
     timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined),
     refreshPending = useRef<Promise<void> | null>(null);
+  const generation = useRef(0);
   useEffect(() => {
     document.documentElement.removeAttribute("data-theme");
     try {
@@ -60,8 +61,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // Share the request so both mounts resolve to the same sample family.
     if (refreshPending.current) return refreshPending.current;
     refreshPending.current = (async () => {
+      const version = generation.current;
       try {
-        setState(await api<AppSnapshot>("/state"));
+        const next = await api<AppSnapshot>("/state");
+        if (generation.current !== version) return;
+        setState(next);
         setError("");
       } catch (e) {
         setError((e as Error).message);
@@ -80,6 +84,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setBusy(true);
     try {
       const next = await api<AppSnapshot>(path, method, body);
+      generation.current++;
       setState(next);
       return next;
     } catch (e) {

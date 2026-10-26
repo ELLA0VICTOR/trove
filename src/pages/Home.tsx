@@ -67,8 +67,10 @@ export function Home() {
         .map((approval) => (
           <div className="approved-notice" key={approval.id}>
             <span>
-              Your sample parent approved {money(approval.quote.amount)} in{" "}
-              {approval.quote.symbol}.
+              Your{" "}
+              {state.session?.mode === "account" ? "parent" : "sample parent"}{" "}
+              approved {money(approval.quote.amount)} in {approval.quote.symbol}
+              .
             </span>
             <button
               className="text-link"

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -111,7 +111,13 @@ export function ExerciseDialog({ onClose }: { onClose: () => void }) {
   );
 }
 
-type Message = { role: "you" | "guide"; text: string; sources?: string[] };
+type Message = {
+  role: "you" | "guide";
+  text: string;
+  sources?: string[];
+  mode?: "local" | "live";
+  cached?: boolean;
+};
 export function Guide() {
   const { state } = useApp(),
     [tab, setTab] = useState<"lessons" | "guide">("lessons"),
@@ -142,7 +148,13 @@ export function Guide() {
       });
       setMessages((previous) => [
         ...previous,
-        { role: "guide", text: result.text, sources: result.sources },
+        {
+          role: "guide",
+          text: result.text,
+          sources: result.sources,
+          mode: result.mode,
+          cached: result.cached,
+        },
       ]);
     } catch (error) {
       setMessages((previous) => [
@@ -277,7 +289,11 @@ export function Guide() {
         >
           <div className="simple-section-heading">
             <h2>Ask Trove</h2>
-            <span>Sample guide</span>
+            <span>
+              {state.session?.mode === "account" && state.session.memoryEnabled
+                ? "Remembered guide"
+                : "Sample guide"}
+            </span>
           </div>
           {messages.length === 0 ? (
             <div className="guide-starters">
@@ -300,7 +316,11 @@ export function Guide() {
                   key={index}
                 >
                   <span className="mini-label">
-                    {message.role === "you" ? "YOU" : "TROVE"}
+                    {message.role === "you"
+                      ? "YOU"
+                      : message.mode === "live"
+                        ? `TROVE / ${message.sources?.length ?? 0} SAVED THOUGHTS${message.cached ? " / SAVED REPLY" : ""}`
+                        : "TROVE"}
                   </span>
                   <p>{message.text}</p>
                   {!!message.sources?.length && (
@@ -392,10 +412,15 @@ export function MemoryDialog({
   onClose: () => void;
   decisionId?: string;
 }) {
-  const { state, update, busy, notify } = useApp(),
+  const { state, update, busy, notify, refresh } = useApp(),
     [text, setText] = useState(""),
     [correcting, setCorrecting] = useState<string | null>(null),
     [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  useEffect(() => {
+    if (!state?.session?.memoryEnabled) return;
+    const timer = setInterval(() => void refresh(), 4000);
+    return () => clearInterval(timer);
+  }, [state?.session?.memoryEnabled, state?.id]);
   if (!state) return null;
   async function save(event: React.FormEvent) {
     event.preventDefault();
@@ -420,7 +445,9 @@ export function MemoryDialog({
     <Modal title="SAVED THOUGHTS" onClose={onClose} wide>
       <h2>Saved thoughts</h2>
       <p className="muted">
-        Stored locally. Add, correct, or remove a thought.
+        {state.session?.memoryEnabled
+          ? "New thoughts sync to Walrus Memory. Removing a thought excludes it from coaching; uploaded records may remain stored."
+          : "Stored locally. Add, correct, or remove a thought."}
       </p>
       <div className="memory-list">
         {state.memories
@@ -433,6 +460,21 @@ export function MemoryDialog({
                   {memory.origin === "sample"
                     ? "SAMPLE HISTORY"
                     : "YOUR SAVED THOUGHT"}
+                  {memory.origin !== "sample" && (
+                    <span className="memory-sync">
+                      {" "}
+                      /{" "}
+                      {memory.blobId
+                        ? "MAINNET CONFIRMED"
+                        : memory.syncStatus === "failed"
+                          ? "SYNC NEEDS ATTENTION"
+                          : ["pending", "accepted"].includes(
+                                memory.syncStatus ?? "",
+                              )
+                            ? "SYNCING"
+                            : "LOCAL"}
+                    </span>
+                  )}
                 </span>
                 <span>
                   {new Date(memory.recordedAt).toLocaleDateString("en-US", {
@@ -468,7 +510,9 @@ export function MemoryDialog({
                           .catch(() => {})
                       }
                     >
-                      Remove local memory
+                      {memory.blobId || state.session?.memoryEnabled
+                        ? "Remove from coaching"
+                        : "Remove local memory"}
                     </button>
                     <button onClick={() => setConfirmDelete(null)}>
                       Keep it

@@ -1,3 +1,5 @@
+import { COACH_MODEL } from "./jobs/coach-budget.ts";
+
 export type Environment = Record<string, string | undefined>;
 
 /** Placeholder values must never be sent to a provider as credentials. */
@@ -12,8 +14,9 @@ const settings = [
   ["Walrus account", "MEMWAL_ACCOUNT_ID"],
   ["Walrus delegate", "MEMWAL_PRIVATE_KEY"],
   ["Market data", "MARKETSTACK_API_KEY"],
-  ["AI coach", "ANTHROPIC_API_KEY"],
+  ["AI coach", "OPENAI_API_KEY"],
   ["Coach model", "COACH_MODEL"],
+  ["Coach allowance", "COACH_BUDGET_USD"],
 ] as const;
 
 export function setupReport(env: Environment) {
@@ -31,6 +34,16 @@ export function setupReport(env: Environment) {
       value &&
       variable === "MEMWAL_PRIVATE_KEY" &&
       !/^(0x)?[\da-f]{64}$/i.test(value)
+    )
+      status = "invalid-format";
+    if (value && variable === "COACH_MODEL" && value !== COACH_MODEL)
+      status = "invalid-format";
+    if (
+      value &&
+      variable === "COACH_BUDGET_USD" &&
+      (!/^(0|[1-5])(?:\.\d{1,2})?$/.test(value) ||
+        Number(value) <= 0 ||
+        Number(value) > 5)
     )
       status = "invalid-format";
     return { service, variable, status };

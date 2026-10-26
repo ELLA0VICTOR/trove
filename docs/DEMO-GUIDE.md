@@ -13,6 +13,7 @@ The introduction plays whenever the landing page loads, including every refresh.
 1. **Home:** review the account value, invested value, available cash, return, full-width chart, and holdings. The header toggle hides or restores the sidebar. Visit **Decisions** to read Maya's original five-company reasoning.
 
    The portfolio chart supports crosshair date/value readings, drag-to-pan, scroll/pinch-to-zoom, area/line views, and reset. Use 1W, 1M, 2M, or All for the available sample history. Keyboard users can focus the chart and press left/right arrows to inspect observations; Escape clears the selection. Chart controls do not change holdings or stored decisions.
+
 2. **Explore → Coca-Cola → Make a practice move:** enter $50 and a reason such as “I want to understand a different sector.” Review the fixed quote and confirm. Reload **Your decisions**; the action and original reason remain.
 3. **Replay:** compare the original mix and a broader alternative with the same $1,000 and the same sample observations. Change the alternative weights and scrub the period. This illustrates tradeoffs, not proof of a universally better strategy. The actual account remains unchanged.
 4. **Learn → Ask Trove:** ask about concentration. Open **Saved thoughts**, correct the original five-companies thought to “I meant to explore technology companies, not claim that I had spread out my risk,” and ask again. The deterministic guide acknowledges the correction rather than presenting the old belief as current.
@@ -31,3 +32,9 @@ The **Parent** destination is also directly available in desktop and mobile navi
 **About this build** lists working local behavior and disconnected integrations. Local record counts can change, but Mainnet memories and live chain transactions stay at zero. No wallet signatures, real funds, actual shares, external model calls, or provider writes are produced by these demo steps.
 
 Run `npm test`, `npm run test:browser`, and `npm run build` for the corresponding automated checks. See [build status](BUILD-STATUS.md) for remaining live work and [integration setup](INTEGRATION-SETUP.md) for configuration requirements.
+
+## Verified family memory flow
+
+The generated non-personal demo family is saved privately in ignored `.trove/demo-access.json`. Start `npm run dev`, choose Sign in, and use the learner credentials from that file. Saved thoughts contains ten confirmed active Mainnet records from real API-driven practice actions over authored sample markets. In Learn, choose Ask Trove and ask about the corrected view of counting company names. The answer should cite the correction; an unchanged question/context can use the reply cache. Sign out and back in to restore the same family. About this build exposes scoped confirmed counts and expandable blob receipts.
+
+To create your own family, choose Create family, create a learner invitation from the parent account, and join from a separate browser/session. Parent and learner use separate credentials. Only the parent can enable remembering or change practice limits. The Mainnet demonstration does not prove contract enforcement, real stock ownership, live market prices, or long-term teaching effectiveness.
