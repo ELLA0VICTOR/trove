@@ -1,0 +1,1014 @@
+/* Consumer navigation and catalog layout. */
+.consumer-app {
+  --sidebar-width: 238px;
+}
+.app-sidebar {
+  overflow-y: auto;
+  width: var(--sidebar-width);
+  height: 100dvh;
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 35;
+  display: flex;
+  flex-direction: column;
+  padding: 33px 22px 23px;
+  border-right: 1px solid var(--line);
+  background: var(--card);
+}
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px;
+}
+.app-sidebar .brand {
+  gap: 9px;
+}
+.app-sidebar .brand > span {
+  font-size: 37px;
+}
+.app-sidebar .brand-mark {
+  width: 33px;
+  height: 33px;
+}
+.app-sidebar nav {
+  margin-top: 62px;
+  display: grid;
+  gap: 10px;
+}
+.app-sidebar nav > a {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 15px 16px;
+  color: var(--muted);
+  border: 1px solid transparent;
+  font-size: 14px;
+  font-weight: 500;
+  min-height: 54px;
+}
+.app-sidebar nav > a:hover {
+  color: var(--foreground);
+  background: var(--surface);
+}
+.app-sidebar nav > a.active {
+  color: var(--spot);
+  background: color-mix(in srgb, var(--spot) 7%, transparent);
+  border-color: color-mix(in srgb, var(--spot) 25%, var(--line));
+}
+.nav-chevron {
+  margin-left: auto;
+  opacity: 0;
+}
+.active > .nav-chevron {
+  opacity: 1;
+}
+.sidebar-bottom {
+  margin-top: auto;
+  padding-top: 40px;
+}
+.sidebar-parent {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 7px 24px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.sidebar-parent > svg:last-child {
+  margin-left: auto;
+}
+.sidebar-parent:hover,
+.sidebar-parent.active {
+  color: var(--spot);
+}
+.sidebar-profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--line);
+  padding: 14px 12px;
+  background: var(--surface);
+}
+.sidebar-profile > span:nth-child(2) {
+  flex: 1;
+  min-width: 0;
+}
+.sidebar-profile strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+}
+.sidebar-profile small {
+  display: block;
+  color: var(--muted);
+  font-size: 9px;
+  margin-top: 2px;
+}
+.profile-symbol {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  color: var(--spot);
+  background: var(--background);
+  border: 1px solid var(--line);
+  flex-shrink: 0;
+}
+.sidebar-close,
+.app-menu-toggle,
+.app-menu-backdrop,
+.app-bottomnav {
+  display: none;
+}
+.app-body {
+  margin-left: var(--sidebar-width);
+  min-width: 0;
+}
+.desktop-sidebar-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  margin-left: -7px;
+  margin-right: 3px;
+  color: var(--muted);
+}
+.desktop-sidebar-toggle:hover {
+  color: var(--foreground);
+  background: var(--surface);
+}
+.app-topbar {
+  min-height: 82px;
+  padding: 20px 42px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  border-bottom: 1px solid var(--line);
+}
+.app-location,
+.app-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+.app-location {
+  font-size: 11px;
+  color: var(--muted);
+}
+.app-location strong {
+  font-weight: 400;
+  color: var(--foreground);
+}
+.app-topbar-actions {
+  gap: 20px;
+}
+.app-topbar .theme-toggle {
+  width: 35px;
+  height: 35px;
+  background: none;
+  color: var(--muted);
+}
+.practice-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 10px;
+  color: var(--muted);
+}
+.sample-strip {
+  padding: 9px 42px;
+  font-size: 9px;
+  gap: 12px;
+}
+.sample-strip .sample-separator {
+  padding: 0 8px;
+}
+.app-main {
+  max-width: none;
+  margin: 0 auto;
+  padding: 0 42px 55px;
+  min-height: calc(100dvh - 230px);
+}
+.consumer-app .page-heading {
+  padding: 35px 0 30px;
+}
+.consumer-app .page-heading h1,
+.app-welcome h1 {
+  font-size: clamp(32px, 3vw, 44px);
+  letter-spacing: -1.6px;
+  line-height: 1.12;
+}
+.consumer-app .page-heading > .eyebrow,
+.consumer-app .page-heading .eyebrow {
+  margin-bottom: 12px;
+  font-size: 10px;
+}
+.consumer-app .page-heading > p {
+  font-size: 12px;
+  margin-top: 15px;
+}
+.consumer-app .app-welcome {
+  padding: 34px 0 28px;
+  align-items: center;
+}
+.app-welcome .eyebrow {
+  margin-bottom: 12px;
+}
+.home-greeting {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 10px 0 0;
+}
+.welcome-note {
+  align-items: center;
+  gap: 10px;
+}
+.welcome-note > a {
+  display: inline-flex;
+  align-items: center;
+  gap: 15px;
+  font-size: 11px;
+}
+.growth-overview {
+  grid-template-columns: minmax(0, 1.85fr) minmax(240px, 1fr);
+}
+.consumer-app .portfolio-panel {
+  padding: 28px;
+}
+.consumer-app .next-growth {
+  padding: 28px;
+}
+.next-growth > .pixel-icon {
+  width: 40px;
+  height: 40px;
+  margin: 21px 0 19px;
+}
+.next-growth h2 {
+  font-size: 29px;
+}
+.next-growth > p {
+  font-size: 11px;
+  margin-top: 17px;
+}
+.next-growth blockquote {
+  font-size: 11px;
+  margin-top: 18px;
+}
+.portfolio-heading .eyebrow {
+  font-size: 9px;
+}
+.portfolio-value {
+  font-size: clamp(35px, 3.8vw, 52px);
+}
+.portfolio-heading p {
+  font-size: 10px;
+}
+.portfolio-panel .chart svg {
+  max-height: 260px;
+}
+.consumer-app .holdings-section {
+  margin-top: 35px;
+}
+.consumer-app .row-heading h2 {
+  font-size: 24px;
+  letter-spacing: -0.6px;
+}
+.holdings-table-head,
+.holding-row {
+  grid-template-columns: minmax(160px, 1.6fr) 105px 90px 100px 110px;
+  gap: 18px;
+}
+.holding-trend .sparkline {
+  width: 100px;
+  height: 38px;
+}
+.holding-row > .holding-trend {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+.company-cell {
+  min-width: 0;
+  gap: 13px;
+}
+.company-cell > span:last-child {
+  min-width: 0;
+}
+.company-cell strong {
+  font-size: 13px;
+}
+.company-cell small {
+  font-size: 10px;
+}
+.company-cell small span {
+  display: none;
+}
+.holding-row {
+  min-height: 78px;
+  padding: 14px 10px;
+}
+.holdings-table-head {
+  padding-left: 10px;
+  padding-right: 10px;
+  font-size: 9px;
+}
+.consumer-app .learning-callout {
+  margin-top: 35px;
+  padding: 25px;
+}
+.learning-callout h2 {
+  font-size: 24px;
+}
+.learning-callout p {
+  font-size: 11px;
+}
+.app-footer {
+  padding: 24px 42px;
+  font-size: 10px;
+}
+.app-footer > span {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.company-logo {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 9px;
+  background: #fff;
+  border: 1px solid #e5e5df;
+  color: #30332c;
+  overflow: hidden;
+}
+.company-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.company-logo.extra-large {
+  width: 64px;
+  height: 64px;
+  padding: 13px;
+}
+.company-logo.brand-jnj {
+  padding: 6px;
+}
+.company-logo.brand-ko,
+.company-logo.brand-xom {
+  padding: 5px;
+}
+.company-logo.brand-amd {
+  background: #141414;
+  border-color: #333;
+  padding: 6px;
+}
+.company-logo.brand-wmt {
+  background: #0053e2;
+  border-color: #0053e2;
+}
+.company-logo.brand-nvda {
+  background: #101410;
+  border-color: #303a2a;
+}
+.decision-orbit .company-logo {
+  width: 44px;
+  height: 44px;
+}
+.sparkline {
+  width: 128px;
+  height: 48px;
+  display: block;
+  overflow: visible;
+}
+.sparkline.rising {
+  color: var(--spot);
+}
+.sparkline.falling {
+  color: var(--negative);
+}
+.explore-heading {
+  padding: 35px 0 28px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+}
+.explore-heading .eyebrow {
+  display: block;
+  font-size: 10px;
+  color: var(--muted);
+  margin-bottom: 11px;
+}
+.explore-heading h1 {
+  font-size: 44px;
+  line-height: 1.1;
+  letter-spacing: -1.5px;
+}
+.catalog-count {
+  color: var(--muted);
+  font-size: 10px;
+  padding-bottom: 5px;
+}
+.catalog-controls {
+  display: grid;
+  gap: 17px;
+}
+.catalog-search {
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  gap: 17px;
+  padding: 0 21px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--muted);
+}
+.catalog-search:focus-within {
+  border-color: var(--spot);
+  outline: 1px solid var(--spot);
+}
+.catalog-search input {
+  width: 100%;
+  min-width: 0;
+  outline: none;
+  background: none;
+  border: none;
+  color: var(--foreground);
+  font-size: 13px;
+}
+.catalog-search input::placeholder {
+  color: var(--muted);
+  opacity: 0.85;
+}
+.catalog-search > button {
+  width: 30px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+}
+.catalog-filter-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+}
+.catalog-filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.catalog-filters button {
+  border: 1px solid var(--line);
+  padding: 10px 16px;
+  font-size: 11px;
+  color: var(--muted);
+  transition:
+    color 0.15s,
+    background 0.15s;
+}
+.catalog-filters button:hover {
+  color: var(--foreground);
+  border-color: var(--border);
+}
+.catalog-filters button.active {
+  background: var(--spot);
+  color: var(--on-spot);
+  border-color: var(--spot);
+}
+.catalog-period {
+  font-size: 8px;
+  color: var(--muted);
+  text-align: right;
+}
+.catalog-period > span {
+  display: block;
+  font-size: 9px;
+  color: var(--foreground);
+  margin-top: 2px;
+}
+.catalog-results-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 26px 0 13px;
+  color: var(--muted);
+  font-size: 10px;
+}
+.catalog-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 15px;
+}
+.stock-card {
+  min-height: 146px;
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) 112px;
+  gap: 18px;
+  align-items: center;
+  background: var(--card);
+  border: 1px solid var(--line);
+  padding: 22px;
+  position: relative;
+  transition:
+    border-color 0.2s,
+    background 0.2s;
+}
+.stock-card:hover {
+  border-color: var(--spot);
+  background: var(--surface);
+}
+.stock-card .company-logo {
+  width: 48px;
+  height: 48px;
+}
+.stock-card-info {
+  min-width: 0;
+}
+.stock-card h2 {
+  font-size: 21px;
+  line-height: 1.2;
+  letter-spacing: -0.5px;
+  margin: 0 0 2px;
+}
+.stock-symbol {
+  display: block;
+  font-size: 10px;
+  color: var(--muted);
+}
+.stock-price {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 2px;
+  flex-wrap: wrap;
+}
+.stock-price > strong {
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+.stock-price > span {
+  font-size: 11px;
+}
+.stock-sector {
+  display: block;
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.stock-card-trend {
+  min-width: 0;
+}
+.stock-card-trend .sparkline {
+  width: 100%;
+  height: 44px;
+}
+.stock-card-trend > span {
+  font-size: 7px;
+  text-align: right;
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+}
+.stock-card-arrow {
+  position: absolute;
+  right: 13px;
+  top: 13px;
+  color: var(--muted);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.stock-card:hover .stock-card-arrow,
+.stock-card:focus-visible .stock-card-arrow {
+  opacity: 1;
+}
+.catalog-note {
+  margin-top: 23px;
+  font-size: 10px;
+  color: var(--muted);
+}
+.explore-page .empty-state h2 {
+  font-size: 25px;
+  margin: 16px 0 8px;
+}
+.explore-page .empty-state > svg {
+  color: var(--muted);
+  margin: auto;
+}
+.explore-page .empty-state p {
+  font-size: 12px;
+  margin-bottom: 20px;
+}
+
+@media (min-width: 1700px) {
+  .consumer-app {
+    --sidebar-width: 270px;
+  }
+  .app-main {
+    padding-left: 55px;
+    padding-right: 55px;
+  }
+  .stock-card {
+    min-height: 153px;
+    grid-template-columns: 52px minmax(0, 1fr) 135px;
+    padding: 26px;
+    gap: 22px;
+  }
+  .stock-card h2 {
+    font-size: 23px;
+  }
+}
+@media (max-width: 1250px) {
+  .consumer-app {
+    --sidebar-width: 210px;
+  }
+  .app-sidebar {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+  .app-main {
+    padding-left: 28px;
+    padding-right: 28px;
+  }
+  .app-topbar,
+  .sample-strip,
+  .app-footer {
+    padding-left: 28px;
+    padding-right: 28px;
+  }
+  .stock-card {
+    grid-template-columns: 42px minmax(0, 1fr) 82px;
+    gap: 12px;
+    padding: 18px;
+  }
+  .stock-card .company-logo {
+    width: 42px;
+    height: 42px;
+    padding: 8px;
+  }
+  .stock-card h2 {
+    font-size: 19px;
+  }
+  .stock-price {
+    gap: 7px;
+  }
+  .stock-price > strong {
+    font-size: 14px;
+  }
+  .stock-price > span {
+    font-size: 10px;
+  }
+  .growth-overview {
+    grid-template-columns: minmax(0, 1.6fr) minmax(210px, 1fr);
+  }
+  .consumer-app .portfolio-panel,
+  .consumer-app .next-growth {
+    padding: 22px;
+  }
+  .holdings-table-head,
+  .holding-row {
+    grid-template-columns: minmax(140px, 1.5fr) 80px 65px 90px 95px;
+    gap: 10px;
+  }
+  .holding-trend .sparkline {
+    width: 78px;
+  }
+}
+@media (min-width: 761px) and (max-width: 1050px) {
+  .catalog-grid {
+    grid-template-columns: 1fr;
+  }
+  .stock-card {
+    grid-template-columns: 48px minmax(0, 1fr) 125px;
+    padding: 20px 24px;
+    min-height: 127px;
+    gap: 22px;
+  }
+  .stock-card .company-logo {
+    width: 48px;
+    height: 48px;
+  }
+  .growth-overview {
+    grid-template-columns: 1fr;
+  }
+  .consumer-app .next-growth {
+    border-left: none;
+    border-top: 1px solid var(--line);
+  }
+  .holdings-table-head,
+  .holding-row {
+    grid-template-columns: minmax(130px, 1.5fr) 75px 85px 85px;
+  }
+  .holdings-table-head > :nth-child(3),
+  .holding-row > :nth-child(3) {
+    display: none;
+  }
+  .welcome-note {
+    display: none;
+  }
+  .guide-layout,
+  .parent-layout,
+  .replay-layout {
+    grid-template-columns: 1fr;
+  }
+  .guide-sidebar {
+    padding-top: 25px;
+  }
+}
+@media (max-width: 760px) {
+  .desktop-sidebar-toggle {
+    display: none;
+  }
+  .consumer-app {
+    --sidebar-width: 0px;
+  }
+  .app-sidebar {
+    display: none;
+    width: 252px;
+    padding: 24px 20px;
+  }
+  .app-sidebar.is-open {
+    display: flex;
+    z-index: 60;
+    box-shadow: 15px 0 60px #0005;
+  }
+  .app-menu-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: #0008;
+    z-index: 55;
+  }
+  .sidebar-close {
+    display: grid;
+    place-items: center;
+    color: var(--muted);
+    width: 32px;
+    height: 40px;
+  }
+  .app-topbar {
+    min-height: 68px;
+    padding: 15px 20px;
+  }
+  .app-location {
+    gap: 10px;
+  }
+  .app-location > .accent,
+  .app-location > span,
+  .app-location > svg {
+    display: none;
+  }
+  .app-menu-toggle {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 32px;
+    margin-right: 5px;
+  }
+  .app-topbar-actions {
+    gap: 12px;
+  }
+  .practice-badge {
+    font-size: 9px;
+    gap: 7px;
+  }
+  .app-main {
+    padding: 0 20px 35px;
+  }
+  .sample-strip {
+    padding: 8px 20px;
+    font-size: 8px;
+  }
+  .sample-strip > span {
+    font-size: 0;
+  }
+  .sample-strip > span .live-dot {
+    display: none;
+  }
+  .sample-strip > span::after {
+    content: "Sample prices · practice funds";
+    font-size: 8px;
+  }
+  .sample-strip .sample-separator {
+    display: none;
+  }
+  .sample-strip > a {
+    font-size: 8px;
+    white-space: nowrap;
+  }
+  .consumer-app .app-welcome {
+    padding: 28px 0 24px;
+  }
+  .app-welcome h1,
+  .consumer-app .page-heading h1,
+  .explore-heading h1 {
+    font-size: 35px;
+    letter-spacing: -1.2px;
+  }
+  .welcome-note {
+    display: none;
+  }
+  .explore-heading {
+    padding: 28px 0 24px;
+  }
+  .catalog-count {
+    font-size: 8px;
+  }
+  .catalog-search {
+    min-height: 55px;
+    padding: 0 16px;
+    gap: 11px;
+  }
+  .catalog-search input {
+    font-size: 11px;
+  }
+  .catalog-filters {
+    gap: 7px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 3px;
+    max-width: 100%;
+  }
+  .catalog-filters button {
+    white-space: nowrap;
+    padding: 9px 13px;
+    font-size: 10px;
+    flex-shrink: 0;
+  }
+  .catalog-filter-row {
+    min-width: 0;
+    display: block;
+  }
+  .catalog-period {
+    display: none;
+  }
+  .catalog-results-label {
+    margin-top: 20px;
+  }
+  .catalog-grid {
+    gap: 12px;
+  }
+  .stock-card {
+    grid-template-columns: 40px minmax(0, 1fr) 86px;
+    min-height: 132px;
+    padding: 17px;
+    gap: 13px;
+  }
+  .stock-card h2 {
+    font-size: 18px;
+  }
+  .stock-card .company-logo {
+    width: 40px;
+    height: 40px;
+    padding: 8px;
+  }
+  .stock-price > strong {
+    font-size: 14px;
+  }
+  .stock-price > span {
+    font-size: 10px;
+  }
+  .stock-sector {
+    font-size: 9px;
+  }
+  .stock-symbol {
+    font-size: 9px;
+  }
+  .stock-card-trend > span {
+    font-size: 6px;
+  }
+  .growth-overview {
+    grid-template-columns: 1fr;
+  }
+  .consumer-app .next-growth {
+    border-left: none;
+    border-top: 1px solid var(--line);
+  }
+  .consumer-app .next-growth h2 {
+    font-size: 29px;
+  }
+  .app-bottomnav {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    position: fixed;
+    inset: auto 0 0;
+    background: var(--card);
+    border-top: 1px solid var(--line);
+    z-index: 40;
+    padding: 9px 10px calc(9px + env(safe-area-inset-bottom));
+  }
+  .app-bottomnav a {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    min-height: 46px;
+    font-size: 9px;
+  }
+  .app-bottomnav a.active {
+    color: var(--spot);
+  }
+  .app-footer {
+    padding: 22px 20px 105px;
+    font-size: 9px;
+  }
+  .company-logo {
+    width: 38px;
+    height: 38px;
+    padding: 8px;
+  }
+  .consumer-app .page-heading {
+    padding: 28px 0;
+  }
+  .consumer-app .page-heading > p {
+    font-size: 11px;
+  }
+  .consumer-app .learning-callout {
+    padding: 22px;
+  }
+}
+@media (max-width: 650px) {
+  .catalog-grid {
+    grid-template-columns: 1fr;
+  }
+  .holdings-table-head,
+  .holding-row {
+    grid-template-columns: minmax(120px, 1fr) 78px 78px;
+    gap: 10px;
+  }
+  .holdings-table-head > :nth-child(2),
+  .holding-row > :nth-child(2),
+  .holdings-table-head > :nth-child(3),
+  .holding-row > :nth-child(3) {
+    display: none;
+  }
+  .holdings-table-head > :nth-child(4),
+  .holdings-table-head > :nth-child(5) {
+    display: block;
+  }
+  .holding-row > :nth-child(4),
+  .holding-row > :nth-child(5) {
+    display: block;
+  }
+  .company-cell {
+    gap: 9px;
+  }
+  .company-cell strong {
+    font-size: 11px;
+  }
+  .company-cell small {
+    font-size: 8px;
+  }
+  .holding-row > span:not(:first-child),
+  .holding-row > strong {
+    font-size: 10px;
+  }
+  .holding-row > span:last-child > svg {
+    display: none;
+  }
+  .catalog-count {
+    display: none;
+  }
+}
+@media (max-width: 380px) {
+  .app-main,
+  .app-topbar,
+  .sample-strip {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .stock-card {
+    padding: 15px 12px;
+    grid-template-columns: 36px minmax(0, 1fr) 72px;
+    gap: 11px;
+  }
+  .stock-card .company-logo {
+    width: 36px;
+    height: 36px;
+  }
+  .stock-card h2 {
+    font-size: 17px;
+  }
+  .stock-price {
+    gap: 7px;
+  }
+  .stock-price > strong {
+    font-size: 13px;
+  }
+  .stock-price > span {
+    font-size: 9px;
+  }
+  .holdings-table-head,
+  .holding-row {
+    grid-template-columns: minmax(100px, 1fr) 67px 67px;
+  }
+}

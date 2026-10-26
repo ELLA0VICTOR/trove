@@ -6,8 +6,9 @@ Updated October 26, 2026. The user authorized implementation, then confirmed: **
 
 Trove helps a young person understand their own investing decisions, with a parent setting practice boundaries. It includes:
 
-- An original sapling identity, green/cream themes, self-hosted IBM Plex Mono, fullscreen character introduction, rotating letter globe spelling GROWTH, pixel readouts/icons, scroll reveals, and responsive consumer pages.
+- An original green sapling identity, NEAR-reference blue/cream themes, self-hosted IBM Plex Mono, fullscreen character introduction, rotating letter globe spelling GROWTH, pixel readouts/icons, scroll reveals, and responsive consumer pages.
 - A persistent sample family, $1,000 initial practice capital, twelve instruments, authored daily observations, holdings, company search/detail, reviewed buys and sells, and original decision reasons.
+- The updated app uses side navigation, simpler page headings, full-width company/industry search, filters, two-column horizontal company cards, and compact trend charts in exploration and holdings. Company marks are local assets sourced from official websites; fund tiles use their provider marks. Source URLs are recorded in `public/brands/sources.json`. The latest portfolio revision shows total value, invested value, cash, return, a full-width chart, and holdings without a large learning promotion. Desktop navigation can be hidden and restored, with its setting retained across reloads. The approved landing structure and motion remain; its palette follows the user's latest blue-theme instruction.
 - Integer accounting, immutable two-minute quote previews, duplicate execution protection, policy revisions, daily gross-buy limits, pause controls, and exact one-time parent approvals. Reset invalidates earlier quotes.
 - A deterministic local guide using active learning records; reflections and corrections remain distinct from original decision history. A correct concentration exercise advances to a time-horizon exercise without granting more financial authority.
 - Two allocation paths compared over the same sample period and initial capital, including residual cash. Replay controls never transact or change actual holdings.
@@ -33,7 +34,7 @@ Adding keys does **not** automatically turn this sample into the live product. T
 ## Validation
 
 - 26 accounting/API/outbox tests: exact parsing/rounding, 2,000 immediate round trips, replay assumptions, invalid inputs, stale/expired/duplicate orders, family scope, approvals, reset invalidation, learning and correction recency, honest integration status, and job recovery.
-- Nine Chromium browser journeys: first-session consistency, keyboard intro exit, persisted practice purchase, exact parent approval, learning progression, correction-aware guide, replay isolation, theme/reduced motion, and mobile layout/runtime checks.
+- Eleven Chromium browser journeys: first-session consistency, keyboard intro exit, persisted practice purchase, exact parent approval, learning progression, correction-aware guide, replay isolation, theme/reduced motion, mobile layout/runtime checks, company discovery with loaded brand assets and keyboard-accessible mobile navigation, and persistent desktop sidebar hiding/restoration with keyboard chart inspection.
 - Desktop captures at 1440×1000 and mobile captures at 390×844 were inspected. Automated consumer layout checks also cover 360px width. Captures and raw results are in ignored `.artifacts/qa/`; Playwright failure traces belong in ignored `test-results/`.
 - TypeScript project checks and the Vite production build. The provider SDKs are server-only; their credentials and clients do not enter the browser bundle.
 

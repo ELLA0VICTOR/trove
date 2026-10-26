@@ -10,6 +10,10 @@ The requirements below are the user's direction. Screen composition, proposed co
 
 ## User requirements
 
+October 26 follow-up: the user approved the landing page and requested **no changes there**. The main app now follows the attached Cresco reference for arrangement only: a side navigation, prominent company search, simple filters, and two-column horizontal company cards with official brand marks and price-history sparklines. Trove's existing colors, type, and square visual language remain. Narrow screens use direct bottom navigation plus an accessible menu for parent guidance. No emoji or generated image assets are used for the new app layout.
+
+Latest October 26 revision: the user retained the sidebar but asked for a conventional account-focused portfolio and NEAR's original blue palette. The current accent is `#0091FD` in dark mode and `#005FB0` in light mode; the sapling identity remains green. The landing layout and motion remain intact, with its accent colors updated. Home now shows four account metrics, a full-width line chart without a gradient, and holdings. The large learning panel and promotional lesson block have been removed from Home; learning is reached through Learn and Decisions. The desktop sidebar can hide completely, with that view preference saved across reloads.
+
 - Use [nearhackathon.com](https://nearhackathon.com/) as the close visual and motion reference, including the exact font families, overall theme, proportions, spacing, graphic treatment, and interaction style.
 - Aim for screenshot-level fidelity in the shared visual language. Adapt the content, branding, and sections to Trove's actual product.
 - Start with green accents to convey growth, financial learning, and savings. Preserve the ability to switch the accent back to the reference blue through theme tokens.
@@ -64,9 +68,9 @@ No need to reproduce NEAR's judges, partner directory, prize claims, developer r
 
 ## Main app composition
 
-Recommended structure: a spacious consumer product with a small top navigation, an obvious learner/parent identity context, and one clear primary task on each page. Typography, spacing, borders, greens, cream highlights, and small pixel details continue from the landing page. The large globe is a landing moment; it should not dominate every app screen.
+Current structure: a spacious consumer product with a clear desktop side navigation, an obvious learner/parent identity context, and one clear primary task on each page. This follows the user's later Cresco arrangement reference. Typography, spacing, borders, greens, cream highlights, and small pixel details continue from the landing page. The large globe is a landing moment; it does not dominate app screens.
 
-Suggested top-level navigation: **Your growth**, **Explore**, **Your decisions**. Parent guidance has its own clearly labelled view reached through the family/profile context. Final labels can change during the functionality discussion.
+Current top-level navigation: **Home**, **Learn**, **Explore**, **Decisions**. Parent guidance has a separate labelled link and family/profile context. Mobile uses the same four main destinations in a bottom navigation bar, with parent guidance available through the menu.
 
 ### Welcome and first visit
 

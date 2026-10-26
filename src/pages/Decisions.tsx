@@ -7,6 +7,7 @@ import type { Decision } from "../../shared/model.ts";
 import { Button, Eyebrow, Modal } from "../components/UI.tsx";
 import { PixelIcon } from "../components/Brand.tsx";
 import { MemoryDialog } from "./Learning.tsx";
+import { CompanyLogo } from "../components/CompanyLogo.tsx";
 
 export function Decisions() {
   const { state } = useApp(),
@@ -47,12 +48,12 @@ export function Decisions() {
         </div>
         <div className="decision-orbit" aria-hidden="true">
           <div className="orbit-ring" />
-          {["A", "M", "N", "a", "A"].map((letter, index) => (
+          {["AAPL", "MSFT", "NVDA", "AMD", "ADBE"].map((symbol, index) => (
             <span
               key={index}
               style={{ "--orbit-index": index } as React.CSSProperties}
             >
-              {letter}
+              <CompanyLogo symbol={symbol} />
             </span>
           ))}
           <PixelIcon kind="memory" />

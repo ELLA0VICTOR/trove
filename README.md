@@ -24,7 +24,7 @@ The local database is created at `.trove/local.sqlite` and is ignored by Git. Yo
 
 ## Try the learning loop
 
-1. Open **Your growth** and read Maya's original five-company decision.
+1. Open **Home** to see your portfolio and Maya's original five-company decision.
 2. Make a practice investment with your own reason in **Explore**.
 3. Visit **Your decisions**, compare allocations in **Replay**, and add or correct a remembered thought in the guide.
 4. Complete a concept exercise; the next lesson changes while financial permission stays the same.

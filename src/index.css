@@ -14,11 +14,12 @@
   --muted: #b0b29d;
   --line: #454d3d;
   --border: #4a5241;
-  --spot: #8ee573;
+  --spot: #0091fd;
+  --brand-green: #8ee573;
   --on-spot: #181c16;
   --cream: #e7dfca;
   --ink: #161a15;
-  --negative: #e5a89d;
+  --negative: #ff8b84;
   color: var(--foreground);
   background: var(--background);
   color-scheme: dark;
@@ -31,9 +32,10 @@
   --muted: #655d4f;
   --line: #bdb199;
   --border: #b7ac94;
-  --spot: #2d6d3c;
+  --spot: #005fb0;
+  --brand-green: #2d6d3c;
   --on-spot: #fff7e9;
-  --negative: #a24636;
+  --negative: #b53124;
   color-scheme: light;
 }
 * {
@@ -148,6 +150,9 @@ input[type="range"] {
 .accent,
 .gain {
   color: var(--spot);
+}
+.trove-sapling {
+  color: var(--brand-green);
 }
 .muted {
   color: var(--muted);

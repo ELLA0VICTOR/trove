@@ -1,5 +1,5 @@
 {
-  "status": "Research inventory; not wired into the app",
+  "status": "Verified reference inventory with current blue accent selection; runtime colors are in src/index.css.",
   "source": "https://nearhackathon.com/",
   "inspectedOn": "2026-10-26",
   "reference": {
@@ -39,10 +39,13 @@
       "sphereInk": "#494337",
       "destructive": "#B53124"
     },
-    "brand": { "blue": "#0091FD", "sky": "#83DCFF" }
+    "brand": {
+      "blue": "#0091FD",
+      "sky": "#83DCFF"
+    }
   },
   "troveProposedOverrides": {
-    "status": "Proposed green values; user approved green direction, exact shades remain reviewable",
+    "status": "Archived initial green proposal, superseded by the user-requested reference blue palette. Green remains the sapling identity.",
     "dark": {
       "primary": "#8EE573",
       "primaryForeground": "#181C16",
@@ -55,11 +58,18 @@
       "ring": "#2D6D3C",
       "spot": "#2D6D3C"
     },
-    "brand": { "green": "#8EE573", "greenSoft": "#C4EDB6" }
+    "brand": {
+      "green": "#8EE573",
+      "greenSoft": "#C4EDB6"
+    }
   },
   "typography": {
     "bodyFamily": "\"IBM Plex Mono\", monospace",
-    "bodyWeights": [400, 500, 600],
+    "bodyWeights": [
+      400,
+      500,
+      600
+    ],
     "headingFamily": "Arial, Helvetica, sans-serif",
     "headingWeight": 700,
     "definedPixelFamily": "\"Pixelify Sans\", monospace",
@@ -96,7 +106,20 @@
     "pixelIconGapPx": 3,
     "buttonMinHeightPx": 56,
     "compactButtonHeightPx": 44,
-    "referenceBreakpointsPx": [360, 560, 600, 700, 701, 751, 850, 1000, 1150, 1240, 1279, 1600]
+    "referenceBreakpointsPx": [
+      360,
+      560,
+      600,
+      700,
+      701,
+      751,
+      850,
+      1000,
+      1150,
+      1240,
+      1279,
+      1600
+    ]
   },
   "motion": {
     "introExpansionMs": 580,
@@ -119,7 +142,12 @@
     "revealEasing": "cubic-bezier(.22,.61,.36,1)",
     "revealThreshold": 0.12,
     "revealRootMargin": "0px 0px -40px 0px",
-    "revealStaggerMs": [0, 90, 180, 270],
+    "revealStaggerMs": [
+      0,
+      90,
+      180,
+      270
+    ],
     "pixelScrambleStepMs": 65,
     "pixelWaveDurationMs": 3600,
     "pixelWaveDistanceDelayMs": 130,
@@ -129,10 +157,27 @@
     "signalStripDurationMs": 126000,
     "logoSignalDurationMs": 6000,
     "hoverDurationMs": 200,
-    "hoverTranslatePx": [-3, -3],
-    "hoverShadowOffsetPx": [4, 4],
+    "hoverTranslatePx": [
+      -3,
+      -3
+    ],
+    "hoverShadowOffsetPx": [
+      4,
+      4
+    ],
     "themeDurationMs": 250,
     "respectReducedMotion": true,
     "pauseOffscreenAndWhenPageHidden": true
+  },
+  "activeAccentSelection": {
+    "dark": {
+      "spot": "#0091FD",
+      "brandGreen": "#8EE573"
+    },
+    "light": {
+      "spot": "#005FB0",
+      "brandGreen": "#2D6D3C"
+    },
+    "decision": "Use the NEAR reference blue palette across the site, preserving green only for the sapling identity and existing third-party company marks."
   }
 }

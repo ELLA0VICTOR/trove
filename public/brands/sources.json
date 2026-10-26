@@ -1,0 +1,79 @@
+{
+  "retrievedOn": "2026-10-26",
+  "note": "Official website icons and brand marks identify sample instruments. SPY and VTI use State Street and Vanguard provider marks; this is not an affiliation or endorsement.",
+  "assets": [
+    {
+      "symbol": "AAPL",
+      "file": "aapl.ico",
+      "url": "https://www.apple.com/favicon.ico",
+      "bytes": 22382
+    },
+    {
+      "symbol": "MSFT",
+      "file": "msft.ico",
+      "url": "https://www.microsoft.com/favicon.ico",
+      "bytes": 17174
+    },
+    {
+      "symbol": "NVDA",
+      "file": "nvda.ico",
+      "url": "https://www.nvidia.com/favicon.ico",
+      "bytes": 25214
+    },
+    {
+      "symbol": "AMD",
+      "file": "amd.svg",
+      "url": "https://www.amd.com/content/dam/code/images/header/amd-header-logo.svg",
+      "bytes": 924
+    },
+    {
+      "symbol": "ADBE",
+      "file": "adbe.ico",
+      "url": "https://www.adobe.com/favicon.ico",
+      "bytes": 15086
+    },
+    {
+      "symbol": "KO",
+      "file": "ko.png",
+      "url": "https://www.coca-cola.com/content/dam/onexp/us/en/homepage/CocaColalogor.png",
+      "bytes": 9558
+    },
+    {
+      "symbol": "JNJ",
+      "file": "jnj.png",
+      "url": "https://jnj-content-lab2.brightspotcdn.com/dims4/default/44265f8/2147483647/strip/true/crop/1710x1072+0+0/resize/896x562!/quality/90/?url=https%3A%2F%2Fjnj-production-jnj.s3.us-east-1.amazonaws.com%2Fbrightspot%2F42%2F31%2Fc2e1a13f43a680a4ef4c078ca0bf%2Fjj-logo-shorthand-red-rgb.png",
+      "bytes": 18064
+    },
+    {
+      "symbol": "XOM",
+      "file": "xom.png",
+      "url": "https://corporate.exxonmobil.com/-/media/global/icons/logos/exxonmobillogocolor2x.png",
+      "bytes": 2910
+    },
+    {
+      "symbol": "WMT",
+      "file": "wmt.svg",
+      "url": "https://corporate.walmart.com/content/dam/corporate/site-images/WMT-Spark-New-SparkYellow-RGB.svg",
+      "bytes": 2155
+    },
+    {
+      "symbol": "DIS",
+      "file": "dis.png",
+      "url": "https://thewaltdisneycompany.com/app/uploads/2026/01/icon-512x512-1.png",
+      "bytes": 18046
+    },
+    {
+      "symbol": "SPY",
+      "file": "spy.svg",
+      "url": "https://www.ssga.com/library-content/images/site/state-street-investment-management-logo.svg",
+      "bytes": 11352,
+      "displayNote": "Official State Street symbol isolated by SVG viewBox; original paths retained."
+    },
+    {
+      "symbol": "VTI",
+      "file": "vti.ico",
+      "url": "https://www.vanguard.com/favicon.ico",
+      "bytes": 3638
+    }
+  ]
+}

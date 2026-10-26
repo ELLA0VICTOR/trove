@@ -4,6 +4,59 @@ test.beforeEach(async ({ page }) => {
   await page.request.post("/api/reset", { data: {} });
 });
 
+test("company discovery supports industries, official logos, and direct mobile navigation", async ({
+  page,
+}) => {
+  await page.goto("/app/explore");
+  await expect(
+    page.getByRole("heading", { name: "Explore", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".stock-card")).toHaveCount(12);
+  await expect
+    .poll(() =>
+      page
+        .locator(".stock-card .company-logo img")
+        .evaluateAll(
+          (images) =>
+            images.length === 12 &&
+            images.every(
+              (image) =>
+                (image as HTMLImageElement).complete &&
+                (image as HTMLImageElement).naturalWidth > 0,
+            ),
+        ),
+    )
+    .toBe(true);
+  await page.getByLabel("Search companies").fill("healthcare");
+  await expect(page.locator(".stock-card")).toHaveCount(1);
+  await expect(
+    page.getByRole("heading", { name: "Johnson & Johnson" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Clear search" }).click();
+  await page.getByRole("button", { name: "Funds", exact: true }).click();
+  await expect(page.locator(".stock-card")).toHaveCount(2);
+  await page.getByRole("button", { name: "All", exact: true }).click();
+  await page.getByLabel("Search companies").fill("MSFT");
+  await page.locator(".stock-card").click();
+  await expect(page).toHaveURL(/\/app\/explore\/MSFT$/);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page
+    .getByRole("navigation", { name: "Mobile navigation" })
+    .getByRole("link", { name: "Learn", exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/app\/guide$/);
+  await page.getByRole("button", { name: "Open navigation" }).click();
+  await expect(
+    page.getByRole("dialog", { name: "Main navigation" }),
+  ).toBeVisible();
+  await expect(page.locator(".app-body")).toHaveAttribute("inert");
+  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("button", { name: "Open navigation" }),
+  ).toBeFocused();
+  await expect(page.locator(".app-body")).not.toHaveAttribute("inert");
+});
+
 test("a first visit creates one consistent sample session", async ({
   page,
   context,
@@ -16,7 +69,7 @@ test("a first visit creates one consistent sample session", async ({
   });
   await page.goto("/app");
   await expect(
-    page.getByRole("heading", { name: "A little wiser, every day." }),
+    page.getByRole("heading", { name: "Your portfolio" }),
   ).toBeVisible();
   const snapshot = await (await page.request.get("/api/state")).json();
   expect(familyIds.length).toBeGreaterThan(0);
@@ -35,7 +88,7 @@ test("intro can be skipped and hands control back to the page", async ({
   await expect(page.locator("#root")).not.toHaveAttribute("inert");
   await page.getByRole("link", { name: "Try now", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "A little wiser, every day." }),
+    page.getByRole("heading", { name: "Your portfolio" }),
   ).toBeVisible();
 });
 test("a practice buy persists after reload with its original explanation", async ({
@@ -94,8 +147,8 @@ test("the exact parent-approved action can return to the learner and execute onc
 test("a learning attempt changes the next task without changing spending authority", async ({
   page,
 }) => {
-  await page.goto("/app");
-  await page.getByRole("button", { name: "Try this thought" }).click();
+  await page.goto("/app/guide");
+  await page.getByRole("button", { name: "Try a thought" }).click();
   await page
     .getByRole("button", {
       name: /Different names can still share the same risks/,
@@ -109,6 +162,40 @@ test("a learning attempt changes the next task without changing spending authori
   ).toBeVisible();
   const snapshot = await (await page.request.get("/api/state")).json();
   expect(snapshot.policy.revision).toBe(1);
+});
+
+test("desktop sidebar can hide and restore without losing the account or chart", async ({
+  page,
+}) => {
+  await page.goto("/app");
+  await expect(
+    page.getByRole("heading", { name: "Your portfolio" }),
+  ).toBeVisible();
+  const width = await page
+    .locator(".app-main")
+    .evaluate((element) => element.getBoundingClientRect().width);
+  await page.getByRole("button", { name: "Hide sidebar" }).click();
+  await expect(page.locator(".app-sidebar")).toBeHidden();
+  expect(
+    await page
+      .locator(".app-main")
+      .evaluate((element) => element.getBoundingClientRect().width),
+  ).toBeGreaterThan(width);
+  await page.reload();
+  await expect(page.locator(".app-sidebar")).toBeHidden();
+  await page.getByRole("button", { name: "Show sidebar" }).click();
+  await expect(
+    page.getByRole("navigation", { name: "Your Trove" }),
+  ).toBeVisible();
+  await page
+    .getByRole("img", {
+      name: /Practice portfolio value over the selected sample period/,
+    })
+    .focus();
+  await page.keyboard.press("ArrowLeft");
+  await expect(page.locator(".portfolio-chart-tooltip")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".portfolio-chart-tooltip")).toHaveCount(0);
 });
 test("a corrected memory changes the local guide response", async ({
   page,

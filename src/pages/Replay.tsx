@@ -5,6 +5,7 @@ import {
   ArrowUpRight,
   Play,
   RotateCcw,
+  Sparkles,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useApp } from "../lib/app-context.tsx";
@@ -189,7 +190,7 @@ export function Replay() {
         </aside>
       </section>
       <section className="replay-reflection">
-        <span className="little-star">✳</span>
+        <Sparkles className="accent" size={27} />
         <div>
           <Eyebrow>THE NUMBER IS ONLY PART OF THE STORY.</Eyebrow>
           <h2>What changed in your thinking?</h2>

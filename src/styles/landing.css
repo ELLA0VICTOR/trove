@@ -7,7 +7,7 @@
 .brand-mark {
   width: 40px;
   height: 40px;
-  color: var(--spot);
+  color: var(--brand-green);
 }
 .brand > span:first-of-type {
   font-family: Arial, Helvetica, sans-serif;
@@ -321,14 +321,14 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 9%;
-  background: #8ee573;
-  color: #182115;
-  --spot: #203d1a;
-  --foreground: #182115;
-  --muted: #294c24;
-  --line: #639b52;
-  --background: #8ee573;
-  background-image: radial-gradient(#18211522 0.65px, transparent 0.65px);
+  background: #0091fd;
+  color: #ffffff;
+  --spot: #ffffff;
+  --foreground: #ffffff;
+  --muted: #d1eaff;
+  --line: #ffffff40;
+  --background: #0091fd;
+  background-image: radial-gradient(#ffffff22 0.65px, transparent 0.65px);
   background-size: 16px 16px;
 }
 .growth-band .eyebrow {
@@ -338,7 +338,7 @@
   font-size: clamp(46px, 5.2vw, 76px);
 }
 .growth-band p {
-  color: #294c24;
+  color: #d1eaff;
   max-width: 440px;
   margin-top: 27px;
 }
@@ -537,7 +537,7 @@
   gap: 10%;
   background: var(--cream);
   color: var(--ink);
-  --spot: #2d6d3c;
+  --spot: #0091fd;
   --foreground: #161a15;
   --border: #b8b4a1;
   --background: #e7dfca;

@@ -11,53 +11,50 @@ import {
   valueOf,
   USD_SCALE,
 } from "../../shared/model.ts";
-import { nextExercise } from "../../shared/learning.ts";
-import { Button, Eyebrow } from "../components/UI.tsx";
-import { PixelIcon } from "../components/Brand.tsx";
-import { Chart } from "../components/Chart.tsx";
-import { ExerciseDialog } from "./Learning.tsx";
+import { Button } from "../components/UI.tsx";
+import { PortfolioChart } from "../components/PortfolioChart.tsx";
 import { OrderDialog } from "./Explore.tsx";
 import type { Quote } from "../../shared/model.ts";
+import { CompanyLogo } from "../components/CompanyLogo.tsx";
+import { Sparkline } from "../components/Sparkline.tsx";
 
 export function Home() {
   const { state } = useApp(),
     [period, setPeriod] = useState(60),
-    [exercise, setExercise] = useState(false),
     [approvedQuote, setApprovedQuote] = useState<Quote | null>(null);
   if (!state) return null;
   const value = portfolioValue(state, state.instruments),
-    hasLocalDecisions = state.decisions.some((d) => d.origin === "local");
-  const gain = value - 1000n * USD_SCALE,
-    series = portfolioSeries(
-      state.holdings,
-      state.cash,
-      state.instruments,
-    ).slice(-period);
-  const passed = new Set(
-    state.attempts.filter((a) => a.correct).map((a) => a.concept),
-  ).size;
+    cash = BigInt(state.cash),
+    invested = value - cash;
+  const gain = value - 1000n * USD_SCALE;
+  const series = portfolioSeries(
+    state.holdings,
+    state.cash,
+    state.instruments,
+  ).slice(-period);
+  const hasLocalDecisions = state.decisions.some(
+    (decision) => decision.origin === "local",
+  );
   return (
-    <>
-      <section className="app-welcome">
+    <div className="portfolio-page">
+      <header className="account-heading">
         <div>
-          <Eyebrow>YOUR NEXT CHAPTER</Eyebrow>
-          <h1>
-            A little wiser,
-            <br />
-            <span className="accent">every day.</span>
-          </h1>
-        </div>
-        <div className="welcome-note">
-          <span className="little-star">✳</span>
+          <h1>Your portfolio</h1>
           <p>
-            Good to see you, Maya.
-            <br />
-            Your next lightbulb moment is waiting.
+            {state.learner}'s practice account <span>USD</span>
           </p>
         </div>
-      </section>
+        <Button to="/app/explore">
+          <Plus size={16} />
+          Explore companies
+        </Button>
+      </header>
       {state.approvals
-        .filter((a) => a.state === "approved" && a.quote.expiresAt > Date.now())
+        .filter(
+          (approval) =>
+            approval.state === "approved" &&
+            approval.quote.expiresAt > Date.now(),
+        )
         .map((approval) => (
           <div className="approved-notice" key={approval.id}>
             <span>
@@ -72,102 +69,82 @@ export function Home() {
             </button>
           </div>
         ))}
-      <section className="growth-overview">
-        <div className="portfolio-panel">
-          <div className="portfolio-heading">
-            <div>
-              <Eyebrow>YOUR PRACTICE PORTFOLIO</Eyebrow>
-              <div className="portfolio-value">{money(value)}</div>
-              <p className={gain >= 0 ? "gain" : "loss"}>
-                {gain >= 0 ? "+" : ""}
-                {money(gain)}{" "}
-                <span className="muted">
-                  vs. your starting practice balance
-                </span>
-              </p>
-            </div>
-            <Link
-              to="/app/explore"
-              className="square-action"
-              aria-label="Explore companies"
-            >
-              <Plus size={22} />
-            </Link>
-          </div>
-          <div className="period-tabs" aria-label="Chart period">
+      <section className="account-metrics" aria-label="Account summary">
+        <div className="account-total">
+          <span>Total value</span>
+          <strong>{money(value)}</strong>
+        </div>
+        <div>
+          <span>Invested</span>
+          <strong>{money(invested)}</strong>
+        </div>
+        <div>
+          <span>Available cash</span>
+          <strong>{money(cash)}</strong>
+        </div>
+        <div>
+          <span>Total return</span>
+          <strong className={gain >= 0 ? "gain" : "loss"}>
+            {gain >= 0 ? "+" : ""}
+            {money(gain)}
+            <small>
+              {gain >= 0 ? "+" : ""}
+              {((Number(gain) / Number(1000n * USD_SCALE)) * 100).toFixed(2)}%
+            </small>
+          </strong>
+        </div>
+      </section>
+      <section
+        className="portfolio-performance"
+        aria-label="Portfolio performance"
+      >
+        <div className="performance-toolbar">
+          <h2>Value over time</h2>
+          <div className="performance-periods" aria-label="Chart period">
             {[
               [20, "1M"],
               [40, "2M"],
-              [60, "ALL"],
-            ].map(([amount, text]) => (
+              [60, "All"],
+            ].map(([amount, label]) => (
               <button
-                key={text}
+                key={label}
+                aria-pressed={period === amount}
                 className={period === amount ? "active" : ""}
                 onClick={() => setPeriod(Number(amount))}
               >
-                {text}
+                {label}
               </button>
             ))}
-            <span>SAMPLE PRICE HISTORY</span>
           </div>
-          <Chart points={series} />
-          <div className="portfolio-bottom">
-            <div>
-              <span className="mini-label">AVAILABLE TO PRACTICE</span>
-              <strong>{money(state.cash)}</strong>
-            </div>
-            <Button to="/app/explore" secondary>
-              Make a new move
-            </Button>
-          </div>
-          {hasLocalDecisions && (
-            <p className="fine-print">
-              The chart marks your current holdings across sample history; it is
-              not your actual transaction history.
-            </p>
-          )}
         </div>
-        <aside className="next-growth">
-          <Eyebrow>GROWTH IS MORE THAN GREEN NUMBERS.</Eyebrow>
-          <PixelIcon kind="memory" />
-          <h2>
-            Five names.
-            <br />
-            One shared risk?
-          </h2>
-          <p>
-            You chose different companies. Let’s take a closer look at what they
-            have in common.
-          </p>
-          <blockquote>“I think I have spread out my risk.”</blockquote>
-          <Link className="text-link" to="/app/replay">
-            Revisit your thinking <ArrowUpRight size={17} />
-          </Link>
-          <span className="mini-label footnote">
-            FROM YOUR SAMPLE DECISION · JUL 06
-          </span>
-        </aside>
+        <PortfolioChart points={series} />
+        <p className="performance-note">
+          {hasLocalDecisions
+            ? "Current holdings valued across sample history; this is not your transaction history."
+            : "Sample price history · Jul 06 – Sep 25, 2026"}
+        </p>
       </section>
-      <section className="holdings-section">
-        <div className="row-heading">
+      <section className="portfolio-holdings" aria-labelledby="holdings-title">
+        <div className="holdings-heading">
           <div>
-            <Eyebrow>01 / WHAT YOU’RE GROWING</Eyebrow>
-            <h2>Your little corner of the market.</h2>
+            <h2 id="holdings-title">Holdings</h2>
+            <span>{state.holdings.length} assets</span>
           </div>
-          <Link className="text-link" to="/app/explore">
-            Keep exploring <ArrowUpRight size={15} />
+          <Link to="/app/decisions" className="text-link">
+            Activity <ArrowUpRight size={15} />
           </Link>
         </div>
         <div className="holdings-table">
           <div className="holdings-table-head">
             <span>COMPANY</span>
+            <span className="holding-trend">SAMPLE TREND</span>
             <span>SHARES</span>
-            <span>VALUE</span>
-            <span>YOUR RETURN</span>
+            <span>MARKET VALUE</span>
+            <span>RETURN</span>
           </div>
           {state.holdings.map((holding) => {
             const instrument = state.instruments.find(
-                (i) => i.symbol === holding.symbol,
+                (item) => item.symbol === holding.symbol,
               )!,
               current = valueOf(holding, latest(instrument).price),
               difference = current - BigInt(holding.cost);
@@ -175,24 +152,18 @@ export function Home() {
               <Link
                 className="holding-row"
                 key={holding.symbol}
-                to={`/app/explore/${holding.symbol}`}
+                to={"/app/explore/" + holding.symbol}
               >
                 <div className="company-cell">
-                  <span
-                    className="company-monogram"
-                    style={{ color: instrument.color }}
-                  >
-                    {holding.symbol === "AAPL"
-                      ? "a"
-                      : holding.symbol.slice(0, 1)}
-                  </span>
+                  <CompanyLogo symbol={holding.symbol} />
                   <span>
                     <strong>{instrument.name}</strong>
-                    <small>
-                      {instrument.symbol} <span>· {instrument.sector}</span>
-                    </small>
+                    <small>{instrument.symbol}</small>
                   </span>
                 </div>
+                <span className="holding-trend">
+                  <Sparkline instrument={instrument} />
+                </span>
                 <span className="muted">{shares(holding.units)}</span>
                 <strong>{money(current)}</strong>
                 <span className={difference >= 0 ? "gain" : "loss"}>
@@ -204,38 +175,29 @@ export function Home() {
             );
           })}
         </div>
+        {!state.holdings.length && (
+          <div className="portfolio-empty">
+            <h3>No holdings yet</h3>
+            <p>Explore a company to make your first practice investment.</p>
+            <Button to="/app/explore">Explore companies</Button>
+          </div>
+        )}
+        {!!state.holdings.length && (
+          <div className="holdings-total">
+            <span>Total invested value</span>
+            <strong>{money(invested)}</strong>
+          </div>
+        )}
       </section>
-      <section className="learning-callout">
-        <PixelIcon kind="sprout" />
-        <div>
-          <Eyebrow>02 / A LITTLE SOMETHING FOR YOU</Eyebrow>
-          <h2>{nextExercise(state).title}</h2>
-          <p>
-            One question. A different perspective. Take a minute for your future
-            self.
-          </p>
-        </div>
-        <button className="button" onClick={() => setExercise(true)}>
-          Try this thought <ArrowRight size={17} />
-        </button>
-      </section>
-      <div className="progress-note">
-        <span>
-          {String(state.decisions.length).padStart(2, "0")} choices to revisit
-        </span>
-        <span>{String(passed).padStart(2, "0")} concepts explored</span>
-        <span>One growing money mind.</span>
-      </div>
-      {exercise && <ExerciseDialog onClose={() => setExercise(false)} />}
       {approvedQuote && (
         <OrderDialog
           instrument={state.instruments.find(
-            (i) => i.symbol === approvedQuote.symbol,
+            (instrument) => instrument.symbol === approvedQuote.symbol,
           )!}
           initialQuote={approvedQuote}
           onClose={() => setApprovedQuote(null)}
         />
       )}
-    </>
+    </div>
   );
 }

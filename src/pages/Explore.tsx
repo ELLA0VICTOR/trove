@@ -6,135 +6,157 @@ import {
   ArrowUpRight,
   Check,
   Search,
+  X,
+  Sparkles,
 } from "lucide-react";
 import { useApp, api } from "../lib/app-context.tsx";
 import { money, latest, shares, USD_SCALE } from "../../shared/model.ts";
 import type { Instrument, Quote } from "../../shared/model.ts";
 import { Button, Eyebrow, Modal } from "../components/UI.tsx";
 import { Chart } from "../components/Chart.tsx";
+import { CompanyLogo } from "../components/CompanyLogo.tsx";
+import { Sparkline } from "../components/Sparkline.tsx";
 
 export function Explore() {
   const { state } = useApp(),
     [search, setSearch] = useState(""),
-    [filter, setFilter] = useState("All companies");
+    [filter, setFilter] = useState("All");
   if (!state) return null;
-  const filtered = state.instruments.filter(
-    (i) =>
-      `${i.name} ${i.symbol}`.toLowerCase().includes(search.toLowerCase()) &&
-      (filter === "All companies" ||
-        (filter === "Technology" && i.sector === "Technology") ||
-        (filter === "Everyday life" &&
-          !["Technology", "Broad-market fund"].includes(i.sector)) ||
-        (filter === "Funds" && i.sector === "Broad-market fund")),
-  );
+  const filters = ["All", "Technology", "Everyday life", "Healthcare", "Funds"];
+  const filtered = state.instruments.filter((instrument) => {
+    const query = search.trim().toLowerCase();
+    const matchesSearch = (
+      instrument.name +
+      " " +
+      instrument.symbol +
+      " " +
+      instrument.sector
+    )
+      .toLowerCase()
+      .includes(query);
+    const matchesFilter =
+      filter === "All" ||
+      (filter === "Technology" && instrument.sector === "Technology") ||
+      (filter === "Healthcare" && instrument.sector === "Healthcare") ||
+      (filter === "Funds" && instrument.sector === "Broad-market fund") ||
+      (filter === "Everyday life" &&
+        ["Consumer staples", "Communication", "Energy"].includes(
+          instrument.sector,
+        ));
+    return matchesSearch && matchesFilter;
+  });
   return (
-    <>
-      <section className="page-heading">
-        <Eyebrow>FOLLOW YOUR CURIOSITY</Eyebrow>
-        <h1>
-          Big ideas.
-          <br />
-          <span className="accent">Familiar names.</span>
-        </h1>
-        <p>
-          The next thing you understand might be something you already know.
-        </p>
-      </section>
-      <div className="explore-toolbar">
-        <div className="filter-tabs" aria-label="Filter companies">
-          {["All companies", "Technology", "Everyday life", "Funds"].map(
-            (label) => (
+    <section className="explore-page">
+      <header className="explore-heading">
+        <div>
+          <Eyebrow>FIND YOUR NEXT IDEA</Eyebrow>
+          <h1>Explore</h1>
+        </div>
+        <span className="catalog-count">
+          {state.instruments.length} companies & funds
+        </span>
+      </header>
+      <div className="catalog-controls">
+        <label className="catalog-search">
+          <Search size={22} strokeWidth={1.7} />
+          <input
+            placeholder="Search companies, symbols, industries..."
+            aria-label="Search companies"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+          {search && (
+            <button
+              aria-label="Clear search"
+              type="button"
+              onClick={() => setSearch("")}
+            >
+              <X size={17} />
+            </button>
+          )}
+        </label>
+        <div className="catalog-filter-row">
+          <div className="catalog-filters" aria-label="Filter companies">
+            {filters.map((label) => (
               <button
                 key={label}
+                aria-pressed={filter === label}
                 className={filter === label ? "active" : ""}
                 onClick={() => setFilter(label)}
               >
                 {label}
               </button>
-            ),
-          )}
+            ))}
+          </div>
+          <span className="catalog-period">
+            Sample period <span>Jul 06 – Sep 25</span>
+          </span>
         </div>
-        <label className="search-field">
-          <Search size={17} />
-          <input
-            placeholder="Find a company or symbol"
-            aria-label="Search companies"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </label>
       </div>
-      <div className="company-grid">
-        {filtered.map((instrument, index) => {
+      <div className="catalog-results-label" aria-live="polite">
+        <span>{filter === "All" ? "All companies & funds" : filter}</span>
+        <span>{filtered.length} results</span>
+      </div>
+      <div className="catalog-grid">
+        {filtered.map((instrument) => {
           const first = BigInt(instrument.prices[0].price),
             current = BigInt(latest(instrument).price),
             change = (Number(current - first) / Number(first)) * 100;
           return (
             <Link
-              className="company-card"
+              className="stock-card"
               key={instrument.symbol}
-              to={`/app/explore/${instrument.symbol}`}
+              to={"/app/explore/" + instrument.symbol}
             >
-              <div className="company-card-top">
-                <span className="mini-label">
-                  [ {String(index + 1).padStart(2, "0")} / {instrument.symbol} ]
-                </span>
-                <ArrowUpRight size={18} />
-              </div>
-              <span
-                className="company-monogram large"
-                style={{ color: instrument.color }}
-              >
-                {instrument.symbol === "AAPL"
-                  ? "a"
-                  : instrument.symbol.slice(0, 1)}
-              </span>
-              <div className="company-card-name">
+              <CompanyLogo symbol={instrument.symbol} />
+              <div className="stock-card-info">
                 <h2>{instrument.name}</h2>
-                <span className="tiny-tag">{instrument.sector}</span>
-              </div>
-              <p>{instrument.description}</p>
-              <div className="mini-chart">
-                <Chart
-                  points={instrument.prices.map((p) => ({
-                    date: p.date,
-                    value: Number(p.price) / Number(USD_SCALE),
-                  }))}
-                  filled={false}
-                  label={`${instrument.name} sample price history`}
-                />
-              </div>
-              <div className="company-card-bottom">
-                <strong>{money(current)}</strong>
-                <span className={change >= 0 ? "gain" : "loss"}>
-                  {change >= 0 ? "+" : ""}
-                  {change.toFixed(2)}% <small>sample period</small>
+                <span className="stock-symbol">{instrument.symbol}</span>
+                <div className="stock-price">
+                  <strong>{money(current)}</strong>
+                  <span className={change >= 0 ? "gain" : "loss"}>
+                    {change >= 0 ? "+" : ""}
+                    {change.toFixed(2)}%
+                  </span>
+                </div>
+                <span className="stock-sector">
+                  {instrument.sector === "Broad-market fund"
+                    ? instrument.symbol === "SPY"
+                      ? "State Street · S&P 500"
+                      : "Vanguard · US market"
+                    : instrument.sector}
                 </span>
               </div>
+              <div className="stock-card-trend">
+                <Sparkline instrument={instrument} />
+                <span>Sample period</span>
+              </div>
+              <ArrowUpRight className="stock-card-arrow" size={16} />
             </Link>
           );
         })}
       </div>
       {!filtered.length && (
         <div className="empty-state">
-          <h2>A little too far off the beaten path.</h2>
-          <p>Try another name or choose a different category.</p>
+          <Search size={28} />
+          <h2>No companies found.</h2>
+          <p>Try another company, symbol, or industry.</p>
           <button
             className="text-link"
             onClick={() => {
               setSearch("");
-              setFilter("All companies");
+              setFilter("All");
             }}
           >
-            See all companies <ArrowRight size={16} />
+            Clear filters <ArrowRight size={16} />
           </button>
         </div>
       )}
-      <p className="data-note">
-        All prices on this page are authored sample data, not current market
-        quotes. No shares are bought or sold.
+      <p className="catalog-note">
+        Practice prices and chart movements are authored sample data, not live
+        quotes.
       </p>
-    </>
+    </section>
   );
 }
 export function Company() {
@@ -158,12 +180,7 @@ export function Company() {
         <ArrowLeft size={15} /> Back to exploring
       </Link>
       <section className="company-detail-heading">
-        <span
-          className="company-monogram extra-large"
-          style={{ color: instrument.color }}
-        >
-          {instrument.symbol === "AAPL" ? "a" : instrument.symbol[0]}
-        </span>
+        <CompanyLogo symbol={instrument.symbol} className="extra-large" />
         <div>
           <Eyebrow>
             {instrument.symbol} / {instrument.sector}
@@ -235,7 +252,7 @@ export function Company() {
         </aside>
       </div>
       <section className="question-banner">
-        <span className="accent">✳</span>
+        <Sparkles className="accent" size={26} />
         <p>
           Knowing a company is a start.
           <br />
