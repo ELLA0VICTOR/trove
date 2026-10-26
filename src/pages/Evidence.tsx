@@ -60,7 +60,7 @@ export function Evidence() {
             "04",
             "WALRUS MEMORY",
             "Not connected",
-            "No Mainnet memories have been written. The sample stores learning records locally. Account and delegate credentials are required.",
+            "Decisions, reflections, corrections, and lesson results have a durable local memory journal. Uploads are disabled; no Mainnet memories have been written. Account and delegate credentials are required.",
             false,
           ],
           [

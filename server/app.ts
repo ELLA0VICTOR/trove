@@ -185,9 +185,20 @@ export function createApp(store: DemoStore) {
     )
       throw new DomainError("That decision is not part of your sample family.");
     if (input.supersedes) {
+      if (input.kind !== "correction")
+        throw new DomainError("Only a correction can replace a saved thought.");
       const previous = state.memories.find((m) => m.id === input.supersedes);
       if (!previous)
         throw new DomainError("That memory is not part of your sample family.");
+      if (!previous.active)
+        throw new DomainError(
+          "That thought has already been corrected. Correct its current version instead.",
+        );
+      if (input.decisionId && input.decisionId !== previous.decisionId)
+        throw new DomainError(
+          "A correction must stay linked to the original decision.",
+        );
+      input.decisionId = previous.decisionId;
       previous.active = false;
     }
     state.memories.unshift({
@@ -260,10 +271,14 @@ export function createApp(store: DemoStore) {
       marketData: "authored-sample",
       chain: { connected: false, network: "testnet", provider: "Tatum" },
       memory: { connected: false, network: "mainnet", confirmed: 0 },
+      localMemory: store.memoryStatus(c.get("family")),
       coach: { mode: "deterministic-local", connected: false },
       storage: "local-sqlite",
       authentication: "sample-role-preview",
     }),
+  );
+  app.get("/api/memory/status", (c) =>
+    c.json(store.memoryStatus(c.get("family"))),
   );
   return app;
 }

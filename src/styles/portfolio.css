@@ -380,10 +380,6 @@
     font-size: 7px;
     gap: 5px;
   }
-  .portfolio-chart-axis,
-  .portfolio-chart-dates {
-    font-size: 8px;
-  }
   .performance-toolbar {
     margin-bottom: 19px;
   }

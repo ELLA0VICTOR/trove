@@ -4,30 +4,32 @@ Prepared October 26, 2026. Checklist for implementation, not a request to paste 
 
 ## Current state
 
+For the user's step-by-step account creation and credential mapping, start with [ACCOUNT-SETUP.md](ACCOUNT-SETUP.md). An ignored `.env.local` with placeholders is now created. `npm run setup:check` checks it offline without printing values; `check:integrations -- --service tatum|walrus|market|coach` limits provider preflight to one service. Placeholder values are never sent as credentials. Mainnet and Testnet Tatum keys are configured separately.
+
 The local React/Vite/Tailwind product and persistent API now work without provider accounts. The user explicitly requested continuing locally. Typed adapters and a durable memory outbox are prepared but inactive; no product integration has been exercised with credentials. See [BUILD-STATUS.md](BUILD-STATUS.md).
 
-The expected credentials were absent when checked, and the user confirmed accounts were not ready. A blank `.env.example` is now provided; copy it to ignored `.env.local` when configuring the future live stage. Keep keys out of chat. This does not enable the live product automatically.
+The user confirmed accounts were not ready and requested the private file and manual setup instructions. Keep keys out of chat. Do not copy `.env.example` over `.env.local` after entering credentials. This does not enable the live product automatically.
 
 Run `npm run check:integrations` for the manual preflight. With no credentials it reports missing setup. With configured Tatum and Marketstack keys it attempts read-only checks. Add `-- --write-memory` only to explicitly request a Mainnet diagnostic write, or `-- --model-call` for a metered coach check. The diagnostic is not useful learner history and must not be counted toward the ten-memory requirement. Acceptance alone is not confirmed storage. The local app never invokes these adapters automatically.
 
 ## Required configuration
 
-| Configuration | Purpose | Exposure |
-| --- | --- | --- |
-| `TATUM_API_KEY` | Sui Testnet practice reads and Mainnet memory-object evidence. Verify permitted networks/methods. | Server only |
-| `MEMWAL_ACCOUNT_ID` | Mainnet `MemWalAccount` object ID for the configured account. | Identifier; keep configuration server-side |
-| `MEMWAL_PRIVATE_KEY` | Registered memory delegate credential, not the owner wallet key. | Server secret |
-| `MEMWAL_SERVER_URL` | `https://relayer.memory.walrus.xyz` for final Mainnet memory use. | Public endpoint |
-| `ANTHROPIC_API_KEY` | Grounded coach generation and carefully budgeted evaluation. | Server secret |
-| `COACH_MODEL` | An available model with the required structured-output capabilities. | Server configuration |
-| `MARKETSTACK_API_KEY` | Initial real daily market-data adapter. | Server secret; redact query-string credentials in logs |
-| `DATABASE_URL` | Durable PostgreSQL state and outbox. | Server secret |
-| Session secrets/allowed origin | Session signing/encryption and request-origin validation. | Secrets server-side; allowed origin public |
-| `VITE_ENOKI_PUBLIC_KEY` | Preferred provider-wallet login. | Deliberately public provider key |
-| `VITE_GOOGLE_CLIENT_ID` | Configured OAuth client/origins for the chosen provider. | Public identifier |
-| `ENOKI_SECRET_KEY` | Restricted sponsorship if the account plan permits it. | Server secret |
-| Practice package/account IDs | Verified Testnet Move deployment and per-learner account mapping. | Public identifiers, typed by network |
-| Quote-attestor credential | Issue constrained practice-price tickets. Cannot serve as parent authority. | Restricted server secret |
+| Configuration                  | Purpose                                                                                           | Exposure                                               |
+| ------------------------------ | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| `TATUM_API_KEY`                | Sui Testnet practice reads and Mainnet memory-object evidence. Verify permitted networks/methods. | Server only                                            |
+| `MEMWAL_ACCOUNT_ID`            | Mainnet `MemWalAccount` object ID for the configured account.                                     | Identifier; keep configuration server-side             |
+| `MEMWAL_PRIVATE_KEY`           | Registered memory delegate credential, not the owner wallet key.                                  | Server secret                                          |
+| `MEMWAL_SERVER_URL`            | `https://relayer.memory.walrus.xyz` for final Mainnet memory use.                                 | Public endpoint                                        |
+| `ANTHROPIC_API_KEY`            | Grounded coach generation and carefully budgeted evaluation.                                      | Server secret                                          |
+| `COACH_MODEL`                  | An available model with the required structured-output capabilities.                              | Server configuration                                   |
+| `MARKETSTACK_API_KEY`          | Initial real daily market-data adapter.                                                           | Server secret; redact query-string credentials in logs |
+| `DATABASE_URL`                 | Durable PostgreSQL state and outbox.                                                              | Server secret                                          |
+| Session secrets/allowed origin | Session signing/encryption and request-origin validation.                                         | Secrets server-side; allowed origin public             |
+| `VITE_ENOKI_PUBLIC_KEY`        | Preferred provider-wallet login.                                                                  | Deliberately public provider key                       |
+| `VITE_GOOGLE_CLIENT_ID`        | Configured OAuth client/origins for the chosen provider.                                          | Public identifier                                      |
+| `ENOKI_SECRET_KEY`             | Restricted sponsorship if the account plan permits it.                                            | Server secret                                          |
+| Practice package/account IDs   | Verified Testnet Move deployment and per-learner account mapping.                                 | Public identifiers, typed by network                   |
+| Quote-attestor credential      | Issue constrained practice-price tickets. Cannot serve as parent authority.                       | Restricted server secret                               |
 
 `MEMWAL_AGENT_ID` on the submission form is the delegate's **public key**. It is not `MEMWAL_PRIVATE_KEY`, the memory account object ID, or a practice-account ID. The Walrus account owner credential is kept outside the application server for administrative account/delegate lifecycle operations.
 
@@ -35,15 +37,15 @@ In a Vite project, variables prefixed `VITE_` are bundled into client code. Neve
 
 ## Cost and entitlement checks
 
-| Service | Verified expectation | Check before live use |
-| --- | --- | --- |
-| Walrus managed memory relayer | Advertises sponsored WAL and SUI for relayed writes, subject to service limits. | Delegate/account works, allowed payloads/rate, confirmations, retention, account-creation requirements. |
-| Sui practice execution | Target Testnet and test gas. | Toolchain, faucet availability, sponsor behavior, deployed package/objects. Test coins are not real practice money. |
-| Tatum | An API key and appropriate provider access are needed. | Actual account plan, RPC/method/network availability, credit/rate limits. Do not assume all services are free. |
-| Marketstack | Published Free is limited/non-commercial; Basic advertises $9.99/month and commercial use. | Exact plan, symbols, history, caching/public display/export rights, and overage cap. No purchase authorized. |
-| Enoki | Free Sandbox is advertised; public/live usage and sponsorship depend on account entitlements. | Available networks, origins, allowed targets, credits, and whether any paid plan is required. No purchase authorized. |
-| Coach provider | Model calls are metered. | Available model, account budget, per-user limits, and evaluation ceiling before running paid calls. |
-| PostgreSQL/hosting | Can start locally; public hosting may have free or paid limits. | Durable storage, worker lifecycle, connection limits, sleep/expiry behavior, and an approved hosting choice. |
+| Service                       | Verified expectation                                                                          | Check before live use                                                                                                 |
+| ----------------------------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Walrus managed memory relayer | Advertises sponsored WAL and SUI for relayed writes, subject to service limits.               | Delegate/account works, allowed payloads/rate, confirmations, retention, account-creation requirements.               |
+| Sui practice execution        | Target Testnet and test gas.                                                                  | Toolchain, faucet availability, sponsor behavior, deployed package/objects. Test coins are not real practice money.   |
+| Tatum                         | An API key and appropriate provider access are needed.                                        | Actual account plan, RPC/method/network availability, credit/rate limits. Do not assume all services are free.        |
+| Marketstack                   | Published Free is limited/non-commercial; Basic advertises $9.99/month and commercial use.    | Exact plan, symbols, history, caching/public display/export rights, and overage cap. No purchase authorized.          |
+| Enoki                         | Free Sandbox is advertised; public/live usage and sponsorship depend on account entitlements. | Available networks, origins, allowed targets, credits, and whether any paid plan is required. No purchase authorized. |
+| Coach provider                | Model calls are metered.                                                                      | Available model, account budget, per-user limits, and evaluation ceiling before running paid calls.                   |
+| PostgreSQL/hosting            | Can start locally; public hosting may have free or paid limits.                               | Durable storage, worker lifecycle, connection limits, sleep/expiry behavior, and an approved hosting choice.          |
 
 Do not interpret a general instruction to build as unlimited authority to purchase plans, top up real tokens, enable uncapped overages, or publish the app. Prepare the concrete integration and show the actual cost/remaining requirement when such a decision is needed. No account or plan changes were made during research.
 

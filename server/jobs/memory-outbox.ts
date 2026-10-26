@@ -1,5 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import { createHash } from "node:crypto";
+import { memoryEnvelope } from "../integrations/walrus.ts";
 import type { MemoryEnvelope, MemoryGateway } from "../integrations/walrus.ts";
 
 type Job = {
@@ -14,7 +15,7 @@ type Job = {
   lease_until: number;
   error_code: string | null;
 };
-/** Durable infrastructure. Uploads are intentionally not started by the local demo. */
+/** Local product records are held; only explicitly pending jobs can be dispatched. */
 export class MemoryOutbox {
   private db: DatabaseSync;
   constructor(db: DatabaseSync) {
@@ -26,7 +27,8 @@ export class MemoryOutbox {
       lease_until INTEGER NOT NULL DEFAULT 0, error_code TEXT
     )`);
   }
-  enqueue(record: MemoryEnvelope) {
+  enqueue(input: MemoryEnvelope, options: { held?: boolean } = {}) {
+    const record = memoryEnvelope.parse(input);
     const key = `trove-v1:${record.learnerScope}:${record.eventId}`,
       payload = JSON.stringify(record),
       hash = createHash("sha256").update(payload).digest("hex");
@@ -37,10 +39,37 @@ export class MemoryOutbox {
       );
     this.db
       .prepare(
-        "INSERT OR IGNORE INTO memory_outbox(operation_key,payload,payload_hash) VALUES(?,?,?)",
+        "INSERT OR IGNORE INTO memory_outbox(operation_key,payload,payload_hash,state) VALUES(?,?,?,?)",
       )
-      .run(key, payload, hash);
+      .run(key, payload, hash, options.held ? "held" : "pending");
     return key;
+  }
+  /** Runs inside the same transaction as the family's local domain mutation. */
+  synchronizeHeld(scope: string, records: MemoryEnvelope[]) {
+    if (!this.db.isTransaction)
+      throw new Error("Memory synchronization requires a domain transaction.");
+    if (records.some((record) => record.learnerScope !== scope))
+      throw new Error("Memory scope mismatch.");
+    const activeIds = new Set(records.map((record) => record.eventId));
+    for (const job of this.forScope(scope)) {
+      const record = JSON.parse(job.payload) as MemoryEnvelope;
+      // Only never-dispatched local records are removed here. This is not a
+      // remote deletion implementation and cannot retract a provider upload.
+      if (job.state === "held" && !activeIds.has(record.eventId))
+        this.db
+          .prepare(
+            "DELETE FROM memory_outbox WHERE operation_key=? AND state='held'",
+          )
+          .run(job.operation_key);
+    }
+    for (const record of records) this.enqueue(record, { held: true });
+  }
+  forScope(scope: string) {
+    return this.db
+      .prepare(
+        "SELECT * FROM memory_outbox WHERE json_extract(payload,'$.learnerScope')=? ORDER BY operation_key",
+      )
+      .all(scope) as Job[];
   }
   get(key: string) {
     return this.db

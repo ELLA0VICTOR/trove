@@ -92,6 +92,7 @@ export function PortfolioChart({ points }: { points: ChartPoint[] }) {
         timeVisible: false,
         secondsVisible: false,
         minBarSpacing: 3,
+        lockVisibleTimeRangeOnResize: true,
       },
       localization: {
         locale: "en-US",

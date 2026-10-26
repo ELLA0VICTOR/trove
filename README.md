@@ -45,14 +45,15 @@ Browser tests start the local services if needed and reuse an existing local dev
 
 ## Live integration preparation
 
-`.env.example` documents the configuration names. Copy it to ignored `.env.local` when accounts are ready and keep server secrets outside `VITE_` variables. Merely adding credentials does not enable the live application; read [integration setup](docs/INTEGRATION-SETUP.md) and the [remaining work](docs/BUILD-STATUS.md#remaining-live-implementation).
+Follow [the account setup guide](docs/ACCOUNT-SETUP.md) for dashboard links and the exact values to copy. An ignored `.env.local` with placeholders is prepared for this checkout; `.env.example` is the blank template for new checkouts. Keep server secrets outside `VITE_` variables. Merely adding credentials does not enable the live application; read [integration setup](docs/INTEGRATION-SETUP.md) and the [remaining work](docs/BUILD-STATUS.md#remaining-live-implementation).
 
 ```cmd
-copy .env.example .env.local
-npm run check:integrations
+npm run setup:check
+npm run check:integrations -- --service tatum
+npm run check:integrations -- --service walrus
 ```
 
-Without credentials, this command reports missing setup. With Tatum/market-data keys, it attempts their read-only preflight. Walrus diagnostic writes require the explicit `--write-memory` argument; metered model calls require `--model-call`. Neither runs by default. Diagnostic writes do not count as meaningful learner memories.
+`setup:check` is offline and never prints values. Placeholder or missing credentials are skipped by provider preflight. With real credentials, the selected preflight makes Tatum checkpoint reads, authenticated Walrus recall, or a market-history request. Walrus diagnostic writes require the explicit `--write-memory` argument; metered model calls require `--model-call`. Neither runs by default. Diagnostic writes do not count as meaningful learner memories. In a new checkout, copy `.env.example` to `.env.local` once before filling it in; do not overwrite a populated file.
 
 ## Code map
 
@@ -67,3 +68,5 @@ Without credentials, this command reports missing setup. With Tatum/market-data 
 | `docs`           | Product/design briefs, research, architecture, setup, build status, demo guide               |
 
 The visual direction follows the user's [NEAR Hackathon reference](https://nearhackathon.com/), adapted to Trove's green identity and family learning product. The canvas, SVG sapling, pixel graphics, and application UI are implemented in this repository. IBM Plex Mono is self-hosted under its [SIL Open Font License](public/licenses/ibm-plex-mono.txt). This is not a NEAR hackathon submission.
+
+The portfolio renderer uses [TradingView Lightweight Charts](https://tradingview.github.io/lightweight-charts/) with its [Apache 2.0 license](public/licenses/lightweight-charts-LICENSE.txt), [attribution notice](public/licenses/lightweight-charts-NOTICE.txt), and the [fancy-canvas license](public/licenses/fancy-canvas-LICENSE.txt). The chart module loads separately from the landing page. Zoom, pan, crosshair inspection, and area/line modes operate on the same authored sample portfolio values; the library does not supply market data.

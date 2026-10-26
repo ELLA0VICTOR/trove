@@ -273,6 +273,54 @@ test("desktop sidebar can hide and restore without losing the account or chart",
     "false",
   );
 });
+test("portfolio chart supports inspection, zoom, pan, styles, and real sample periods", async ({
+  page,
+}) => {
+  await page.goto("/app");
+  await expect(
+    page.locator(".portfolio-chart-canvas canvas").first(),
+  ).toBeVisible();
+  const window = page.locator(".chart-window"),
+    initial = await window.textContent();
+  await page
+    .getByRole("img", {
+      name: /Practice portfolio value over the selected sample period/,
+    })
+    .focus();
+  await page.keyboard.press("ArrowLeft");
+  await expect(page.locator(".chart-reading-date")).toContainText(
+    "Sep 24, 2026",
+  );
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".chart-reading-date")).toContainText(
+    "Sep 25, 2026",
+  );
+  await page.getByRole("button", { name: "Zoom in chart" }).click();
+  await expect(window).not.toHaveText(initial!);
+  const zoomed = await window.textContent(),
+    box = await page.locator(".portfolio-chart-canvas").boundingBox();
+  if (!box) throw new Error("The chart did not render.");
+  await page.mouse.move(box.x + box.width * 0.65, box.y + box.height * 0.45);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 0.35, box.y + box.height * 0.45, {
+    steps: 10,
+  });
+  await page.mouse.up();
+  await expect(window).not.toHaveText(zoomed!);
+  await page.getByRole("button", { name: "Line chart", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Line chart", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "Reset chart view" }).click();
+  await expect(window).toHaveText(initial!);
+  await page.getByRole("button", { name: "1W", exact: true }).click();
+  await expect(window).toContainText("Sep 21, 2026");
+  await expect(window).toContainText("Sep 25, 2026");
+  const snapshot = await (await page.request.get("/api/state")).json();
+  expect(snapshot.sequence).toBe(0);
+  expect(snapshot.decisions).toHaveLength(5);
+});
+
 test("a corrected memory changes the local guide response", async ({
   page,
 }) => {

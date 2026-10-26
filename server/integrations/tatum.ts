@@ -5,19 +5,24 @@ import { ChannelCredentials } from "@grpc/grpc-js";
 export class TatumSuiGateway {
   readonly client: SuiGrpcClient;
   readonly network: "testnet" | "mainnet";
+  private readonly transport: GrpcTransport;
   constructor(apiKey: string, network: "testnet" | "mainnet") {
     if (!apiKey.trim())
       throw new Error("A server-side Tatum API key is required.");
     this.network = network;
+    this.transport = new GrpcTransport({
+      host: `sui-${network}-grpc.gateway.tatum.io:443`,
+      channelCredentials: ChannelCredentials.createSsl(),
+      meta: { "x-api-key": apiKey },
+      timeout: 15_000,
+    });
     this.client = new SuiGrpcClient({
       network,
-      transport: new GrpcTransport({
-        host: `sui-${network}-grpc.gateway.tatum.io:443`,
-        channelCredentials: ChannelCredentials.createSsl(),
-        meta: { "x-api-key": apiKey },
-        timeout: 15_000,
-      }),
+      transport: this.transport,
     });
+  }
+  destroy() {
+    this.transport.close();
   }
   async checkpoint() {
     const { response } = await this.client.ledgerService.getCheckpoint({

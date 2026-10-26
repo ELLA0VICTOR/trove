@@ -71,16 +71,6 @@
   background: #f3f8f4;
 }
 
-.consumer-app .portfolio-chart-tooltip {
-  color: #ffffff;
-  background: var(--panel-green);
-  border-color: var(--panel-green);
-}
-
-.consumer-app .portfolio-chart-tooltip strong {
-  color: #ffffff;
-}
-
 .consumer-app .holding-row {
   transition:
     background-color 0.18s,

@@ -3,6 +3,26 @@ import { WalrusMemoryGateway } from "../server/integrations/walrus.ts";
 import { CoachGateway } from "../server/integrations/coach.ts";
 import { MarketstackGateway } from "../server/integrations/marketstack.ts";
 import { randomUUID } from "node:crypto";
+import { configuredValue } from "../server/config.ts";
+
+const env = process.env;
+const key = (name: string) => configuredValue(env, name);
+const serviceIndex = process.argv.indexOf("--service");
+const service = serviceIndex < 0 ? "all" : process.argv[serviceIndex + 1];
+if (!["all", "tatum", "walrus", "market", "coach"].includes(service ?? "")) {
+  console.error("Use --service tatum, walrus, market, or coach.");
+  process.exit(1);
+}
+const selected = (name: string) => service === "all" || service === name;
+
+async function checkpoint(variable: string, network: "testnet" | "mainnet") {
+  const gateway = new TatumSuiGateway(key(variable)!, network);
+  try {
+    return await gateway.checkpoint();
+  } finally {
+    gateway.destroy();
+  }
+}
 
 const results: { service: string; status: string; detail: unknown }[] = [];
 async function check(service: string, operation: () => Promise<unknown>) {
@@ -17,21 +37,32 @@ async function check(service: string, operation: () => Promise<unknown>) {
     });
   }
 }
-if (process.env.TATUM_API_KEY)
+if (selected("tatum") && key("TATUM_API_KEY"))
   await check("Tatum Testnet read", () =>
-    new TatumSuiGateway(process.env.TATUM_API_KEY!, "testnet").checkpoint(),
+    checkpoint("TATUM_API_KEY", "testnet"),
   );
-else
+else if (selected("tatum"))
   results.push({
     service: "Tatum",
     status: "not configured",
     detail: "Set TATUM_API_KEY on the server.",
   });
 
-if (process.env.MARKETSTACK_API_KEY)
+if (selected("tatum") && key("TATUM_MAINNET_API_KEY"))
+  await check("Tatum Mainnet read", () =>
+    checkpoint("TATUM_MAINNET_API_KEY", "mainnet"),
+  );
+else if (selected("tatum"))
+  results.push({
+    service: "Tatum Mainnet",
+    status: "not configured",
+    detail: "Set TATUM_MAINNET_API_KEY for Mainnet evidence reads.",
+  });
+
+if (selected("market") && key("MARKETSTACK_API_KEY"))
   await check("Marketstack history", async () => {
     const history = await new MarketstackGateway(
-      process.env.MARKETSTACK_API_KEY!,
+      key("MARKETSTACK_API_KEY")!,
     ).history("AAPL", "2026-08-01", "2026-10-01");
     return {
       symbol: history.symbol,
@@ -39,23 +70,53 @@ if (process.env.MARKETSTACK_API_KEY)
       basis: history.basis,
     };
   });
-else
+else if (selected("market"))
   results.push({
     service: "Market data",
     status: "not configured",
     detail: "Provider key and appropriate data permissions required.",
   });
 
+if (selected("walrus") && key("MEMWAL_ACCOUNT_ID") && key("MEMWAL_PRIVATE_KEY"))
+  await check("Walrus authenticated recall", async () => {
+    const gateway = new WalrusMemoryGateway({
+      accountId: key("MEMWAL_ACCOUNT_ID")!,
+      delegateKey: key("MEMWAL_PRIVATE_KEY")!,
+      learnerScope: "preflight",
+      serverUrl: key("MEMWAL_SERVER_URL"),
+    });
+    try {
+      const matches = await gateway.recall("Trove connection check");
+      return {
+        network: "mainnet",
+        authenticated: true,
+        matches: matches.length,
+        note: "Read-only credential check; zero matches is valid. No memory text is printed. This does not prove writes or ten stored memories.",
+      };
+    } finally {
+      gateway.destroy();
+    }
+  });
+else if (selected("walrus"))
+  results.push({
+    service: "Walrus authenticated recall",
+    status: "not configured",
+    detail:
+      "Set MEMWAL_ACCOUNT_ID and MEMWAL_PRIVATE_KEY. No read was attempted.",
+  });
+
 if (
+  selected("walrus") &&
   process.argv.includes("--write-memory") &&
-  process.env.MEMWAL_ACCOUNT_ID &&
-  process.env.MEMWAL_PRIVATE_KEY
+  key("MEMWAL_ACCOUNT_ID") &&
+  key("MEMWAL_PRIVATE_KEY")
 ) {
   await check("Walrus explicit Mainnet write", async () => {
     const gateway = new WalrusMemoryGateway({
-      accountId: process.env.MEMWAL_ACCOUNT_ID!,
-      delegateKey: process.env.MEMWAL_PRIVATE_KEY!,
+      accountId: key("MEMWAL_ACCOUNT_ID")!,
+      delegateKey: key("MEMWAL_PRIVATE_KEY")!,
       learnerScope: "preflight",
+      serverUrl: key("MEMWAL_SERVER_URL"),
     });
     try {
       const eventId = randomUUID(),
@@ -79,26 +140,27 @@ if (
       gateway.destroy();
     }
   });
-} else
+} else if (selected("walrus"))
   results.push({
-    service: "Walrus",
+    service: "Walrus writes",
     status: "not exercised",
     detail:
       "Requires credentials and explicit --write-memory. No diagnostic writes occur by default.",
   });
 
 if (
+  selected("coach") &&
   process.argv.includes("--model-call") &&
-  process.env.ANTHROPIC_API_KEY &&
-  process.env.COACH_MODEL
+  key("ANTHROPIC_API_KEY") &&
+  key("COACH_MODEL")
 )
   await check("Explicit model call", () =>
-    new CoachGateway(
-      process.env.ANTHROPIC_API_KEY!,
-      process.env.COACH_MODEL!,
-    ).explain("Explain why five companies can still share risk.", []),
+    new CoachGateway(key("ANTHROPIC_API_KEY")!, key("COACH_MODEL")!).explain(
+      "Explain why five companies can still share risk.",
+      [],
+    ),
   );
-else
+else if (selected("coach"))
   results.push({
     service: "Live coach",
     status: "not exercised",

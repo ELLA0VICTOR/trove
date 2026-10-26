@@ -12,6 +12,7 @@
     "test:browser": "playwright test",
     "lint": "oxlint",
     "preview": "vite preview",
+    "setup:check": "node --env-file-if-exists=.env.local --import tsx scripts/check-setup.ts",
     "check:integrations": "node --env-file-if-exists=.env.local --import tsx scripts/check-integrations.ts",
     "format": "prettier --write src server shared tests scripts vite.config.ts playwright.config.ts"
   },

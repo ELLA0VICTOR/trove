@@ -11,6 +11,8 @@ The introduction plays whenever the landing page loads, including every refresh.
 ## Show the product
 
 1. **Home:** review the account value, invested value, available cash, return, full-width chart, and holdings. The header toggle hides or restores the sidebar. Visit **Decisions** to read Maya's original five-company reasoning.
+
+   The portfolio chart supports crosshair date/value readings, drag-to-pan, scroll/pinch-to-zoom, area/line views, and reset. Use 1W, 1M, 2M, or All for the available sample history. Keyboard users can focus the chart and press left/right arrows to inspect observations; Escape clears the selection. Chart controls do not change holdings or stored decisions.
 2. **Explore → Coca-Cola → Make a practice move:** enter $50 and a reason such as “I want to understand a different sector.” Review the fixed quote and confirm. Reload **Your decisions**; the action and original reason remain.
 3. **Replay:** compare the original mix and a broader alternative with the same $1,000 and the same sample observations. Change the alternative weights and scrub the period. This illustrates tradeoffs, not proof of a universally better strategy. The actual account remains unchanged.
 4. **Learn → Ask Trove:** ask about concentration. Open **Saved thoughts**, correct the original five-companies thought to “I meant to explore technology companies, not claim that I had spread out my risk,” and ask again. The deterministic guide acknowledges the correction rather than presenting the old belief as current.
