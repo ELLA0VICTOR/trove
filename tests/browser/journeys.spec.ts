@@ -625,11 +625,23 @@ test("Home exposes required wallet setup and activation asks the parent wallet t
     page.getByRole("heading", { name: "Set up your family portfolio" }),
   ).toBeVisible();
   await expect(
+    page.getByRole("button", {
+      name: "Activate practice portfolio",
+      exact: true,
+    }),
+  ).toBeDisabled();
+  await expect(
     page.getByRole("button", { name: "Link Test Sui Wallet", exact: true }),
   ).toBeVisible();
   await page
     .getByRole("button", { name: "Link Test Sui Wallet", exact: true })
     .click();
+  await expect(
+    page.getByRole("button", {
+      name: "Activate practice portfolio",
+      exact: true,
+    }),
+  ).toBeEnabled();
   await page
     .getByRole("button", { name: "Activate practice portfolio", exact: true })
     .click();
@@ -637,6 +649,49 @@ test("Home exposes required wallet setup and activation asks the parent wallet t
     page.getByRole("heading", { name: "Set up your family portfolio" }),
   ).toHaveCount(0);
   expect(wallet.signatures()).toBe(1);
+});
+
+test("a linked parent sees activation waiting clearly for the learner wallet", async ({
+  page,
+}) => {
+  await createPortfolioAccount(page);
+  await page.route("**/api/state", async (route) => {
+    const response = await route.fetch();
+    const state = await response.json();
+    const guardian = "0x" + "7".repeat(64);
+    state.chain = {
+      ready: true,
+      network: "testnet",
+      guardian,
+      wallet: guardian,
+      pending: [],
+    };
+    await route.fulfill({ response, json: state });
+  });
+  await page.goto("/app");
+  await expect(
+    page.getByRole("button", {
+      name: "Activate practice portfolio",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", {
+      name: "Activate practice portfolio",
+      exact: true,
+    }),
+  ).toBeDisabled();
+  await expect(
+    page
+      .getByRole("status")
+      .filter({
+        hasText:
+          "Waiting for your learner to link their wallet from their own account.",
+      }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("list", { name: "Setup progress" }).locator(".complete"),
+  ).toHaveCount(1);
 });
 
 test("an unconfigured family sees setup before trading while lessons remain available", async ({

@@ -9,7 +9,7 @@ export function PracticeSetup({ onAccount }: { onAccount: () => void }) {
   const steps = [
     { label: "Parent wallet", complete: Boolean(state.chain?.guardian) },
     { label: "Learner wallet", complete: Boolean(state.chain?.learner) },
-    { label: "Activate portfolio", complete: false },
+    { label: "Portfolio activation", complete: false },
   ];
   return (
     <section
@@ -29,7 +29,7 @@ export function PracticeSetup({ onAccount }: { onAccount: () => void }) {
           <ShieldCheck size={14} /> Sui Testnet
         </span>
       </header>
-      <ol className="practice-setup-steps">
+      <ol className="practice-setup-steps" aria-label="Setup progress">
         {steps.map((step) => (
           <li key={step.label} className={step.complete ? "complete" : ""}>
             {step.complete ? <Check size={17} /> : <Circle size={15} />}

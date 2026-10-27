@@ -35,6 +35,18 @@ export function ChainAccount({ setup = false }: { setup?: boolean }) {
       </p>
     ) : null;
   const chain = state.chain;
+  const activationHint =
+    !chain.guardian || !chain.learner
+      ? !chain.guardian && !chain.learner
+        ? "Connect both family wallets to enable activation."
+        : !chain.learner
+          ? "Waiting for your learner to link their wallet from their own account."
+          : "Connect your parent wallet to enable activation."
+      : chain.pending?.length
+        ? "Waiting for the pending transaction to finish."
+        : state.market?.mode !== "market"
+          ? "Waiting for market prices before activation."
+          : "";
   async function run(action: () => Promise<unknown>) {
     setBusy(true);
     setError("");
@@ -75,7 +87,7 @@ export function ChainAccount({ setup = false }: { setup?: boolean }) {
             )
           }
         >
-          {chain.wallet ? "Connect " : "Link "}
+          {chain.wallet ? "Reconnect " : "Link "}
           {wallet.name}
         </Button>
       ))}
@@ -102,17 +114,21 @@ export function ChainAccount({ setup = false }: { setup?: boolean }) {
             View practice contract account ↗
           </a>
         </p>
-      ) : chain.guardian && chain.learner && state.role === "parent" ? (
-        <>
-          <p>
-            Your portfolio starts with {money(practiceCapital(state))} in
-            practice funds.
-            {state.holdings.length > 0 &&
-              " Activating archives your earlier holdings and starts a fresh round. Your saved learning stays."}
-          </p>
+      ) : state.role === "parent" ? (
+        <div className="practice-activation">
+          {chain.guardian && chain.learner && (
+            <p>
+              Your portfolio starts with {money(practiceCapital(state))} in
+              practice funds.
+              {state.holdings.length > 0 &&
+                " Activating archives your earlier holdings and starts a fresh round. Your saved learning stays."}
+            </p>
+          )}
           <Button
             disabled={
               busy ||
+              !chain.guardian ||
+              !chain.learner ||
               Boolean(chain.pending?.length) ||
               state.market?.mode !== "market"
             }
@@ -122,16 +138,17 @@ export function ChainAccount({ setup = false }: { setup?: boolean }) {
           >
             Activate practice portfolio
           </Button>
-        </>
+          {activationHint && (
+            <p className="practice-activation-hint" role="status">
+              {activationHint}
+            </p>
+          )}
+        </div>
       ) : !chain.guardian || !chain.learner ? (
         <p>
-          {state.role === "parent"
-            ? chain.wallet
-              ? "Your learner can now connect their wallet from Home."
-              : "Your learner connects their own wallet from their account."
-            : chain.wallet
-              ? "Your parent can activate the portfolio once both wallets are connected."
-              : "Your parent connects their own wallet from their account."}
+          {chain.wallet
+            ? "Your parent can activate the portfolio once both wallets are connected."
+            : "Your parent connects their own wallet from their account."}
         </p>
       ) : (
         <p>

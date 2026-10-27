@@ -729,6 +729,20 @@
   color: var(--muted);
   font-size: 12px;
 }
+.practice-activation {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+.practice-activation > p {
+  font-size: 12px;
+  margin-bottom: 13px;
+}
+.practice-activation .practice-activation-hint {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 10px 0 0;
+}
 @media (max-width: 600px) {
   .practice-setup {
     padding: 19px 16px;
