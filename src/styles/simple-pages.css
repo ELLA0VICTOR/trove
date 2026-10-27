@@ -734,6 +734,23 @@
   padding-top: 20px;
   border-top: 1px solid var(--line);
 }
+.wallet-account-choices {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid var(--line);
+}
+.wallet-account-choices .button {
+  justify-content: flex-start;
+  min-width: 0;
+  text-align: left;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.wallet-account-choices .text-link {
+  justify-self: start;
+}
 .practice-activation > p {
   font-size: 12px;
   margin-bottom: 13px;

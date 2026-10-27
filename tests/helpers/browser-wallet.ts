@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { Transaction } from "@mysten/sui/transactions";
 import { DemoStore } from "../../server/store.ts";
 import { execute, preview } from "../../server/domain.ts";
+import { applyFunding, fundingAmount } from "../../shared/funding.ts";
 
 // Browser fixtures simulate the wallet/provider boundary, while using the real
 // isolated SQLite ledger for saved decisions. Production never imports this.
@@ -40,6 +41,7 @@ export async function installBrowserWallet(
   active = true,
   learnerReady = true,
   linkedInitially = active,
+  authorization: "own" | "other" | "both" = "own",
 ) {
   const original = await (await page.request.get("/api/state")).json();
   const role = original.role;
@@ -63,30 +65,97 @@ export async function installBrowserWallet(
   ]);
   const bytes = Buffer.from(await tx.build()).toString("base64");
   let signatures = 0;
-  await page.exposeFunction("signTestTroveTransaction", async () => {
-    signatures++;
-    return { bytes, signature: "synthetic-browser-wallet-signature" };
-  });
+  const signedAddresses: string[] = [],
+    linkedAddresses: string[] = [];
+  await page.exposeFunction(
+    "signTestTroveTransaction",
+    async (signer: string) => {
+      if (signer !== address)
+        throw new Error("The wrong family wallet was asked to sign.");
+      signedAddresses.push(signer);
+      signatures++;
+      return { bytes, signature: "synthetic-browser-wallet-signature" };
+    },
+  );
   await page.addInitScript(
-    ({ address }) => {
+    ({ address, guardian, learner, authorization }) => {
       const account = {
         address,
         publicKey: new Uint8Array(32),
         chains: ["sui:testnet"],
         features: ["sui:signTransaction", "sui:signPersonalMessage"],
       };
+      const other = {
+        ...account,
+        address: address === guardian ? learner : guardian,
+      };
+      let accounts =
+        authorization === "both"
+          ? [other, account]
+          : authorization === "other"
+            ? [other]
+            : [account];
+      let grant = authorization;
+      let connects = 0,
+        disconnects = 0;
+      const listeners = new Set<
+        (change: { accounts: typeof accounts }) => void
+      >();
+      function authorize(mode: "own" | "other" | "both") {
+        accounts =
+          mode === "both"
+            ? [other, account]
+            : mode === "other"
+              ? [other]
+              : [account];
+        for (const listener of listeners) listener({ accounts });
+      }
+      Object.assign(window, {
+        troveWalletTest: {
+          authorize,
+          setGrant: (mode: typeof grant) => {
+            grant = mode;
+          },
+          stats: () => ({ connects, disconnects }),
+        },
+      });
       const wallet = {
         name: "Test Sui Wallet",
         version: "1.0.0",
         icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg'/>",
         chains: ["sui:testnet"],
-        accounts: [account],
+        get accounts() {
+          return accounts;
+        },
         features: {
           "standard:connect": {
             version: "1.0.0",
-            connect: async () => ({ accounts: [account] }),
+            connect: async () => {
+              connects++;
+              authorize(grant);
+              return { accounts };
+            },
           },
-          "standard:events": { version: "1.0.0", on: () => () => {} },
+          "standard:disconnect": {
+            version: "1.0.0",
+            disconnect: async () => {
+              disconnects++;
+              accounts = [];
+              for (const listener of listeners) listener({ accounts });
+            },
+          },
+          "standard:events": {
+            version: "1.0.0",
+            on: (
+              _: string,
+              listener: (change: { accounts: typeof accounts }) => void,
+            ) => {
+              listeners.add(listener);
+              return () => {
+                listeners.delete(listener);
+              };
+            },
+          },
           "sui:signPersonalMessage": {
             version: "1.0.0",
             signPersonalMessage: async () => ({
@@ -96,12 +165,14 @@ export async function installBrowserWallet(
           },
           "sui:signTransaction": {
             version: "2.0.0",
-            signTransaction: async () =>
+            signTransaction: async (input: { account: { address: string } }) =>
               (
                 window as unknown as {
-                  signTestTroveTransaction: () => Promise<unknown>;
+                  signTestTroveTransaction: (
+                    address: string,
+                  ) => Promise<unknown>;
                 }
-              ).signTestTroveTransaction(),
+              ).signTestTroveTransaction(input.account.address),
           },
         },
       };
@@ -116,7 +187,7 @@ export async function installBrowserWallet(
         }),
       );
     },
-    { address },
+    { address, guardian, learner, authorization },
   );
   const chain = () => ({
     ready: true,
@@ -145,11 +216,12 @@ export async function installBrowserWallet(
   await page.route("**/api/state", async (route) =>
     route.fulfill({ json: await snapshot() }),
   );
-  await page.route("**/api/chain/challenge", async (route) =>
-    route.fulfill({
+  await page.route("**/api/chain/challenge", async (route) => {
+    linkedAddresses.push(route.request().postDataJSON().address);
+    await route.fulfill({
       json: { id: crypto.randomUUID(), message: "Synthetic wallet link" },
-    }),
-  );
+    });
+  });
   await page.route("**/api/chain/link", async (route) => {
     linked = true;
     await route.fulfill({ json: chain() });
@@ -193,6 +265,16 @@ export async function installBrowserWallet(
         account = "0x" + "9".repeat(64);
         learnerBound = Boolean(chain().learner);
       } else if (action.action === "enroll") learnerBound = true;
+      else if (action.action === "fund")
+        await store.atomic(async () => {
+          const state = await store.get(original.id);
+          applyFunding(state, {
+            id: action.id,
+            amount: String(fundingAmount(action.amount)),
+            recordedAt: new Date().toISOString(),
+          });
+          await store.set(state);
+        });
       else if (action.action === "order")
         await execute(store, original.id, action.quoteId, "learner");
       else if (action.action === "approve")
@@ -212,5 +294,10 @@ export async function installBrowserWallet(
       await store.db.close();
     }
   });
-  return { signatures: () => signatures };
+  return {
+    signatures: () => signatures,
+    signedAddresses: () => signedAddresses,
+    linkedAddresses: () => linkedAddresses,
+    preparations: () => actions.size,
+  };
 }

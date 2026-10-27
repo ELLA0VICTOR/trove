@@ -1,6 +1,6 @@
 ﻿# Trove manual test and demo rehearsal
 
-Open https://trove-x.vercel.app/app. Use one browser profile for the parent and a different browser profile or browser for the learner. Two ordinary tabs share the same sign-in. Keep both windows available during the approval test.
+Open https://trove-x.vercel.app/app. On one computer, use two separate regular browser profiles, or Chrome for the parent and Edge for the learner. Install Slush separately in each profile and use the corresponding wallet address. Keep both windows available during the approval test.
 
 This is a rehearsal checklist. Complete it before recording the short demo. Use fictional, non-personal learning statements for the rehearsal family. Use inboxes you can open for both family members. Write down your emails, current usernames, and passwords privately; passwords require at least 12 characters.
 
@@ -51,6 +51,8 @@ Wallet setup is part of the main practice flow on Home. Complete it before placi
 7. Open Settings > Practice wallet > View practice contract account to inspect the Testnet object.
 
 Pass when setup is complete, the contract account exists, and parent and learner remain linked to their separate wallets. Signed execution is the only trading path. If wallet setup is unavailable, browsing and learning remain available while trading waits for setup.
+
+If Slush exposes several addresses during linking, choose the correct address in Trove. To recover a mismatched connection, open Home > Settings > Practice wallet > Reconnect Slush and authorize the address shown as Linked wallet. Switching the extension's active address alone may leave the site's previous authorization in place. Separate browser profiles avoid sharing the same extension instance during the rehearsal.
 
 ## 4. Make an ordinary practice investment
 

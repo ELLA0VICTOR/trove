@@ -1251,3 +1251,118 @@ test("parent practice refills update the shared portfolio without manufacturing 
     ),
   ).toBe(true);
 });
+
+async function walletAuthorization(
+  page: Page,
+  mode: "own" | "other" | "both",
+  grant?: "own" | "other" | "both",
+) {
+  await page.evaluate(
+    ({ mode, grant }) => {
+      const wallet = (
+        window as unknown as {
+          troveWalletTest: {
+            authorize: (mode: string) => void;
+            setGrant: (mode: string) => void;
+          };
+        }
+      ).troveWalletTest;
+      wallet.authorize(mode);
+      if (grant) wallet.setGrant(grant);
+    },
+    { mode, grant },
+  );
+}
+
+test("parent reconnect resets authorization and funding keeps the parent signer after account switches", async ({
+  page,
+}) => {
+  await createPortfolioAccount(page);
+  const wallet = await installBrowserWallet(page);
+  await page.goto("/app");
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Reconnect Test Sui Wallet", exact: true })
+    .click();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (
+            window as unknown as {
+              troveWalletTest: { stats: () => { disconnects: number } };
+            }
+          ).troveWalletTest.stats().disconnects,
+      ),
+    )
+    .toBe(1);
+  await page.keyboard.press("Escape");
+  await walletAuthorization(page, "other", "own");
+  await page.getByRole("link", { name: "Parent", exact: true }).click();
+  for (const [amount, mode] of [
+    ["75", "other"],
+    ["25", "both"],
+  ] as const) {
+    await walletAuthorization(page, mode);
+    await page
+      .getByRole("button", { name: "Add practice funds", exact: true })
+      .click();
+    const dialog = page.getByRole("dialog", { name: "PRACTICE FUNDS" });
+    await dialog.getByLabel("Amount ($)", { exact: true }).fill(amount);
+    await dialog
+      .getByRole("button", { name: "Add funds", exact: true })
+      .click();
+    await expect(dialog).toHaveCount(0);
+  }
+  expect(wallet.signedAddresses()).toEqual([
+    "0x" + "7".repeat(64),
+    "0x" + "7".repeat(64),
+  ]);
+  const state = await (await page.request.get("/api/state")).json();
+  expect(state.cash).toBe("1100000000");
+  expect(state.funding).toHaveLength(2);
+});
+
+test("linking from multiple authorized accounts uses the learner's chosen address", async ({
+  page,
+}) => {
+  await createLearnerAccount(page);
+  const wallet = await installBrowserWallet(page, true, false, false, "both");
+  await page.goto("/app");
+  await page
+    .getByRole("button", { name: "Link Test Sui Wallet", exact: true })
+    .click();
+  const picker = page.getByRole("group", {
+    name: "Choose your learner wallet",
+  });
+  await expect(picker).toBeVisible();
+  await picker
+    .getByRole("button", { name: "0x" + "8".repeat(64), exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Your portfolio is active" }),
+  ).toHaveCount(0);
+  expect(wallet.linkedAddresses()).toEqual(["0x" + "8".repeat(64)]);
+  expect(wallet.signedAddresses()).toEqual(["0x" + "8".repeat(64)]);
+});
+
+test("a wallet granting only the learner address cannot prepare a parent funding transaction", async ({
+  page,
+}) => {
+  await createPortfolioAccount(page);
+  const wallet = await installBrowserWallet(page, true, true, true, "other");
+  await page.goto("/app/parent");
+  await page
+    .getByRole("button", { name: "Add practice funds", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog", { name: "PRACTICE FUNDS" });
+  await dialog.getByRole("button", { name: "Add funds", exact: true }).click();
+  await expect(dialog.getByRole("alert")).toContainText(
+    "Authorize 0x777777…777777",
+  );
+  expect(wallet.preparations()).toBe(0);
+  expect(wallet.signatures()).toBe(0);
+  expect((await (await page.request.get("/api/state")).json()).cash).toBe(
+    "1000000000",
+  );
+});

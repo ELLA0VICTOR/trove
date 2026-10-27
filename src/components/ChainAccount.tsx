@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getWallets } from "@mysten/wallet-standard";
-import type { Wallet } from "@mysten/wallet-standard";
+import type { Wallet, WalletAccount } from "@mysten/wallet-standard";
 import {
   availableWallets,
   chainAction,
-  connectWallet,
+  reconnectWallet,
   linkWallet,
 } from "../lib/wallet.ts";
 import { useApp } from "../lib/app-context.tsx";
@@ -14,7 +14,23 @@ export function ChainAccount({ setup = false }: { setup?: boolean }) {
   const { state, refresh, update } = useApp();
   const [wallets, setWallets] = useState<readonly Wallet[]>(availableWallets),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [choices, setChoices] = useState<readonly WalletAccount[] | null>(null);
+  const selectResult = useRef<((address?: string) => void) | undefined>(
+    undefined,
+  );
+  useEffect(() => () => selectResult.current?.(), []);
+  function chooseAccount(accounts: readonly WalletAccount[]) {
+    return new Promise<string | undefined>((resolve) => {
+      selectResult.current = resolve;
+      setChoices(accounts);
+    });
+  }
+  function finishChoice(address?: string) {
+    selectResult.current?.(address);
+    selectResult.current = undefined;
+    setChoices(null);
+  }
   useEffect(() => {
     const registry = getWallets(),
       updateWallets = () => setWallets(availableWallets());
@@ -80,11 +96,11 @@ export function ChainAccount({ setup = false }: { setup?: boolean }) {
                 ? chain.account &&
                   state.role === "learner" &&
                   chain.learnerBound === false
-                  ? connectWallet(wallet, chain.wallet).then(() =>
+                  ? reconnectWallet(wallet, chain.wallet).then(() =>
                       chainAction({ action: "enroll" }, chain.wallet),
                     )
-                  : connectWallet(wallet, chain.wallet)
-                : linkWallet(wallet),
+                  : reconnectWallet(wallet, chain.wallet)
+                : linkWallet(wallet, chooseAccount),
             )
           }
         >
@@ -98,6 +114,27 @@ export function ChainAccount({ setup = false }: { setup?: boolean }) {
           {wallet.name}
         </Button>
       ))}
+      {choices && (
+        <div
+          className="wallet-account-choices"
+          role="group"
+          aria-label={`Choose your ${state.role} wallet`}
+        >
+          <p>Choose your {state.role} wallet</p>
+          {choices.map((account) => (
+            <Button
+              key={account.address}
+              secondary
+              onClick={() => finishChoice(account.address)}
+            >
+              {account.address}
+            </Button>
+          ))}
+          <button className="text-link" onClick={() => finishChoice()}>
+            Cancel
+          </button>
+        </div>
+      )}
       {!wallets.length && (
         <div className="practice-wallet-install">
           <p>Install Slush, select Testnet, then return here to connect.</p>

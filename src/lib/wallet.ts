@@ -3,18 +3,14 @@ import {
   isWalletWithRequiredFeatureSet,
   signTransaction,
 } from "@mysten/wallet-standard";
-import type {
-  Wallet,
-  WalletAccount,
-  SuiWalletFeatures,
-  WalletWithFeatures,
-} from "@mysten/wallet-standard";
+import type { Wallet } from "@mysten/wallet-standard";
 import { Transaction } from "@mysten/sui/transactions";
 import { api } from "./app-context.tsx";
 import type { ChainStatus } from "../../shared/chain.ts";
+import { WalletConnection } from "./wallet-connection.ts";
+import type { AccountSelector } from "./wallet-connection.ts";
 
-let selected: WalletWithFeatures<Partial<SuiWalletFeatures>> | undefined;
-let selectedAccount: WalletAccount | undefined;
+const connection = new WalletConnection();
 export function availableWallets(): readonly Wallet[] {
   return getWallets()
     .get()
@@ -27,38 +23,32 @@ export function availableWallets(): readonly Wallet[] {
     );
 }
 export async function connectWallet(wallet: Wallet, expected?: string) {
-  if (
-    !isWalletWithRequiredFeatureSet<SuiWalletFeatures>(wallet, [
-      "sui:signPersonalMessage",
-    ])
-  )
-    throw new Error("This wallet does not support Sui message signing.");
-  const result = await wallet.features["standard:connect"].connect();
-  const account = result.accounts.find(
-    (a) =>
-      (!expected || a.address === expected) && a.chains.includes("sui:testnet"),
-  );
-  if (!account)
-    throw new Error(
-      expected
-        ? "Select the wallet address linked to this account."
-        : "Select a Sui Testnet wallet account.",
-    );
-  selected = wallet;
-  selectedAccount = account;
-  return account;
+  return connection.connect(wallet, expected);
 }
-export async function linkWallet(wallet: Wallet) {
-  const account = await connectWallet(wallet);
+export async function reconnectWallet(wallet: Wallet, expected: string) {
+  return connection.connect(wallet, expected, { fresh: true });
+}
+export async function linkWallet(
+  wallet: Wallet,
+  selectAccount?: AccountSelector,
+) {
+  const account = await connection.connect(wallet, undefined, {
+    fresh: true,
+    selectAccount,
+  });
+  const signingWallet = connection.wallet!;
   const challenge = await api<{ id: string; message: string }>(
     "/chain/challenge",
     "POST",
     { address: account.address },
   );
-  const feature = selected!.features["sui:signPersonalMessage"];
+  const feature = signingWallet.features["sui:signPersonalMessage"];
   if (!feature) throw new Error("Personal message signing is unavailable.");
+  const currentAccount = connection.authorized(signingWallet, account.address);
+  if (!currentAccount)
+    throw new Error("Your wallet connection changed. Reconnect and try again.");
   const signed = await feature.signPersonalMessage({
-    account,
+    account: currentAccount,
     chain: "sui:testnet",
     message: new TextEncoder().encode(challenge.message),
   });
@@ -80,17 +70,18 @@ export async function chainAction(
   action: Record<string, unknown>,
   expected?: string,
 ) {
-  if (!selected || !selectedAccount || selectedAccount.address !== expected) {
-    const wallets = availableWallets();
-    if (!wallets.length)
-      throw new Error("Connect your practice wallet before signing a trade.");
-    const preferred =
-      wallets.find((w) => w.accounts.some((a) => a.address === expected)) ??
-      (wallets.length === 1 ? wallets[0] : undefined);
-    if (!preferred)
-      throw new Error("Choose your Sui wallet in Account settings first.");
-    await connectWallet(preferred, expected);
-  }
+  if (!expected) throw new Error("Link your practice wallet before signing.");
+  const wallets = availableWallets();
+  if (!wallets.length)
+    throw new Error("Connect your practice wallet before signing a trade.");
+  const preferred =
+    wallets.find((w) => connection.authorized(w, expected)) ??
+    wallets.find((w) => w === connection.wallet) ??
+    (wallets.length === 1 ? wallets[0] : undefined);
+  if (!preferred)
+    throw new Error("Choose your Sui wallet in Account settings first.");
+  await connectWallet(preferred, expected);
+  const signingWallet = connection.wallet!;
   const prepared = await api<{ id: string; bytes: string }>(
     "/chain/prepare",
     "POST",
@@ -98,8 +89,13 @@ export async function chainAction(
   );
   let submitted = false;
   try {
-    const signed = await signTransaction(selected!, {
-      account: selectedAccount!,
+    const currentAccount = connection.authorized(signingWallet, expected);
+    if (!currentAccount)
+      throw new Error(
+        "Your wallet connection changed. Reconnect and try again.",
+      );
+    const signed = await signTransaction(signingWallet, {
+      account: currentAccount,
       chain: "sui:testnet",
       transaction: Transaction.from(prepared.bytes),
     });
