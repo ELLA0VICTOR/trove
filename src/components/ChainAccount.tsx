@@ -1,5 +1,3 @@
-import { practiceCapital } from "../../shared/funding.ts";
-import { money } from "../../shared/model.ts";
 import { useEffect, useState } from "react";
 import { getWallets } from "@mysten/wallet-standard";
 import type { Wallet } from "@mysten/wallet-standard";
@@ -36,13 +34,13 @@ export function ChainAccount({ setup = false }: { setup?: boolean }) {
     ) : null;
   const chain = state.chain;
   const activationHint = !chain.guardian
-    ? "Connect your parent wallet to enable activation."
+    ? "Connect your wallet first."
     : !chain.learner && !chain.enrollmentReady
-      ? "Parent-first activation needs the updated practice contract."
+      ? "Activation unavailable."
       : chain.pending?.length
-        ? "Waiting for the pending transaction to finish."
+        ? "Transaction pending."
         : state.market?.mode !== "market"
-          ? "Waiting for market prices before activation."
+          ? "Prices unavailable."
           : "";
   async function run(action: () => Promise<unknown>) {
     setBusy(true);
@@ -125,14 +123,6 @@ export function ChainAccount({ setup = false }: { setup?: boolean }) {
         </p>
       ) : state.role === "parent" ? (
         <div className="practice-activation">
-          {chain.guardian && (
-            <p>
-              Your portfolio starts with {money(practiceCapital(state))} in
-              practice funds.
-              {state.holdings.length > 0 &&
-                " Activating archives your earlier holdings and starts a fresh round. Your saved learning stays."}
-            </p>
-          )}
           <Button
             disabled={
               busy ||
