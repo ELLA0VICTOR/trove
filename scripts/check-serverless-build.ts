@@ -67,7 +67,12 @@ import entry from './api/index.js';
 import {createServerlessHandler} from './server/serverless.js';
 import {createRuntime} from './server/runtime.js';
 import {Database} from './server/database.js';
+import {practiceDeployment} from './server/chain-config.js';
 assert.equal(typeof entry.fetch, 'function');
+const deployment=practiceDeployment();
+assert.equal(deployment.packageId,${JSON.stringify(JSON.parse(readFileSync("contracts/practice/deployment.testnet.json", "utf8")).packageId)});
+assert.equal(deployment.enrollmentReady,true);
+assert.equal(deployment.fundingReady,true);
 const work=[];
 const handler=createServerlessHandler({
   runtime:()=>createRuntime({database:new Database({filename:':memory:'}),serverless:true}),
@@ -85,6 +90,7 @@ try {
 `,
 );
 const check = spawnSync(process.execPath, [join(output, "check.mjs")], {
+  cwd: directory,
   env: {
     ...process.env,
     NODE_OPTIONS: "",
@@ -104,6 +110,7 @@ console.log(
         "native Node entry import",
         "compiled health route",
         "compiled state route",
+        "bundled contract capabilities outside the repository working directory",
       ],
       providerCalls: 0,
     },

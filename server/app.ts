@@ -714,6 +714,9 @@ export function createApp(
         connected: Boolean(chain.config),
         network: "testnet",
         provider: "Tatum",
+        packageId: chain.config?.packageId,
+        fundingReady: Boolean(chain.config?.fundingReady),
+        enrollmentReady: Boolean(chain.config?.enrollmentReady),
         account: (await chain.account(c.get("family")))?.object_id,
         pending: (await chain.pending(c.get("family"))).length,
         confirmed: (

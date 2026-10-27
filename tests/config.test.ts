@@ -1,6 +1,33 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { configuredValue, setupReport } from "../server/config.ts";
+import { practiceDeployment } from "../server/chain-config.ts";
+import manifest from "../contracts/practice/deployment.testnet.json" with { type: "json" };
+
+test("the bundled deployment enables current capabilities and retains the original type identity", () => {
+  assert.deepEqual(practiceDeployment(), {
+    packageId: manifest.packageId,
+    originalPackageId: manifest.originalPackageId,
+    fundingReady: true,
+    enrollmentReady: true,
+  });
+  for (const value of [
+    manifest.packageId,
+    `  "${manifest.packageId}"  `,
+    "0x" + manifest.packageId.slice(2).toUpperCase(),
+  ]) {
+    assert.deepEqual(practiceDeployment(value), practiceDeployment());
+  }
+});
+
+test("an unknown or older contract never inherits the current contract capabilities", () => {
+  for (const value of [manifest.previousPackageId, "0x1", "invalid-package"]) {
+    const deployment = practiceDeployment(value, manifest.originalPackageId);
+    assert.equal(deployment.enrollmentReady, false);
+    assert.equal(deployment.fundingReady, false);
+    assert.equal(deployment.originalPackageId, manifest.originalPackageId);
+  }
+});
 
 test("setup checks reject placeholders and never include credential values", () => {
   for (const value of [

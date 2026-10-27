@@ -2,7 +2,8 @@
   "compilerOptions": {
     "target": "ES2023",
     "module": "NodeNext",
-    "rewriteRelativeImportExtensions": true
+    "rewriteRelativeImportExtensions": true,
+    "resolveJsonModule": true
   },
   "files": [],
   "references": [
