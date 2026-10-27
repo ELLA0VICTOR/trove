@@ -44,7 +44,7 @@ flowchart LR
 
 ## Identity and authority
 
-Signup starts with an email address. A 30-minute hashed challenge verifies inbox ownership before creating a member, family portfolio, or authenticated session. A username is assigned automatically and can be changed in Settings. A guardian creates a family and invites a learner using an expiring, single-use token; the learner verifies a separate email before the invitation is consumed. Each member has separate credentials. Passwords use salted scrypt derivation; sessions contain random opaque tokens whose hashes are stored in the database.
+Signup starts with an email address and password. Pending requests retain a salted scrypt hash; verification activates the account using that hash. A 30-minute hashed challenge verifies inbox ownership before creating a member, family portfolio, or authenticated session. A username is assigned automatically and can be changed in Settings. A guardian creates a family and invites a learner using an expiring, single-use token; the learner verifies a separate email before the invitation is consumed. Each member has separate credentials. Passwords use salted scrypt derivation; sessions contain random opaque tokens whose hashes are stored in the database.
 
 Verified recovery emails are separate authentication records. Users can sign in with a username or verified email. Verification and reset links use hashed, single-use tokens bound to the current credential version; reset links expire after 15 minutes. Password changes revoke member sessions and outstanding recovery tokens. A learner without a verified email can recover through the parent's verified inbox. Account addresses stay outside Walrus learning records and coaching prompts.
 

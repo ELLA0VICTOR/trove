@@ -1,6 +1,12 @@
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
-import { Accounts, AccessError, digest, recoveryEmail } from "./auth.ts";
+import {
+  Accounts,
+  AccessError,
+  digest,
+  recoveryEmail,
+  derive,
+} from "./auth.ts";
 import type { DemoStore } from "./store.ts";
 import type { AccountMail } from "./integrations/account-mail.ts";
 
@@ -8,7 +14,13 @@ type Signup = {
   token_hash: string;
   email: string;
   invitation_hash: string | null;
+  salt: string | null;
+  password_hash: string | null;
 };
+const passwordSchema = z
+  .string()
+  .min(12, "Use a password with at least 12 characters.")
+  .max(128);
 const challenge = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
 const unavailable = () =>
   new AccessError(
@@ -51,8 +63,12 @@ export class AccountSignup {
       });
   }
   async request(input: unknown, joining = false) {
-    const { email, code } = z
-      .object({ email: recoveryEmail, code: z.string().length(32).optional() })
+    const { email, code, password } = z
+      .object({
+        email: recoveryEmail,
+        password: passwordSchema,
+        code: z.string().length(32).optional(),
+      })
       .parse(input);
     if (!this.mail)
       throw new AccessError(
@@ -65,9 +81,11 @@ export class AccountSignup {
     if (invitationHash) await this.invitation(invitationHash);
     await this.accounts.limit(`signup-email:${digest(email)}`, 3, 15 * 60000);
     await this.accounts.limit("signup-email:global", 60, 3600000);
+    const salt = randomBytes(32).toString("hex");
+    const passwordHash = (await derive(password, salt)).toString("hex");
     // Lookup and sending are deferred equally for registered and new addresses.
     this.defer(
-      this.deliver(email, invitationHash).catch(() => {
+      this.deliver(email, salt, passwordHash, invitationHash).catch(() => {
         console.error("[trove] A signup email could not be prepared.");
       }),
     );
@@ -91,7 +109,12 @@ export class AccountSignup {
         409,
       );
   }
-  private async deliver(email: string, invitationHash?: string) {
+  private async deliver(
+    email: string,
+    salt: string,
+    passwordHash: string,
+    invitationHash?: string,
+  ) {
     if (
       await this.store.db
         .prepare("SELECT 1 FROM account_emails WHERE email=?")
@@ -109,9 +132,17 @@ export class AccountSignup {
         .run(email, now);
       await this.store.db
         .prepare(
-          "INSERT INTO account_signups(token_hash,email,invitation_hash,expires_at,created_at,state) VALUES(?,?,?,?,?,'pending')",
+          "INSERT INTO account_signups(token_hash,email,invitation_hash,expires_at,created_at,state,salt,password_hash) VALUES(?,?,?,?,?,'pending',?,?)",
         )
-        .run(hash, email, invitationHash ?? null, now + 30 * 60000, now);
+        .run(
+          hash,
+          email,
+          invitationHash ?? null,
+          now + 30 * 60000,
+          now,
+          salt,
+          passwordHash,
+        );
     });
     const url = new URL("/app/create-account", this.origin);
     url.hash = new URLSearchParams({ token }).toString();
@@ -119,7 +150,7 @@ export class AccountSignup {
       await this.mail!.send({
         to: email,
         subject: "Verify your email to join Trove",
-        text: `Welcome to Trove. Open this link to verify your email and choose a password for your ${invitationHash ? "learner" : "family"} account:\n${url}\n\nThis link expires in 30 minutes and can be used once. Your username will be assigned automatically; you can change it in Settings. If you did not request an account, leave this link unused.`,
+        text: `Welcome to Trove. Open this link to verify your email and activate your ${invitationHash ? "learner" : "family"} account:\n${url}\n\nThis link expires in 30 minutes and can be used once. Your username will be assigned automatically; you can change it in Settings. If you did not request an account, leave this link unused.`,
         idempotencyKey: `trove-signup-${hash}`,
       });
       await this.store.db
@@ -139,7 +170,7 @@ export class AccountSignup {
     if (!parsed.success) throw unavailable();
     const row = (await this.store.db
       .prepare(
-        "SELECT token_hash,email,invitation_hash FROM account_signups WHERE token_hash=? AND expires_at>? AND state IN ('pending','sent')",
+        "SELECT token_hash,email,invitation_hash,salt,password_hash FROM account_signups WHERE token_hash=? AND expires_at>? AND state IN ('pending','sent')",
       )
       .get(digest(parsed.data), Date.now())) as Signup | undefined;
     if (!row) throw unavailable();
@@ -152,27 +183,32 @@ export class AccountSignup {
     return {
       email: row.email,
       role: row.invitation_hash ? "learner" : "parent",
+      needsPassword: !row.salt || !row.password_hash,
     };
   }
   async complete(input: unknown) {
     const { token, password } = z
       .object({
         token: z.string(),
-        password: z
-          .string()
-          .min(12, "Use a password with at least 12 characters.")
-          .max(128),
+        password: passwordSchema.optional(),
       })
       .parse(input);
     const initial = await this.token(token);
     return this.store.atomic(async () => {
       await this.store.db.lock(`signup-email:${digest(initial.email)}`);
       const row = await this.token(token);
-      const result = await this.accounts.createVerified(
-        row.email,
-        password,
-        row.invitation_hash ?? undefined,
-      );
+      const result =
+        row.salt && row.password_hash
+          ? await this.accounts.createVerifiedFromHash(
+              row.email,
+              { salt: row.salt, passwordHash: row.password_hash },
+              row.invitation_hash ?? undefined,
+            )
+          : await this.accounts.createVerified(
+              row.email,
+              passwordSchema.parse(password),
+              row.invitation_hash ?? undefined,
+            );
       await this.store.db
         .prepare("DELETE FROM account_signups WHERE email=?")
         .run(row.email);

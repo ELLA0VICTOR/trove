@@ -19,7 +19,7 @@ Pass when visitors can browse and learn while personal actions require sign-in.
 In the parent browser:
 
 1. Open Home and select Create a family account.
-2. Enter your email and select Send verification link. Open the email link within 30 minutes, choose and confirm a password, then select Create account. Trove assigns a username automatically. Select Continue to Trove.
+2. Enter an email inbox you can open and a password of at least 12 characters, then select Sign up. Open the emailed link within 30 minutes and select Verify email. Trove assigns a username automatically. Select Continue to Trove.
 3. Expect Your portfolio, $1,000 in practice cash, and no holdings or decisions.
 4. Select Settings on Home. You can change the assigned username to something memorable, such as trove_parent_01, and select Save username. Select Create learner invitation and copy the invitation code.
 5. Your signup email is already verified and can recover your password. Existing username accounts can add one under Settings > Recovery email using their current password. See [email setup](EMAIL-SETUP.md). In the account panel, read and tick the Remember learning consent checkbox, then select Enable remembering. This enables storage of this family's learning records and the remembered guide for its learner.
@@ -32,7 +32,7 @@ Pass when the parent has a saved family, an invitation, remembering enabled, and
 In the separate learner browser:
 
 1. Open Trove and select Sign in > Join a family.
-2. Paste the invitation code, enter a different email address you can open, and select Send verification link. Open the emailed link in the learner browser, choose and confirm a password, and select Create account. Select Continue to Trove. In Settings, you can change the assigned username to trove_learner_01.
+2. Paste the invitation code, enter a different email address you can open and a password of at least 12 characters, and select Sign up. Open the emailed link in the learner browser and select Verify email. Select Continue to Trove. In Settings, you can change the assigned username to trove_learner_01.
 3. Expect the same family's $1,000 practice portfolio.
 4. Open Parent. Expect Parent account required, without editable limits. Return to Home.
 

@@ -59,7 +59,7 @@ async function setup() {
     const response = await target.request(
       code ? "/auth/join" : "/auth/register",
       "POST",
-      { email: `${username}@example.com`, ...(code ? { code } : {}) },
+      { email: `${username}@example.com`, password, ...(code ? { code } : {}) },
     );
     assert.equal(response.status, 202);
     await email.flush();
@@ -207,6 +207,7 @@ test("family invitations are single use and roles cannot be switched or borrowed
         await other.request("/auth/join", "POST", {
           code: invitation.code,
           email: "another_learner@example.com",
+          password,
         })
       ).status,
       409,

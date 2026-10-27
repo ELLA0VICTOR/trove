@@ -102,6 +102,7 @@ export function Modal({
 }) {
   const dialog = useRef<HTMLDialogElement>(null),
     callback = useRef(onClose);
+  const pointerStartedOutside = useRef(false);
   useEffect(() => {
     callback.current = onClose;
   }, [onClose]);
@@ -126,8 +127,19 @@ export function Modal({
       ref={dialog}
       className={`modal ${wide ? "modal-wide" : ""} ${className}`}
       aria-labelledby="dialog-title"
+      onPointerDown={(event) => {
+        const rect = dialog.current?.getBoundingClientRect();
+        pointerStartedOutside.current = Boolean(
+          rect &&
+          event.target === dialog.current &&
+          (event.clientX < rect.left ||
+            event.clientX > rect.right ||
+            event.clientY < rect.top ||
+            event.clientY > rect.bottom),
+        );
+      }}
       onClick={(event) => {
-        if (event.target === dialog.current) {
+        if (pointerStartedOutside.current && event.target === dialog.current) {
           const rect = dialog.current.getBoundingClientRect();
           if (
             event.clientX < rect.left ||

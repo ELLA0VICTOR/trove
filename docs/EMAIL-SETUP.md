@@ -32,14 +32,14 @@ Account links use the trusted application origin. Vercel supplies the deployment
 
 ## Create an account
 
-1. Select **Create family** and enter an email address. Learners select **Join a family** and enter their invitation code and email address.
-2. Select **Send verification link**. The signup form asks for email; the username is generated later.
-3. Open the emailed link within 30 minutes. Choose and confirm a password of at least 12 characters, then select **Create account**.
+1. Select **Create family** and enter an email address and password of at least 12 characters. Learners select **Join a family** and enter their invitation code, email address, and password.
+2. Select **Sign up**. Trove sends a verification link; the username is generated after verification.
+3. Open the emailed link within 30 minutes and select **Verify email**. Use the password chosen in the signup form when signing in later.
 4. Trove creates the verified account and signs you in. The welcome screen shows the assigned username.
 5. Select **Continue to Trove > Settings**. Change the username and select **Save username** if desired.
 6. Sign out and sign back in with either the email address or current username and password.
 
-Email requests create pending challenges only. Family membership, a portfolio, and a session are created after the verification link is completed. Learner invitations are checked again and consumed at completion. Each account uses its own email address.
+Signup requests store a salted password hash alongside a pending email challenge. The raw password stays out of emails and stored records. Family membership, a portfolio, and a session are created after the verification link is completed. Learner invitations are checked again and consumed at completion. Each account uses its own email address.
 
 ## Verify an existing account
 
@@ -63,7 +63,7 @@ Existing learner accounts without email retain recovery through the parent's ver
 
 ## Implementation
 
-Signup links expire after 30 minutes. Recovery-email verification links expire after 24 hours and require an explicit confirmation. Password-reset links expire after 15 minutes and can be consumed once. The database stores token hashes and credential-version checks. Tokens travel in URL fragments and are removed from the page address before submission.
+Signup links expire after 30 minutes. Verification activates the account using the password chosen at signup. Previously issued email-first links continue to let their recipient choose a password before activation. Recovery-email verification links expire after 24 hours and require an explicit confirmation. Password-reset links expire after 15 minutes and can be consumed once. The database stores token hashes and credential-version checks. Tokens travel in URL fragments and are removed from the page address before submission.
 
 Email changes require the current password and proof of inbox ownership. The previous verified address remains active until replacement verification succeeds. Password resets invalidate the member's sessions and recovery tokens; parent resets also revoke unused learner invitations. Shared database rate limits apply to requests and email sends.
 

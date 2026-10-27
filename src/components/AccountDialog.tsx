@@ -42,6 +42,7 @@ export function AccountDialog({
       } else {
         const result = await api<{ message: string }>(`/auth/${mode}`, "POST", {
           email: email.trim(),
+          password,
           ...(mode === "join" ? { code } : {}),
         });
         setSignupMessage(result.message);
@@ -373,9 +374,21 @@ export function AccountDialog({
                     }}
                   />
                 </label>
+                <label className="field-label">
+                  Password
+                  <input
+                    required
+                    type="password"
+                    minLength={12}
+                    maxLength={128}
+                    autoComplete="new-password"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                  />
+                </label>
                 <p>
-                  Verify your email, then choose a password. Your username is
-                  assigned automatically and can be changed in Settings.
+                  Use at least 12 characters. Verify your email to activate your
+                  account.
                 </p>
                 {!state?.session?.recovery?.ready && (
                   <p>Email signup is not available yet.</p>
@@ -391,12 +404,12 @@ export function AccountDialog({
               }
             >
               {sending
-                ? "Sending?"
+                ? "Sending..."
                 : mode === "login"
                   ? "Sign in"
                   : signupMessage
                     ? "Resend verification link"
-                    : "Send verification link"}
+                    : "Sign up"}
             </Button>
             {mode !== "login" && signupMessage && (
               <p role="status">{signupMessage}</p>

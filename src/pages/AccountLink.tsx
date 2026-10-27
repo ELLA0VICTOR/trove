@@ -18,16 +18,25 @@ export function AccountLink({
   const [busy, setBusy] = useState(false);
   const [complete, setComplete] = useState(false);
   const [error, setError] = useState("");
-  const [signup, setSignup] = useState<{ email: string; role: string } | null>(
-    null,
-  );
+  const [signup, setSignup] = useState<{
+    email: string;
+    role: string;
+    needsPassword: boolean;
+  } | null>(null);
   const [username, setUsername] = useState("");
+  const passwordRequired =
+    purpose === "reset" ||
+    (purpose === "signup" && Boolean(signup?.needsPassword));
   useEffect(() => {
     if (purpose !== "signup" || !token) return;
     let active = true;
-    void api<{ email: string; role: string }>("/auth/signup-details", "POST", {
-      token,
-    })
+    void api<{ email: string; role: string; needsPassword: boolean }>(
+      "/auth/signup-details",
+      "POST",
+      {
+        token,
+      },
+    )
       .then((details) => {
         if (active) setSignup(details);
       })
@@ -49,7 +58,7 @@ export function AccountLink({
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setError("");
-    if (purpose !== "verify" && password !== confirmation) {
+    if (passwordRequired && password !== confirmation) {
       setError("The passwords do not match.");
       return;
     }
@@ -58,7 +67,7 @@ export function AccountLink({
       const result = await api<{ session?: { username?: string } }>(
         `/auth/${purpose === "signup" ? "complete-signup" : purpose === "verify" ? "verify-email" : "reset-password"}`,
         "POST",
-        { token, ...(purpose !== "verify" ? { password } : {}) },
+        { token, ...(passwordRequired ? { password } : {}) },
       );
       setUsername(result.session?.username ?? "");
       setPassword("");
@@ -119,7 +128,9 @@ export function AccountLink({
             )}
             <h1>
               {purpose === "signup"
-                ? "Create your account."
+                ? signup?.needsPassword
+                  ? "Create your account."
+                  : "Verify your email."
                 : purpose === "verify"
                   ? "Verify your email."
                   : "Choose a new password."}
@@ -127,13 +138,15 @@ export function AccountLink({
             <p>
               {purpose === "signup"
                 ? signup
-                  ? `Email verified: ${signup.email}. Choose a password to finish creating your ${signup.role === "learner" ? "learner" : "family"} account.`
-                  : "Checking your verification link?"
+                  ? signup.needsPassword
+                    ? `Choose a password to finish creating the account for ${signup.email}.`
+                    : `Confirm ${signup.email} to activate your ${signup.role === "learner" ? "learner" : "family"} account.`
+                  : "Checking your verification link..."
                 : purpose === "verify"
                   ? "Confirm this inbox as your Trove recovery email."
                   : "Use at least 12 characters. Updating your password signs this account out on other devices."}
             </p>
-            {purpose !== "verify" && (
+            {passwordRequired && (
               <>
                 <label className="field-label">
                   {purpose === "signup" ? "Password" : "New password"}
@@ -175,7 +188,9 @@ export function AccountLink({
               {busy
                 ? "Saving…"
                 : purpose === "signup"
-                  ? "Create account"
+                  ? signup?.needsPassword
+                    ? "Create account"
+                    : "Verify email"
                   : purpose === "verify"
                     ? "Verify email"
                     : "Save new password"}

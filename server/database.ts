@@ -47,7 +47,7 @@ CREATE INDEX IF NOT EXISTS session_expiration ON account_sessions(expires_at);
 CREATE TABLE IF NOT EXISTS account_emails(member TEXT PRIMARY KEY,email TEXT UNIQUE NOT NULL,verified_at INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS account_email_tokens(token_hash TEXT PRIMARY KEY,member TEXT NOT NULL,purpose TEXT NOT NULL CHECK(purpose IN ('verify','reset')),email TEXT NOT NULL,credential_version TEXT NOT NULL,expires_at INTEGER NOT NULL,created_at INTEGER NOT NULL,state TEXT NOT NULL CHECK(state IN ('pending','sent','failed')),provider_id TEXT);
 CREATE INDEX IF NOT EXISTS account_email_tokens_member ON account_email_tokens(member,purpose,created_at);
-CREATE TABLE IF NOT EXISTS account_signups(token_hash TEXT PRIMARY KEY,email TEXT NOT NULL,invitation_hash TEXT,expires_at INTEGER NOT NULL,created_at INTEGER NOT NULL,state TEXT NOT NULL CHECK(state IN ('pending','sent','failed')));
+CREATE TABLE IF NOT EXISTS account_signups(token_hash TEXT PRIMARY KEY,email TEXT NOT NULL,invitation_hash TEXT,expires_at INTEGER NOT NULL,created_at INTEGER NOT NULL,state TEXT NOT NULL CHECK(state IN ('pending','sent','failed')),salt TEXT,password_hash TEXT);
 CREATE INDEX IF NOT EXISTS account_signups_email ON account_signups(email,created_at);
 `;
 
@@ -138,6 +138,11 @@ export class Database {
         this.local.exec(
           "ALTER TABLE memory_outbox ADD COLUMN lease_token TEXT",
         );
+      for (const column of ["salt", "password_hash"])
+        if (!columns("account_signups").includes(column))
+          this.local.exec(
+            `ALTER TABLE account_signups ADD COLUMN ${column} TEXT`,
+          );
       this.ready = Promise.resolve();
       wrappers.set(this.local, this);
     } else {
@@ -180,6 +185,9 @@ export class Database {
         await client.query(`SET LOCAL search_path TO "${this.namespace}"`);
       }
       await client.query(postgresSql(schema));
+      await client.query(
+        "ALTER TABLE account_signups ADD COLUMN IF NOT EXISTS salt TEXT, ADD COLUMN IF NOT EXISTS password_hash TEXT",
+      );
       await client.query(
         "ALTER TABLE families ADD COLUMN IF NOT EXISTS version BIGINT NOT NULL DEFAULT 0",
       );

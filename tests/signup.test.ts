@@ -1,4 +1,6 @@
 import test from "node:test";
+import { DatabaseSync } from "node:sqlite";
+import { Database } from "../server/database.ts";
 import assert from "node:assert/strict";
 import { DemoStore } from "../server/store.ts";
 import { Accounts, digest } from "../server/auth.ts";
@@ -8,6 +10,38 @@ import { createApp } from "../server/app.ts";
 import { emailFixture, emailToken } from "./signup-helpers.ts";
 
 const password = "new-private-test-password";
+
+test("an existing SQLite signup table gains password columns without losing pending verification links", async () => {
+  const raw = new DatabaseSync(":memory:");
+  raw.exec(
+    "CREATE TABLE account_signups(token_hash TEXT PRIMARY KEY,email TEXT NOT NULL,invitation_hash TEXT,expires_at INTEGER NOT NULL,created_at INTEGER NOT NULL,state TEXT NOT NULL)",
+  );
+  const token = Buffer.alloc(32, 3).toString("base64url");
+  raw
+    .prepare("INSERT INTO account_signups VALUES(?,?,NULL,?,?,'sent')")
+    .run(digest(token), "migrated@example.com", Date.now() + 60000, Date.now());
+  const database = new Database({ sqlite: raw });
+  try {
+    const signup = new AccountSignup(new DemoStore(database), {
+      origin: "https://trove.example",
+    });
+    const details = await signup.details({ token });
+    assert.equal(details.email, "migrated@example.com");
+    assert.equal(details.needsPassword, true);
+    await signup.complete({ token, password });
+    assert.equal(
+      (
+        await new Accounts(new DemoStore(database)).login({
+          identifier: "migrated@example.com",
+          password,
+        })
+      ).member.role,
+      "parent",
+    );
+  } finally {
+    await database.close();
+  }
+});
 function setup() {
   const store = new DemoStore(":memory:");
   const email = emailFixture();
@@ -26,7 +60,10 @@ async function challenge(
   email = "new@example.com",
   code?: string,
 ) {
-  await f.signup.request({ email, ...(code ? { code } : {}) }, Boolean(code));
+  await f.signup.request(
+    { email, password, ...(code ? { code } : {}) },
+    Boolean(code),
+  );
   await f.email.flush();
   return emailToken(
     f.email.sent.findLast((message) => message.to === email)!.text,
@@ -74,6 +111,13 @@ test("signup requires inbox ownership before creating a member, portfolio or ses
       .get())!;
     assert.equal(row.token_hash, digest(token));
     assert.ok(!JSON.stringify(row).includes(token));
+    assert.ok(!JSON.stringify(row).includes(password));
+    assert.match(String(row.salt), /^[a-f0-9]{64}$/);
+    assert.match(String(row.password_hash), /^[a-f0-9]{128}$/);
+    assert.ok(!f.email.sent[0].text.includes(password));
+    await assert.rejects(() =>
+      f.accounts.login({ identifier: "new@example.com", password }),
+    );
     assert.match(
       f.email.sent[0].text,
       /https:\/\/trove.example\/app\/create-account#token=/,
@@ -81,11 +125,16 @@ test("signup requires inbox ownership before creating a member, portfolio or ses
     assert.deepEqual(await f.signup.details({ token }), {
       email: "new@example.com",
       role: "parent",
+      needsPassword: false,
     });
     const finished = await f.app.request("/api/auth/complete-signup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token, password, username: "ignored" }),
+      body: JSON.stringify({
+        token,
+        password: "this-is-not-the-original-password",
+        username: "ignored",
+      }),
     });
     assert.equal(finished.status, 200);
     const state = await finished.json();
@@ -122,7 +171,7 @@ test("expired, malformed, superseded and failed-delivery signup links cannot cre
         },
       },
     });
-    await failure.request({ email: "failure@example.com" });
+    await failure.request({ password, email: "failure@example.com" });
     await f.email.flush();
     assert.equal(
       (await f.store.db
@@ -159,7 +208,7 @@ test("concurrent signup completion creates exactly one verified identity and res
       1,
     );
     const count = f.email.sent.length;
-    await f.signup.request({ email: "new@example.com" });
+    await f.signup.request({ password, email: "new@example.com" });
     await f.email.flush();
     assert.equal(f.email.sent.length, count);
     const recovery = new AccountRecovery(f.store, f.options);
@@ -205,10 +254,13 @@ test("learner email verification consumes a valid invitation only when creating 
       learner.member.id,
     );
     await assert.rejects(() =>
-      f.signup.request({ email: "other@example.com", code: invite.code }, true),
+      f.signup.request(
+        { password, email: "other@example.com", code: invite.code },
+        true,
+      ),
     );
     await assert.rejects(() =>
-      f.signup.request({ email: "other@example.com" }, true),
+      f.signup.request({ password, email: "other@example.com" }, true),
     );
     await assert.rejects(() => f.accounts.invite(learner.member));
   } finally {
@@ -308,13 +360,13 @@ test("signup fails closed without mail configuration and bounds email requests",
     const response = await unconfigured.request("/api/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: "new@example.com" }),
+      body: JSON.stringify({ email: "new@example.com", password }),
     });
     assert.equal(response.status, 409);
     for (let i = 0; i < 3; i++)
-      await f.signup.request({ email: "limit@example.com" });
+      await f.signup.request({ password, email: "limit@example.com" });
     await assert.rejects(
-      () => f.signup.request({ email: "limit@example.com" }),
+      () => f.signup.request({ password, email: "limit@example.com" }),
       (error: unknown) => (error as { status: number }).status === 429,
     );
     await f.email.flush();
@@ -323,6 +375,50 @@ test("signup fails closed without mail configuration and bounds email requests",
         .prepare("SELECT count(*) AS n FROM account_members")
         .get())!.n,
       0,
+    );
+  } finally {
+    await f.store.db.close();
+  }
+});
+
+test("verification completes signup without resubmitting the chosen password", async () => {
+  const f = setup();
+  try {
+    await assert.rejects(() =>
+      f.signup.request({ email: "missing-password@example.com" }),
+    );
+    const token = await challenge(f);
+    const result = await f.signup.complete({ token });
+    assert.equal(
+      (await f.accounts.login({ identifier: "new@example.com", password }))
+        .member.id,
+      result.member.id,
+    );
+    assert.equal(
+      (await f.store.db
+        .prepare("SELECT count(*) AS n FROM account_signups")
+        .get())!.n,
+      0,
+    );
+  } finally {
+    await f.store.db.close();
+  }
+});
+
+test("links issued before the password-first update still accept a password after email verification", async () => {
+  const f = setup();
+  try {
+    const token = await challenge(f);
+    await f.store.db
+      .prepare("UPDATE account_signups SET salt=NULL,password_hash=NULL")
+      .run();
+    assert.equal((await f.signup.details({ token })).needsPassword, true);
+    await assert.rejects(() => f.signup.complete({ token }));
+    const result = await f.signup.complete({ token, password });
+    assert.equal(
+      (await f.accounts.login({ identifier: "new@example.com", password }))
+        .member.id,
+      result.member.id,
     );
   } finally {
     await f.store.db.close();

@@ -466,12 +466,15 @@ test("PostgreSQL email signup creates one verified account and retains renamed s
     origin: "https://trove.example",
   });
   const address = `pg_signup_${randomUUID().slice(0, 8)}@example.com`;
-  await signup.request({ email: address });
+  await signup.request({
+    email: address,
+    password: "postgres-signup-password",
+  });
   await email.flush();
   const token = emailToken(email.sent.at(-1)!.text);
   const results = await Promise.allSettled([
-    signup.complete({ token, password: "postgres-signup-password" }),
-    signup.complete({ token, password: "postgres-signup-password" }),
+    signup.complete({ token }),
+    signup.complete({ token }),
   ]);
   assert.equal(
     results.filter((result) => result.status === "fulfilled").length,

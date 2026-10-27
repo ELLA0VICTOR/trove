@@ -7,6 +7,26 @@ const mailFile = resolve(
   process.env.TROVE_BROWSER_DATA_DIR ?? ".artifacts/browser-store",
   "mail.jsonl",
 );
+test("dragging from a signup field onto the backdrop keeps the form open", async ({
+  page,
+}) => {
+  await page.goto("/app?signin=1");
+  const dialog = page.getByRole("dialog");
+  const field = await dialog
+    .getByLabel("Username or email", { exact: true })
+    .boundingBox();
+  const box = await dialog.boundingBox();
+  if (!field || !box) throw new Error("Sign-in dialog did not open.");
+  await page.mouse.move(field.x + 20, field.y + field.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(Math.max(1, box.x - 20), Math.max(1, box.y - 20), {
+    steps: 6,
+  });
+  await page.mouse.up();
+  await expect(dialog).toBeVisible();
+  await page.mouse.click(Math.max(1, box.x - 20), Math.max(1, box.y - 20));
+  await expect(dialog).toHaveCount(0);
+});
 async function signupToken(email: string) {
   let token = "";
   await expect
@@ -38,12 +58,18 @@ async function createVerifiedAccount(
   const email = `${username}@example.com`;
   const response = await request.post(
     code ? "/api/auth/join" : "/api/auth/register",
-    { data: { email, ...(code ? { code } : {}) } },
+    {
+      data: {
+        email,
+        password: "browser-test-password",
+        ...(code ? { code } : {}),
+      },
+    },
   );
   expect(response.status()).toBe(202);
   const token = await signupToken(email);
   const complete = await request.post("/api/auth/complete-signup", {
-    data: { token, password: "browser-test-password" },
+    data: { token },
   });
   expect(complete.ok()).toBe(true);
   const renamed = await request.post("/api/account/username", {
@@ -56,18 +82,11 @@ async function finishSignupScreen(page: Page, email: string, username: string) {
   const token = await signupToken(email);
   await page.goto(`/app/create-account#token=${token}`);
   await expect(
-    page.getByRole("button", { name: "Create account", exact: true }),
+    page.getByRole("button", { name: "Verify email", exact: true }),
   ).toBeEnabled();
   expect(new URL(page.url()).hash).toBe("");
-  await page
-    .getByLabel("Password", { exact: true })
-    .fill("browser-test-password");
-  await page
-    .getByLabel("Confirm password", { exact: true })
-    .fill("browser-test-password");
-  await page
-    .getByRole("button", { name: "Create account", exact: true })
-    .click();
+  await expect(page.getByLabel("Password", { exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Verify email", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Welcome to Trove." }),
   ).toBeVisible();
@@ -341,14 +360,15 @@ test("portfolio stays hidden until sign-in and returns to the welcome screen aft
     .click();
   let dialog = page.getByRole("dialog");
   await expect(dialog.getByLabel("Username", { exact: true })).toHaveCount(0);
-  await expect(dialog.getByLabel("Password", { exact: true })).toHaveCount(0);
+  await expect(dialog.getByLabel("Password", { exact: true })).toBeVisible();
   const username = `welcome_${crypto.randomUUID().slice(0, 8)}`;
   await dialog
     .getByLabel("Email", { exact: true })
     .fill(`${username}@example.com`);
   await dialog
-    .getByRole("button", { name: "Send verification link", exact: true })
-    .click();
+    .getByLabel("Password", { exact: true })
+    .fill("browser-test-password");
+  await dialog.getByRole("button", { name: "Sign up", exact: true }).click();
   await expect(dialog.getByRole("status")).toContainText("Check your inbox");
   expect(
     (await (await page.request.get("/api/state")).json()).session.mode,
@@ -405,8 +425,9 @@ test("family sign-in and learner invitations preserve separate roles and returni
     .getByLabel("Email", { exact: true })
     .fill(`${parent}@example.com`);
   await dialog
-    .getByRole("button", { name: "Send verification link", exact: true })
-    .click();
+    .getByLabel("Password", { exact: true })
+    .fill("browser-test-password");
+  await dialog.getByRole("button", { name: "Sign up", exact: true }).click();
   await expect(dialog.getByRole("status")).toContainText("Check your inbox");
   await finishSignupScreen(page, `${parent}@example.com`, parent);
   await page.getByRole("button", { name: parent, exact: true }).click();
@@ -440,8 +461,9 @@ test("family sign-in and learner invitations preserve separate roles and returni
       .getByLabel("Email", { exact: true })
       .fill(`${learner}@example.com`);
     await join
-      .getByRole("button", { name: "Send verification link", exact: true })
-      .click();
+      .getByLabel("Password", { exact: true })
+      .fill("browser-test-password");
+    await join.getByRole("button", { name: "Sign up", exact: true }).click();
     await expect(join.getByRole("status")).toContainText("Check your inbox");
     await finishSignupScreen(child, `${learner}@example.com`, learner);
     expect(
@@ -606,6 +628,9 @@ test("a practice buy persists after reload with its original explanation", async
   ).toBeVisible();
   await page.getByRole("button", { name: "Keep growing" }).click();
   await page.goto("/app/decisions");
+  await expect(
+    page.getByRole("heading", { name: "Decisions", exact: true }),
+  ).toBeVisible();
   await page.reload();
   await expect(
     page.getByRole("button", {

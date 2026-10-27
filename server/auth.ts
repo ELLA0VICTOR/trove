@@ -259,6 +259,27 @@ export class Accounts {
     credentials.shape.password.parse(password);
     const salt = randomBytes(32).toString("hex");
     const hash = await derive(password, salt);
+    return this.createVerifiedFromHash(
+      email,
+      { salt, passwordHash: hash.toString("hex") },
+      invitationHash,
+    );
+  }
+  /** Only the verified signup service supplies these database-held credentials. */
+  async createVerifiedFromHash(
+    email: string,
+    credential: { salt: string; passwordHash: string },
+    invitationHash?: string,
+  ) {
+    email = recoveryEmail.parse(email);
+    const salt = z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .parse(credential.salt);
+    const passwordHash = z
+      .string()
+      .regex(/^[a-f0-9]{128}$/)
+      .parse(credential.passwordHash);
     return this.store.atomic(async () => {
       await this.db.lock("family-membership");
       await this.db.lock("account-usernames");
@@ -339,7 +360,7 @@ export class Accounts {
           username,
           member.role,
           salt,
-          hash.toString("hex"),
+          passwordHash,
         );
       await this.db
         .prepare(
