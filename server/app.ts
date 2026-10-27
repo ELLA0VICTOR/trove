@@ -480,7 +480,11 @@ export function createApp(
   app.post("/api/approvals", async (c) => {
     const member = requireMember(c, "learner");
     await learnerAction(c);
-    if (!chain.config || !(await chain.account(member.family)))
+    if (
+      !chain.config ||
+      !(await chain.account(member.family)) ||
+      !(await chain.status(member)).learnerBound
+    )
       throw new DomainError(
         "Complete family wallet setup on Home before requesting a trade.",
       );

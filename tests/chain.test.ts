@@ -14,6 +14,9 @@ import {
   ClockBcs,
   CorporateAppliedBcs,
   FundedBcs,
+  CreatedBcs,
+  LearnerEnrolledBcs,
+  UNASSIGNED_LEARNER,
 } from "../shared/chain.ts";
 import { applyAdjustment } from "../shared/corporate-actions.ts";
 import { preview } from "../server/domain.ts";
@@ -171,6 +174,217 @@ test("Testnet role checks and active contracts refuse local permission and order
 function parentKeyAddress() {
   return Ed25519Keypair.generate().toSuiAddress();
 }
+
+test("parent-only activation reconciles, learner self-enrollment preserves the portfolio and locks both authorities", async () => {
+  const {
+    store,
+    chain,
+    gateway,
+    parent,
+    learner,
+    parentKey,
+    learnerKey,
+    attestor,
+  } = setup();
+  try {
+    chain.config!.enrollmentReady = true;
+    const challenge = await chain.challenge(parent, parentKey.toSuiAddress());
+    await chain.link(
+      parent,
+      challenge.id,
+      (await parentKey.signPersonalMessage(Buffer.from(challenge.message)))
+        .signature,
+    );
+    const state = await store.get(parent.family);
+    state.portfolio = {
+      id: randomUUID(),
+      initialCash: "6000000000",
+      datasetId: "market-dataset",
+      startedAt: new Date().toISOString(),
+    };
+    state.policy.paused = true;
+    await store.set(state);
+    const creation = {
+      id: randomUUID(),
+      family: parent.family,
+      member: parent.id,
+      action: "create",
+      payload: JSON.stringify({
+        initialCash: "6000000000",
+        learnerAddress: UNASSIGNED_LEARNER,
+      }),
+      bytes: "AQID",
+      digest: "parent-only-creation",
+      signature: "sig",
+      state: "pending",
+      expires_at: Date.now() + 60000,
+      error: null,
+    };
+    await store.db
+      .prepare("INSERT INTO chain_intents VALUES(?,?,?,?,?,?,?,?,?,?,?)")
+      .run(...Object.values(creation));
+    let chainLearner = UNASSIGNED_LEARNER,
+      sequence = "0",
+      wrongEvent = false,
+      wrongCash = false;
+    gateway.receipt = async (digest) =>
+      ({
+        state: "confirmed",
+        transaction: {
+          digest,
+          events: [
+            {
+              packageId,
+              module: "practice",
+              eventType: `${packageId}::practice::${digest === creation.digest ? "Created" : "LearnerEnrolled"}`,
+              bcs:
+                digest === creation.digest
+                  ? CreatedBcs.serialize({
+                      account: objectId,
+                      guardian: parentKey.toSuiAddress(),
+                      learner: UNASSIGNED_LEARNER,
+                    }).toBytes()
+                  : LearnerEnrolledBcs.serialize({
+                      account: objectId,
+                      learner: wrongEvent
+                        ? parentKey.toSuiAddress()
+                        : learnerKey.toSuiAddress(),
+                      sequence,
+                    }).toBytes(),
+            },
+          ],
+        },
+      }) as never;
+    gateway.object = async () =>
+      ({
+        object: {
+          type: `${packageId}::practice::Account`,
+          content: AccountBcs.serialize({
+            id: objectId,
+            guardian: parentKey.toSuiAddress(),
+            learner: chainLearner,
+            attestor: Array.from(attestor.getPublicKey().toRawBytes()),
+            cash: wrongCash ? "1" : "6000000000",
+            positions: [],
+            per_trade: state.policy.perTrade,
+            daily: state.policy.daily,
+            paused: true,
+            allowed: state.policy.allowed.map((s) =>
+              Array.from(Buffer.from(s)),
+            ),
+            revision: "0",
+            sequence,
+            day_spent: "0",
+            spend_day: "0",
+            approval: [],
+          }).toBytes(),
+        },
+      }) as never;
+    await chain.reconcile(creation);
+    await chain.reconcile(creation);
+    const active = await store.get(parent.family);
+    assert.equal(active.cash, "6000000000");
+    assert.equal(active.holdings.length, 0);
+    assert.equal((await chain.status(parent)).learnerBound, false);
+    assert.equal((await chain.status(parent)).account, objectId);
+    assert.equal(await chain.wallet(parent.family, "learner"), undefined);
+    await assert.rejects(
+      () => chain.challenge(parent, Ed25519Keypair.generate().toSuiAddress()),
+      /fixed wallet/,
+    );
+    await assert.rejects(
+      () => chain.prepare(parent, { action: "enroll" }),
+      /other family role/,
+    );
+    await assert.rejects(
+      () => chain.prepare(learner, { action: "order", quoteId: randomUUID() }),
+      /own practice wallet/,
+    );
+    const link = await chain.challenge(learner, learnerKey.toSuiAddress());
+    const linkStatus = await chain.link(
+      learner,
+      link.id,
+      (await learnerKey.signPersonalMessage(Buffer.from(link.message)))
+        .signature,
+    );
+    assert.equal(linkStatus.learnerBound, false);
+    assert.equal(
+      await chain.enrolledLearner(parent.family),
+      UNASSIGNED_LEARNER,
+    );
+    await assert.rejects(
+      () => chain.prepare(learner, { action: "order", quoteId: randomUUID() }),
+      /finish connecting/,
+    );
+    const enrollment = {
+      ...creation,
+      id: randomUUID(),
+      member: learner.id,
+      action: "enroll",
+      digest: "learner-enrollment",
+      payload: JSON.stringify({
+        action: "enroll",
+        learner: learnerKey.toSuiAddress(),
+        sequence: 0,
+        portfolioId: active.portfolio!.id,
+      }),
+    };
+    await store.db
+      .prepare("INSERT INTO chain_intents VALUES(?,?,?,?,?,?,?,?,?,?,?)")
+      .run(...Object.values(enrollment));
+    chainLearner = learnerKey.toSuiAddress();
+    sequence = "1";
+    wrongEvent = true;
+    await assert.rejects(
+      () => chain.reconcile(enrollment),
+      /registration receipt/,
+    );
+    assert.equal(
+      await chain.enrolledLearner(parent.family),
+      UNASSIGNED_LEARNER,
+    );
+    wrongEvent = false;
+    wrongCash = true;
+    await assert.rejects(
+      () => chain.reconcile(enrollment),
+      /registration receipt/,
+    );
+    wrongCash = false;
+    await chain.reconcile(enrollment);
+    await chain.reconcile(enrollment);
+    const after = await store.get(parent.family);
+    assert.equal(after.portfolio!.id, active.portfolio!.id);
+    assert.equal(after.cash, active.cash);
+    assert.deepEqual(after.policy, active.policy);
+    assert.equal(after.sequence, 1);
+    assert.equal((await chain.status(learner)).learnerBound, true);
+    await assert.rejects(
+      () => chain.challenge(learner, Ed25519Keypair.generate().toSuiAddress()),
+      /fixed wallet/,
+    );
+    await assert.rejects(
+      () => chain.prepare(learner, { action: "enroll" }),
+      /not waiting/,
+    );
+  } finally {
+    await store.db.close();
+  }
+});
+
+test("old contracts cannot prepare a parent-only activation", async () => {
+  const { store, chain, parent, parentKey } = setup();
+  try {
+    await store.db
+      .prepare("INSERT INTO chain_wallets VALUES(?,?,?)")
+      .run(parent.family, "parent", parentKey.toSuiAddress());
+    await assert.rejects(
+      () => chain.prepare(parent, { action: "create" }),
+      /updated Sui practice contract/,
+    );
+  } finally {
+    await store.db.close();
+  }
+});
 test("upgraded corporate receipts validate date, final balances and original object identity before posting once", async () => {
   const {
     store,

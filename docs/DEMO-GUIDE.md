@@ -44,10 +44,10 @@ Wallet setup is part of the main practice flow on Home. Complete it before placi
 
 1. Use two normal browser profiles, one for each role, with the [Slush browser extension](https://slush.app/get-started) installed in both. Create a different wallet address for each role and select Testnet in each wallet's network settings.
 2. Parent: open Home > Set up your family portfolio > Link Slush. Approve the wallet-link message.
-3. Learner: open Home and link their different Slush address. Approve the wallet-link message.
-4. Expect both wallet steps to show connected. The other role's connection appears when the page refreshes or regains focus.
-5. Parent: select Activate practice portfolio on Home and approve the wallet transaction. Testnet gas is sponsored.
-6. Wait for confirmation. Expect a fresh portfolio with the family's current practice capital: $1,000 by default, or $6,000 if the parent previously added $5,000. Any earlier holdings and trading activity are archived; saved learning stays associated with the family.
+3. Parent: select Activate practice portfolio on Home and approve the wallet transaction. The learner does not need a wallet or account yet. Testnet gas is sponsored.
+4. Wait for confirmation. Expect Your portfolio is active and a fresh portfolio with the family's current practice capital: $1,000 by default, or $6,000 if the parent previously added $5,000. Any earlier holdings and trading activity are archived; saved learning stays associated with the family. Parent limits and refills are available immediately.
+5. Learner: after joining the family, open Home and link their different Slush address. Approve the wallet-link message, then the learner-registration transaction. No further parent approval is required. If the transaction is interrupted, select Finish connecting Slush to resume.
+6. Expect setup to disappear once registration confirms. The balance, portfolio identity, and parent limits stay unchanged. Refresh either browser to see the completed connection. If both wallets were already linked before activation, no later registration is needed.
 7. Open Settings > Practice wallet > View practice contract account to inspect the Testnet object.
 
 Pass when setup is complete, the contract account exists, and parent and learner remain linked to their separate wallets. Signed execution is the only trading path. If wallet setup is unavailable, browsing and learning remain available while trading waits for setup.

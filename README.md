@@ -86,7 +86,7 @@ The learning guide carries context across sessions through Walrus Memory. It con
 6. **Learn from it.** The learner reviews the decision, compares alternatives, records a reflection, and completes a concept check.
 7. **Carry understanding forward.** With remembering enabled, the guide retrieves confirmed learning records in later sessions.
 
-Wallet setup is part of onboarding on Home. The guardian signs controls, the learner signs orders, and the server sponsors Testnet gas. Existing families activate a fresh contract-backed portfolio with their supplied practice capital; earlier activity is archived and learning history stays with the family.
+Wallet setup is part of onboarding on Home. The guardian can activate the portfolio before the learner connects. The learner later links their own wallet and signs a one-time registration authorized for their family. The guardian signs controls, the learner signs orders, and the server sponsors Testnet gas. Existing families activate a fresh contract-backed portfolio with their supplied practice capital; earlier activity is archived and learning history stays with the family.
 
 ## Architecture
 

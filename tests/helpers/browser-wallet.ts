@@ -35,14 +35,20 @@ export async function seedBrowserTrade(
   }
 }
 
-export async function installBrowserWallet(page: Page, active = true) {
+export async function installBrowserWallet(
+  page: Page,
+  active = true,
+  learnerReady = true,
+  linkedInitially = active,
+) {
   const original = await (await page.request.get("/api/state")).json();
   const role = original.role;
   const guardian = "0x" + "7".repeat(64),
     learner = "0x" + "8".repeat(64);
   const address = role === "parent" ? guardian : learner;
   let account: string | undefined = active ? "0x" + "9".repeat(64) : undefined;
-  let linked = active;
+  let linked = linkedInitially;
+  let learnerBound = active && learnerReady;
   const tx = new Transaction();
   tx.setSender(address);
   tx.setGasOwner(address);
@@ -115,10 +121,15 @@ export async function installBrowserWallet(page: Page, active = true) {
   const chain = () => ({
     ready: true,
     fundingReady: true,
+    enrollmentReady: true,
+    learnerBound,
     network: "testnet",
     account,
     guardian: role === "parent" && !linked ? undefined : guardian,
-    learner: role === "learner" && !linked ? undefined : learner,
+    learner:
+      (role === "learner" && !linked) || (role === "parent" && !learnerReady)
+        ? undefined
+        : learner,
     wallet: linked ? address : undefined,
     pending: [],
   });
@@ -178,7 +189,10 @@ export async function installBrowserWallet(page: Page, active = true) {
     if (!action) throw new Error("Missing prepared test transaction");
     const store = fixtureStore();
     try {
-      if (action.action === "create") account = "0x" + "9".repeat(64);
+      if (action.action === "create") {
+        account = "0x" + "9".repeat(64);
+        learnerBound = Boolean(chain().learner);
+      } else if (action.action === "enroll") learnerBound = true;
       else if (action.action === "order")
         await execute(store, original.id, action.quoteId, "learner");
       else if (action.action === "approve")

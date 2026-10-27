@@ -221,6 +221,10 @@ test("a wallet-backed request preserves signed quote expiry and duplicate reques
         },
         body: JSON.stringify({ quoteId }),
       });
+    assert.equal((await request(quote.id)).status, 409);
+    await store.db
+      .prepare("INSERT INTO chain_wallets VALUES(?,?,?)")
+      .run(family, "learner", "0x" + "8".repeat(64));
     const first = await request(quote.id);
     assert.equal(first.status, 200);
     const again = await request(quote.id);

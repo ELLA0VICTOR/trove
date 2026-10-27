@@ -32,6 +32,11 @@ public struct Quote has copy, drop, store {
     snapshot: vector<u8>, commitment: vector<u8>, nonce: vector<u8>,
 }
 public struct Created has copy, drop { account: address, guardian: address, learner: address }
+public struct EnrollmentTerms has copy, drop {
+    domain: vector<u8>, package_id: address, account: address, guardian: address,
+    learner: address, expires_at: u64, nonce: vector<u8>,
+}
+public struct LearnerEnrolled has copy, drop { account: address, learner: address, sequence: u64 }
 public struct PolicyChanged has copy, drop { account: address, revision: u64, per_trade: u64, daily: u64, paused: bool }
 public struct FundingKey has copy, drop, store { id: vector<u8> }
 public struct Funded has copy, drop { account: address, id: vector<u8>, amount: u64, cash: u64, sequence: u64 }
@@ -93,7 +98,15 @@ public fun create(learner: address, attestor: vector<u8>, per_trade: u64, daily:
     create_with_funds(learner, attestor, per_trade, daily, allowed, 1000000000, false, ctx);
 }
 public fun create_with_funds(learner: address, attestor: vector<u8>, per_trade: u64, daily: u64, allowed: vector<vector<u8>>, initial_cash: u64, paused: bool, ctx: &mut TxContext) {
-    assert!(learner != ctx.sender() && learner != @0x0 && attestor.length() == 32, EAuthority);
+    assert!(learner != ctx.sender() && learner != @0x0, EAuthority);
+    create_account(learner, attestor, per_trade, daily, allowed, initial_cash, paused, ctx);
+}
+/// A guardian can activate the shared portfolio before a learner has a wallet.
+public fun create_family(attestor: vector<u8>, per_trade: u64, daily: u64, allowed: vector<vector<u8>>, initial_cash: u64, paused: bool, ctx: &mut TxContext) {
+    create_account(@0x0, attestor, per_trade, daily, allowed, initial_cash, paused, ctx);
+}
+fun create_account(learner: address, attestor: vector<u8>, per_trade: u64, daily: u64, allowed: vector<vector<u8>>, initial_cash: u64, paused: bool, ctx: &mut TxContext) {
+    assert!(attestor.length() == 32, EAuthority);
     assert!(per_trade > 0 && daily >= per_trade && allowed.length() > 0 && allowed.length() <= 32, EPolicy);
     assert!(initial_cash >= 10000 && initial_cash <= 1000000000000000, EBalance);
     let account = Account {
@@ -103,6 +116,20 @@ public fun create_with_funds(learner: address, attestor: vector<u8>, per_trade: 
     };
     event::emit(Created { account: object::id_address(&account), guardian: account.guardian, learner });
     transfer::share_object(account);
+}
+/// One-time self-enrollment: the authenticated family member's address is
+/// attested by the pinned operator and must sign this transaction itself.
+public fun enroll(account: &mut Account, expires_at: u64, nonce: vector<u8>, signature: vector<u8>, clock: &Clock, ctx: &TxContext) {
+    let learner = ctx.sender();
+    assert!(account.learner == @0x0 && learner != @0x0 && learner != account.guardian, EAuthority);
+    let now = clock::timestamp_ms(clock);
+    assert!(expires_at > now && expires_at <= now + 120000 && nonce.length() == 16, EQuote);
+    let terms = EnrollmentTerms { domain: b"trove:enrollment:v1", package_id: std::type_name::original_id<Account>(), account: object::id_address(account), guardian: account.guardian, learner, expires_at, nonce };
+    assert!(ed25519::ed25519_verify(&signature, &account.attestor, &bcs::to_bytes(&terms)), ESignature);
+    account.learner = learner;
+    account.sequence = account.sequence + 1;
+    account.approval = vector[];
+    event::emit(LearnerEnrolled { account: object::id_address(account), learner, sequence: account.sequence });
 }
 /// Guardian-issued simulated funds. Preserves holdings, spending, pause, and limits.
 public fun fund(account: &mut Account, id: vector<u8>, amount: u64, sequence: u64, ctx: &TxContext) {
@@ -192,3 +219,5 @@ public fun revision(account: &Account): u64 { account.revision }
 public fun position(account: &Account): (u64, u64) { (account.positions[0].units, account.positions[0].cost) }
 #[test_only]
 public fun spent(account: &Account): u64 { account.day_spent }
+#[test_only]
+public fun learner(account: &Account): address { account.learner }

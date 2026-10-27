@@ -4,7 +4,7 @@ The [deployment manifest](../contracts/practice/deployment.testnet.json) records
 
 ## Authority
 
-Each shared `Account` fixes a guardian address, a separate learner address, and an Ed25519 attestor public key. The guardian controls limits and pause/resume and signs exact one-time exceptions. The learner signs orders.
+Each shared `Account` fixes a guardian address and an Ed25519 attestor public key. The guardian can activate it before the learner connects, with the learner address initially unassigned. The authenticated learner then proves wallet ownership and signs a one-time `enroll` transaction. Its attested terms bind the original package, account, guardian, learner address, nonce, and a maximum two-minute expiry. Enrollment preserves funds and policy and permanently fixes the learner address. Accounts created with both addresses already linked retain their original fixed authorities. The guardian controls limits and pause/resume and signs exact one-time exceptions. The learner signs orders.
 
 Wallet-link challenges establish control of the configured addresses. Family membership is self-service; each role uses separate credentials and a separate wallet.
 

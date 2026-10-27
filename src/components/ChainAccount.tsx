@@ -35,13 +35,10 @@ export function ChainAccount({ setup = false }: { setup?: boolean }) {
       </p>
     ) : null;
   const chain = state.chain;
-  const activationHint =
-    !chain.guardian || !chain.learner
-      ? !chain.guardian && !chain.learner
-        ? "Connect both family wallets to enable activation."
-        : !chain.learner
-          ? "Waiting for your learner to link their wallet from their own account."
-          : "Connect your parent wallet to enable activation."
+  const activationHint = !chain.guardian
+    ? "Connect your parent wallet to enable activation."
+    : !chain.learner && !chain.enrollmentReady
+      ? "Parent-first activation needs the updated practice contract."
       : chain.pending?.length
         ? "Waiting for the pending transaction to finish."
         : state.market?.mode !== "market"
@@ -82,12 +79,24 @@ export function ChainAccount({ setup = false }: { setup?: boolean }) {
           onClick={() =>
             void run(() =>
               chain.wallet
-                ? connectWallet(wallet, chain.wallet)
+                ? chain.account &&
+                  state.role === "learner" &&
+                  chain.learnerBound === false
+                  ? connectWallet(wallet, chain.wallet).then(() =>
+                      chainAction({ action: "enroll" }, chain.wallet),
+                    )
+                  : connectWallet(wallet, chain.wallet)
                 : linkWallet(wallet),
             )
           }
         >
-          {chain.wallet ? "Reconnect " : "Link "}
+          {chain.wallet
+            ? chain.account &&
+              state.role === "learner" &&
+              chain.learnerBound === false
+              ? "Finish connecting "
+              : "Reconnect "
+            : "Link "}
           {wallet.name}
         </Button>
       ))}
@@ -116,7 +125,7 @@ export function ChainAccount({ setup = false }: { setup?: boolean }) {
         </p>
       ) : state.role === "parent" ? (
         <div className="practice-activation">
-          {chain.guardian && chain.learner && (
+          {chain.guardian && (
             <p>
               Your portfolio starts with {money(practiceCapital(state))} in
               practice funds.
@@ -128,7 +137,7 @@ export function ChainAccount({ setup = false }: { setup?: boolean }) {
             disabled={
               busy ||
               !chain.guardian ||
-              !chain.learner ||
+              (!chain.learner && !chain.enrollmentReady) ||
               Boolean(chain.pending?.length) ||
               state.market?.mode !== "market"
             }
@@ -144,17 +153,8 @@ export function ChainAccount({ setup = false }: { setup?: boolean }) {
             </p>
           )}
         </div>
-      ) : !chain.guardian || !chain.learner ? (
-        <p>
-          {chain.wallet
-            ? "Your parent can activate the portfolio once both wallets are connected."
-            : "Your parent connects their own wallet from their account."}
-        </p>
       ) : (
-        <p>
-          Both wallets are connected. Your parent can activate the portfolio
-          from Home.
-        </p>
+        <p>Your parent can activate the portfolio from their own Home page.</p>
       )}
       {!!chain.pending?.length && (
         <>

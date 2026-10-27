@@ -5,11 +5,17 @@ import { ChainAccount } from "./ChainAccount.tsx";
 
 export function PracticeSetup({ onAccount }: { onAccount: () => void }) {
   const { state } = useApp();
-  if (!state || state.chain?.account) return null;
+  if (!state || (state.chain?.account && state.chain.learnerBound !== false))
+    return null;
   const steps = [
     { label: "Parent wallet", complete: Boolean(state.chain?.guardian) },
-    { label: "Learner wallet", complete: Boolean(state.chain?.learner) },
-    { label: "Portfolio activation", complete: false },
+    { label: "Portfolio activation", complete: Boolean(state.chain?.account) },
+    {
+      label: "Learner wallet",
+      complete: Boolean(
+        state.chain?.account ? state.chain.learnerBound : state.chain?.learner,
+      ),
+    },
   ];
   return (
     <section
@@ -22,8 +28,16 @@ export function PracticeSetup({ onAccount }: { onAccount: () => void }) {
           <Wallet size={23} />
         </span>
         <div>
-          <h2 id="practice-setup-heading">Set up your family portfolio</h2>
-          <p>Connect a wallet for each family member to start practicing.</p>
+          <h2 id="practice-setup-heading">
+            {state.chain?.account
+              ? "Your portfolio is active"
+              : "Set up your family portfolio"}
+          </h2>
+          <p>
+            {state.chain?.account
+              ? "The learner can connect their own wallet when ready to trade."
+              : "The parent activates the portfolio. The learner connects when ready to trade."}
+          </p>
         </div>
         <span className="practice-network">
           <ShieldCheck size={14} /> Sui Testnet
@@ -39,7 +53,7 @@ export function PracticeSetup({ onAccount }: { onAccount: () => void }) {
       </ol>
       {state.role === "parent" && state.learner === "Your learner" && (
         <div className="practice-setup-invite">
-          <span>First, invite your learner to join the family.</span>
+          <span>Invite your learner whenever you’re ready.</span>
           <Button secondary onClick={onAccount}>
             Invite learner
           </Button>

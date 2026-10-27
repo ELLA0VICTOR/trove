@@ -1,4 +1,19 @@
 import { bcs } from "@mysten/sui/bcs";
+export const UNASSIGNED_LEARNER = "0x" + "0".repeat(64);
+export const EnrollmentTermsBcs = bcs.struct("EnrollmentTerms", {
+  domain: bcs.vector(bcs.u8()),
+  package_id: bcs.Address,
+  account: bcs.Address,
+  guardian: bcs.Address,
+  learner: bcs.Address,
+  expires_at: bcs.u64(),
+  nonce: bcs.vector(bcs.u8()),
+});
+export const LearnerEnrolledBcs = bcs.struct("LearnerEnrolled", {
+  account: bcs.Address,
+  learner: bcs.Address,
+  sequence: bcs.u64(),
+});
 export const ClockBcs = bcs.struct("Clock", {
   id: bcs.Address,
   timestamp_ms: bcs.u64(),
@@ -108,6 +123,8 @@ export const AccountBcs = bcs.struct("Account", {
 export type ChainStatus = {
   ready: boolean;
   fundingReady?: boolean;
+  enrollmentReady?: boolean;
+  learnerBound?: boolean;
   network: "testnet";
   account?: string;
   wallet?: string;

@@ -113,8 +113,8 @@ The demo's production URL should be publicly accessible. Test it in a signed-out
 
 Official references: [Neon Free plan](https://neon.com/pricing), [Neon pooled connections](https://neon.com/docs/connect/connection-pooling), [Vercel Hobby](https://vercel.com/docs/plans/hobby), [Vercel function lifecycle](https://vercel.com/docs/functions/functions-api-reference/vercel-functions-package#waituntil).
 
-## Practice-funds contract update
+## Practice-account contract update
 
-Sui Testnet version 3 adds parent-signed practice refills and configurable starting capital. The current package is recorded in [the deployment manifest](../contracts/practice/deployment.testnet.json). For an existing Vercel project, set **SUI_PACKAGE_ID** to `0x55b140438efa132ba5bb6a7a06795e9036d9051661b9c8efdd14b8859dc229af`, publish the latest repository changes, and redeploy. The ignored `.artifacts/vercel.env` export also includes the current package IDs and configured email settings.
+Sui Testnet version 4 lets the parent activate the portfolio before the learner connects. The learner later signs a one-time registration without further parent approval. Parent-signed practice refills and configurable starting capital remain available. The current package is recorded in [the deployment manifest](../contracts/practice/deployment.testnet.json). For an existing Vercel project, set **SUI_PACKAGE_ID** to `0xa5c023912b108572b7be4ca24b99f4999fec532d3d14552568cba298d231e4b3`, publish the latest repository changes, and redeploy. Keep **SUI_ORIGINAL_PACKAGE_ID** unchanged. The ignored `.artifacts/vercel.env` export also includes the current package IDs and configured email settings.
 
-The API detects the package's funding capability. Earlier package settings keep refills disabled until the current package is configured.
+The API detects the configured package's funding and enrollment capabilities. Parent-first activation requires the current package and application code.

@@ -208,7 +208,9 @@ export function Company() {
         <Button
           secondary
           to={
-            state.session?.mode === "account" && !state.chain?.account
+            state.session?.mode === "account" &&
+            (!state.chain?.account ||
+              (state.role === "learner" && state.chain.learnerBound === false))
               ? "/app"
               : state.session?.mode === "account" && state.role === "parent"
                 ? "/app/parent"
@@ -217,13 +219,15 @@ export function Company() {
           onClick={() =>
             state.session?.mode === "account"
               ? state.chain?.account &&
+                state.chain.learnerBound !== false &&
                 state.role === "learner" &&
                 setOrdering(true)
               : openAccount()
           }
         >
           {state.session?.mode === "account"
-            ? !state.chain?.account
+            ? !state.chain?.account ||
+              (state.role === "learner" && state.chain.learnerBound === false)
               ? "Set up practice"
               : state.role === "parent"
                 ? "Parent controls"
@@ -374,7 +378,7 @@ export function OrderDialog({
     setWorking(true);
     setError("");
     try {
-      if (!state!.chain?.account)
+      if (!state!.chain?.account || state!.chain.learnerBound === false)
         throw new Error(
           "Complete family wallet setup on Home before investing.",
         );

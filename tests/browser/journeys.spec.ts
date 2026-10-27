@@ -651,47 +651,80 @@ test("Home exposes required wallet setup and activation asks the parent wallet t
   expect(wallet.signatures()).toBe(1);
 });
 
-test("a linked parent sees activation waiting clearly for the learner wallet", async ({
+test("parent activates before any learner wallet is linked", async ({
   page,
 }) => {
   await createPortfolioAccount(page);
-  await page.route("**/api/state", async (route) => {
-    const response = await route.fetch();
-    const state = await response.json();
-    const guardian = "0x" + "7".repeat(64);
-    state.chain = {
-      ready: true,
-      network: "testnet",
-      guardian,
-      wallet: guardian,
-      pending: [],
-    };
-    await route.fulfill({ response, json: state });
-  });
+  const wallet = await installBrowserWallet(page, false, false);
   await page.goto("/app");
+  await page
+    .getByRole("button", { name: "Link Test Sui Wallet", exact: true })
+    .click();
   await expect(
     page.getByRole("button", {
       name: "Activate practice portfolio",
       exact: true,
     }),
-  ).toBeVisible();
+  ).toBeEnabled();
+  await page
+    .getByRole("button", { name: "Activate practice portfolio", exact: true })
+    .click();
   await expect(
-    page.getByRole("button", {
-      name: "Activate practice portfolio",
-      exact: true,
-    }),
-  ).toBeDisabled();
-  await expect(
-    page
-      .getByRole("status")
-      .filter({
-        hasText:
-          "Waiting for your learner to link their wallet from their own account.",
-      }),
+    page.getByRole("heading", { name: "Your portfolio is active" }),
   ).toBeVisible();
   await expect(
     page.getByRole("list", { name: "Setup progress" }).locator(".complete"),
-  ).toHaveCount(1);
+  ).toHaveCount(2);
+  await expect(
+    page.getByRole("link", { name: "View practice contract account" }),
+  ).toBeVisible();
+  expect(wallet.signatures()).toBe(1);
+});
+
+test("learner finishes connecting to an already active portfolio without parent approval", async ({
+  page,
+}) => {
+  await createLearnerAccount(page);
+  const wallet = await installBrowserWallet(page, true, false);
+  await page.goto("/app/explore/AAPL");
+  await page
+    .getByRole("link", { name: "Set up practice", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Your portfolio is active" }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", {
+      name: "Finish connecting Test Sui Wallet",
+      exact: true,
+    })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Your portfolio is active" }),
+  ).toHaveCount(0);
+  expect(wallet.signatures()).toBe(1);
+  await page.goto("/app/explore/AAPL");
+  await expect(
+    page.getByRole("button", { name: "Make a practice move" }),
+  ).toBeVisible();
+});
+
+test("linking the learner wallet automatically starts its one-time registration", async ({
+  page,
+}) => {
+  await createLearnerAccount(page);
+  const wallet = await installBrowserWallet(page, true, false, false);
+  await page.goto("/app");
+  await expect(
+    page.getByRole("heading", { name: "Your portfolio is active" }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Link Test Sui Wallet", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Your portfolio is active" }),
+  ).toHaveCount(0);
+  expect(wallet.signatures()).toBe(1);
 });
 
 test("an unconfigured family sees setup before trading while lessons remain available", async ({

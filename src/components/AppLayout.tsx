@@ -99,7 +99,7 @@ export function AppLayout() {
     const setupPending =
       state?.session?.mode === "account" &&
       state.chain?.ready &&
-      !state.chain.account;
+      (!state.chain.account || state.chain.learnerBound === false);
     if (
       !state?.market?.blocked &&
       !state?.chain?.pending?.length &&
@@ -117,6 +117,7 @@ export function AppLayout() {
     state?.approvals,
     state?.chain?.ready,
     state?.chain?.account,
+    state?.chain?.learnerBound,
     state?.session?.mode,
     state?.role,
     state?.sequence,

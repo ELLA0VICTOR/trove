@@ -24,6 +24,8 @@ export function chainConfig(dataDir: string): ChainConfig | undefined {
     packageId,
     fundingReady:
       packageId === manifest.packageId && Number(manifest.version) >= 3,
+    enrollmentReady:
+      packageId === manifest.packageId && Number(manifest.version) >= 4,
     originalPackageId:
       value("SUI_ORIGINAL_PACKAGE_ID") ??
       (manifest.packageId === packageId

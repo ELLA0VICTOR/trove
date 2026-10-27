@@ -11,6 +11,7 @@ import type {
 } from "@mysten/wallet-standard";
 import { Transaction } from "@mysten/sui/transactions";
 import { api } from "./app-context.tsx";
+import type { ChainStatus } from "../../shared/chain.ts";
 
 let selected: WalletWithFeatures<Partial<SuiWalletFeatures>> | undefined;
 let selectedAccount: WalletAccount | undefined;
@@ -61,10 +62,19 @@ export async function linkWallet(wallet: Wallet) {
     chain: "sui:testnet",
     message: new TextEncoder().encode(challenge.message),
   });
-  return api("/chain/link", "POST", {
+  const status = await api<ChainStatus>("/chain/link", "POST", {
     id: challenge.id,
     signature: signed.signature,
   });
+  if (
+    status.account &&
+    status.learnerBound === false &&
+    status.wallet === status.learner &&
+    status.wallet !== status.guardian
+  ) {
+    await chainAction({ action: "enroll" }, status.wallet);
+  }
+  return status;
 }
 export async function chainAction(
   action: Record<string, unknown>,
