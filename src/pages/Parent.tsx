@@ -249,37 +249,34 @@ export function Parent() {
                           <X size={15} />
                           Decline
                         </button>
-                        <Button
-                          disabled={busy || expired || stale}
-                          onClick={() =>
-                            void (
-                              state.chain?.account
-                                ? chainAction(
-                                    {
-                                      action: "approve",
-                                      approvalId: request.id,
-                                    },
-                                    state.chain.wallet,
-                                  ).then(() => refresh())
-                                : update("/approvals/" + request.id, {
-                                    approve: true,
-                                  })
-                            )
-                              .then(() =>
-                                notify(
-                                  state.chain?.account
-                                    ? "Approved. The learner can sign this trade."
-                                    : "Approved. Practice trade completed.",
-                                ),
+                        {!state.chain?.account ? (
+                          <Button secondary to="/app">
+                            Finish family setup
+                          </Button>
+                        ) : (
+                          <Button
+                            disabled={busy || expired || stale}
+                            onClick={() =>
+                              void chainAction(
+                                {
+                                  action: "approve",
+                                  approvalId: request.id,
+                                },
+                                state.chain?.wallet,
                               )
-                              .catch((e) => notify((e as Error).message))
-                          }
-                        >
-                          <Check size={15} />
-                          {state.chain?.account
-                            ? "Approve this choice"
-                            : "Approve and invest"}
-                        </Button>
+                                .then(() => refresh())
+                                .then(() =>
+                                  notify(
+                                    "Approved. The learner can sign this trade.",
+                                  ),
+                                )
+                                .catch((e) => notify((e as Error).message))
+                            }
+                          >
+                            <Check size={15} />
+                            Approve this choice
+                          </Button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -299,7 +296,7 @@ export function Parent() {
           <p className="parent-controls-note">
             {state.chain?.account
               ? "Controls enforced on Sui Testnet."
-              : "Practice controls."}{" "}
+              : "Starting limits apply once family wallet setup is complete."}{" "}
             Daily allowance resets at 00:00 UTC.
           </p>
         </>

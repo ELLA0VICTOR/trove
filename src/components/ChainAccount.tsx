@@ -12,7 +12,7 @@ import {
 import { useApp } from "../lib/app-context.tsx";
 import { Button } from "./UI.tsx";
 
-export function ChainAccount() {
+export function ChainAccount({ setup = false }: { setup?: boolean }) {
   const { state, refresh, update } = useApp();
   const [wallets, setWallets] = useState<readonly Wallet[]>(availableWallets),
     [busy, setBusy] = useState(false),
@@ -27,7 +27,13 @@ export function ChainAccount() {
       b();
     };
   }, []);
-  if (!state?.chain?.ready) return null;
+  if (!state?.chain?.ready)
+    return setup ? (
+      <p className="practice-setup-unavailable" role="status">
+        Wallet setup is temporarily unavailable. You can explore companies and
+        continue learning.
+      </p>
+    ) : null;
   const chain = state.chain;
   async function run(action: () => Promise<unknown>) {
     setBusy(true);
@@ -43,15 +49,17 @@ export function ChainAccount() {
   }
   return (
     <div className="account-setting">
-      <h3>Sui practice</h3>
+      {!setup && <h3>Practice wallet</h3>}
       {chain.wallet ? (
         <p>
           Linked wallet: {chain.wallet.slice(0, 8)}…{chain.wallet.slice(-6)}
         </p>
       ) : (
         <p>
-          Link a separate wallet for each family role. Only Testnet gas is used;
-          all investments remain simulated.
+          {state.role === "parent"
+            ? "Connect your parent wallet."
+            : "Connect your learner wallet."}{" "}
+          Practice funds are simulated. Testnet gas is sponsored.
         </p>
       )}
       {wallets.map((wallet) => (
@@ -72,13 +80,17 @@ export function ChainAccount() {
         </Button>
       ))}
       {!wallets.length && (
-        <p>
-          Install a Sui wallet such as{" "}
-          <a href="https://slush.app" target="_blank" rel="noreferrer">
-            Slush
+        <div className="practice-wallet-install">
+          <p>Install Slush, select Testnet, then return here to connect.</p>
+          <a
+            className="button button-secondary"
+            href="https://slush.app/get-started"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Get Slush
           </a>
-          , select Testnet, then reopen this panel.
-        </p>
+        </div>
       )}
       {chain.account ? (
         <p>
@@ -93,24 +105,38 @@ export function ChainAccount() {
       ) : chain.guardian && chain.learner && state.role === "parent" ? (
         <>
           <p>
-            Start a new {money(practiceCapital(state))} practice portfolio
-            enforced on Sui. Your earlier activity remains archived. Limits
-            require your wallet; orders require the learner’s wallet. Gas is
-            sponsored.
+            Your portfolio starts with {money(practiceCapital(state))} in
+            practice funds.
+            {state.holdings.length > 0 &&
+              " Activating archives your earlier holdings and starts a fresh round. Your saved learning stays."}
           </p>
           <Button
-            disabled={busy || state.market?.mode !== "market"}
+            disabled={
+              busy ||
+              Boolean(chain.pending?.length) ||
+              state.market?.mode !== "market"
+            }
             onClick={() =>
               void run(() => chainAction({ action: "create" }, chain.wallet))
             }
           >
-            Start Sui practice
+            Activate practice portfolio
           </Button>
         </>
+      ) : !chain.guardian || !chain.learner ? (
+        <p>
+          {state.role === "parent"
+            ? chain.wallet
+              ? "Your learner can now connect their wallet from Home."
+              : "Your learner connects their own wallet from their account."
+            : chain.wallet
+              ? "Your parent can activate the portfolio once both wallets are connected."
+              : "Your parent connects their own wallet from their account."}
+        </p>
       ) : (
         <p>
-          {chain.guardian ? "Parent wallet linked." : "Parent wallet needed."}{" "}
-          {chain.learner ? "Learner wallet linked." : "Learner wallet needed."}
+          Both wallets are connected. Your parent can activate the portfolio
+          from Home.
         </p>
       )}
       {!!chain.pending?.length && (

@@ -7,7 +7,7 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { InputError, parseDollars } from "../shared/model.ts";
 import { localGuide, nextExercise } from "../shared/learning.ts";
-import { DomainError, execute, preview } from "./domain.ts";
+import { DomainError, preview } from "./domain.ts";
 import { DemoStore } from "./store.ts";
 import { Accounts, AccessError } from "./auth.ts";
 import type { Member } from "./auth.ts";
@@ -473,21 +473,17 @@ export function createApp(
   });
   app.post("/api/orders/execute", async (c) => {
     requireMember(c, "learner");
-    await chain.assertLocal(c.get("family"));
-    await market.assertTradable(await marketState(await stateFor(c)));
-    const { quoteId } = z
-      .object({ quoteId: z.uuid() })
-      .parse(await c.req.json());
-    return c.json(
-      await snapshot(
-        await execute(store, c.get("family"), quoteId, c.get("member")?.role),
-        c,
-      ),
+    throw new DomainError(
+      "Practice trades require your wallet signature. Complete family setup on Home, then confirm the trade with your wallet.",
     );
   });
   app.post("/api/approvals", async (c) => {
     const member = requireMember(c, "learner");
     await learnerAction(c);
+    if (!chain.config || !(await chain.account(member.family)))
+      throw new DomainError(
+        "Complete family wallet setup on Home before requesting a trade.",
+      );
     const { quoteId } = z
       .object({ quoteId: z.uuid() })
       .parse(await c.req.json());
@@ -509,17 +505,6 @@ export function createApp(
         throw new DomainError(
           "Your account changed. Please review a fresh order.",
         );
-      // Daily-close requests can wait for a parent without keeping the original
-      // two-minute confirmation window. Signed Sui quotes keep their expiry.
-      if (!(await chain.account(member.family))) {
-        await chain.assertLocal(member.family);
-        quote.expiresAt = Date.now() + 30 * 60000;
-        await store.db
-          .prepare(
-            "UPDATE quotes SET payload=? WHERE id=? AND family=? AND decision IS NULL",
-          )
-          .run(JSON.stringify(quote), quote.id, member.family);
-      }
       state.approvals.unshift({
         id: randomUUID(),
         quote,
@@ -536,36 +521,19 @@ export function createApp(
     const { approve } = z
       .object({ approve: z.boolean() })
       .parse(await c.req.json());
+    if (approve)
+      throw new DomainError("Approve this choice with your parent wallet.");
     const state = await store.atomic(async () => {
       await store.db.lock(`chain-authority:${member.family}`);
-      if (approve) await chain.assertLocal(member.family);
       const current = await store.get(member.family);
       const approval = current.approvals.find(
         (a) => a.id === c.req.param("id"),
       );
-      // A retried approval returns the completed result without a second trade.
-      if (approve && approval?.state === "consumed") return current;
       if (!approval || approval.state !== "requested")
         throw new DomainError("This request is no longer awaiting approval.");
-      if (approve) {
-        if (
-          Date.now() >= approval.quote.expiresAt ||
-          approval.quote.revision !== current.policy.revision ||
-          approval.quote.sequence !== current.sequence
-        )
-          throw new DomainError(
-            "The order changed or expired. Ask the learner to make a fresh request.",
-          );
-        await market.assertTradable(current);
-      }
-      approval.state = approve ? "approved" : "declined";
+      approval.state = "declined";
       await store.set(current);
-      // The learner already reviewed and requested this exact order. Approval
-      // and execution share one transaction, including all normal cash/policy
-      // checks. A failure rolls the approval back as well as the ledger.
-      return approve
-        ? execute(store, member.family, approval.quote.id, "learner")
-        : current;
+      return current;
     });
     return c.json(await snapshot(state, c));
   });

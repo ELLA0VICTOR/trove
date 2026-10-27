@@ -2,6 +2,10 @@ import { test, expect } from "@playwright/test";
 import type { Page, APIRequestContext } from "@playwright/test";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import {
+  installBrowserWallet,
+  seedBrowserTrade,
+} from "../helpers/browser-wallet.ts";
 
 const mailFile = resolve(
   process.env.TROVE_BROWSER_DATA_DIR ?? ".artifacts/browser-store",
@@ -611,10 +615,62 @@ test("intro replays after refresh and can be skipped", async ({ page }) => {
     page.getByRole("heading", { name: "Your portfolio starts here." }),
   ).toBeVisible();
 });
+test("Home exposes required wallet setup and activation asks the parent wallet to sign", async ({
+  page,
+}) => {
+  await createPortfolioAccount(page);
+  const wallet = await installBrowserWallet(page, false);
+  await page.goto("/app");
+  await expect(
+    page.getByRole("heading", { name: "Set up your family portfolio" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Link Test Sui Wallet", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Link Test Sui Wallet", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Activate practice portfolio", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Set up your family portfolio" }),
+  ).toHaveCount(0);
+  expect(wallet.signatures()).toBe(1);
+});
+
+test("an unconfigured family sees setup before trading while lessons remain available", async ({
+  page,
+}) => {
+  await createLearnerAccount(page);
+  await page.goto("/app/explore/AAPL");
+  await expect(
+    page.getByRole("button", { name: "Make a practice move" }),
+  ).toHaveCount(0);
+  await page
+    .getByRole("link", { name: "Set up practice", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Set up your family portfolio" }),
+  ).toBeVisible();
+  await page.goto("/app/guide");
+  await expect(
+    page.getByRole("button", { name: "Start lesson: Shared risk" }),
+  ).toBeEnabled();
+  expect(
+    (
+      await page.request.post("/api/orders/execute", {
+        data: { quoteId: crypto.randomUUID() },
+      })
+    ).status(),
+  ).toBe(409);
+});
+
 test("a practice buy persists after reload with its original explanation", async ({
   page,
 }) => {
   await createLearnerAccount(page);
+  const wallet = await installBrowserWallet(page);
   await page.goto("/app/explore/KO");
   await page.getByRole("button", { name: "Make a practice move" }).click();
   await page.getByLabel("Practice amount").fill("50");
@@ -641,8 +697,9 @@ test("a practice buy persists after reload with its original explanation", async
   expect(
     snapshot.decisions.filter((d: { origin: string }) => d.origin === "local"),
   ).toHaveLength(1);
+  expect(wallet.signatures()).toBe(1);
 });
-test("parent approval completes the requested trade and updates the learner without another confirmation", async ({
+test("parent approval and learner wallet signing complete one exact request", async ({
   page,
   browser,
   baseURL,
@@ -663,6 +720,7 @@ test("parent approval completes the requested trade and updates the learner with
       `approval_child_${suffix}`,
       (await invitation.json()).code,
     );
+    const learnerWallet = await installBrowserWallet(page);
     await page.goto("/app/explore/KO");
     await page.getByRole("button", { name: "Make a practice move" }).click();
     await page.getByLabel("Practice amount").fill("150");
@@ -678,16 +736,18 @@ test("parent approval completes the requested trade and updates the learner with
         .filter({ hasText: "Waiting for parent approval" }),
     ).toBeVisible();
     const parentPage = await parentContext.newPage();
+    const parentWallet = await installBrowserWallet(parentPage);
     await parentPage.goto("/app/parent");
     await parentPage
-      .getByRole("button", { name: "Approve and invest" })
+      .getByRole("button", { name: "Approve this choice" })
       .click();
     await expect(
-      parentPage.getByText("Approved. Practice trade completed.", {
+      parentPage.getByText("Approved. The learner can sign this trade.", {
         exact: true,
       }),
     ).toBeVisible();
     await page.bringToFront();
+    await page.getByRole("button", { name: "Sign approved trade" }).click();
     await expect(
       page.locator(".holding-row").filter({ hasText: "Coca-Cola" }),
     ).toBeVisible({ timeout: 15000 });
@@ -712,8 +772,9 @@ test("parent approval completes the requested trade and updates the learner with
       `/api/approvals/${snapshot.approvals[0].id}`,
       { data: { approve: true } },
     );
-    expect(repeat.ok()).toBe(true);
-    expect((await repeat.json()).cash).toBe(snapshot.cash);
+    expect(repeat.status()).toBe(409);
+    expect(parentWallet.signatures()).toBe(1);
+    expect(learnerWallet.signatures()).toBe(1);
   } finally {
     await parentContext.close();
   }
@@ -722,6 +783,8 @@ test("an expired approval stays visible with a fresh-preview link after reload",
   page,
 }) => {
   await createLearnerAccount(page);
+  await installBrowserWallet(page);
+  await page.goto("/app");
   const quoteResponse = await page.request.post("/api/orders/preview", {
     data: {
       symbol: "KO",
@@ -733,9 +796,17 @@ test("an expired approval stays visible with a fresh-preview link after reload",
   expect(quoteResponse.ok()).toBe(true);
   const quote = await quoteResponse.json();
   expect(
-    (
-      await page.request.post("/api/approvals", { data: { quoteId: quote.id } })
-    ).ok(),
+    await page.evaluate(
+      async (id) =>
+        (
+          await fetch("/api/approvals", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ quoteId: id }),
+          })
+        ).ok,
+      quote.id,
+    ),
   ).toBe(true);
   // Show the state returned for a previously approved quote whose signing
   // window has passed. It must not silently disappear from Home.
@@ -744,6 +815,7 @@ test("an expired approval stays visible with a fresh-preview link after reload",
     const state = await response.json();
     state.approvals[0].state = "approved";
     state.approvals[0].quote.expiresAt = Date.now() - 1000;
+    state.chain = { ready: true, account: "0x" + "9".repeat(64), pending: [] };
     await route.fulfill({ response, json: state });
   });
   await page.goto("/app");
@@ -832,22 +904,11 @@ test("a decision reflection stays linked to its original choice", async ({
   page,
 }) => {
   await createLearnerAccount(page);
-  const quote = await page.request.post("/api/orders/preview", {
-    data: {
-      symbol: "AAPL",
-      side: "buy",
-      amount: "25",
-      reason: "I want to understand how companies share risks.",
-    },
-  });
-  expect(quote.ok()).toBe(true);
-  expect(
-    (
-      await page.request.post("/api/orders/execute", {
-        data: { quoteId: (await quote.json()).id },
-      })
-    ).ok(),
-  ).toBe(true);
+  await seedBrowserTrade(
+    page,
+    "25",
+    "I want to understand how companies share risks.",
+  );
   await page.goto("/app/decisions");
   await page.locator(".compact-decision-row").first().click();
   await page.getByRole("button", { name: "Add a reflection" }).click();

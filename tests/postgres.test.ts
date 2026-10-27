@@ -275,11 +275,11 @@ test("PostgreSQL coach reservations serialize the shared budget without an exter
   assert.equal(await first.total(), 5050000);
 });
 
-test("PostgreSQL parent approval completes the learner trade once across fresh API instances", async () => {
+test("PostgreSQL instances reject unsigned trades without changing the family portfolio", async () => {
   const accounts = new Accounts(store);
   const parent = await accounts.register({
-    username: "pg_approve_" + randomUUID().slice(0, 8),
-    password: "postgres-approval-password",
+    username: "pg_unsigned_" + randomUUID().slice(0, 8),
+    password: "postgres-unsigned-password",
   });
   const invitation = await accounts.invite(parent.member);
   const learner = await accounts.join({
@@ -287,49 +287,35 @@ test("PostgreSQL parent approval completes the learner trade once across fresh A
     username: "pg_learner_" + randomUUID().slice(0, 8),
     password: "postgres-learner-password",
   });
-  const first = createApp(store);
-  const second = createApp(new DemoStore(database, { liveMemory: true }));
-  const headers = (token: string) => ({
-    "Content-Type": "application/json",
-    Cookie: `trove_session=${token}`,
+  const before = await store.get(parent.member.family);
+  const quote = preview(before, {
+    symbol: "KO",
+    side: "buy",
+    amount: "150",
+    reason: "Signed practice only.",
   });
-  const quoteResponse = await first.request("/api/orders/preview", {
-    method: "POST",
-    headers: headers(learner.token),
-    body: JSON.stringify({
-      symbol: "KO",
-      side: "buy",
-      amount: "150",
-      reason: "A parent-approved industry comparison.",
-    }),
-  });
-  assert.equal(quoteResponse.status, 200);
-  const quote = await quoteResponse.json();
-  const requested = await first.request("/api/approvals", {
-    method: "POST",
-    headers: headers(learner.token),
-    body: JSON.stringify({ quoteId: quote.id }),
-  });
-  assert.equal(requested.status, 200);
-  const pending = await requested.json();
-  const approve = (app: ReturnType<typeof createApp>) =>
-    app.request(`/api/approvals/${pending.approvals[0].id}`, {
-      method: "POST",
-      headers: headers(parent.token),
-      body: JSON.stringify({ approve: true }),
-    });
-  const replies = await Promise.all([approve(first), approve(second)]);
+  await store.putQuote(parent.member.family, quote);
+  const replies = await Promise.all(
+    [createApp(store), createApp(new DemoStore(database))].map((app) =>
+      app.request("/api/orders/execute", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: `trove_session=${learner.token}`,
+        },
+        body: JSON.stringify({ quoteId: quote.id }),
+      }),
+    ),
+  );
   assert.deepEqual(
     replies.map((r) => r.status),
-    [200, 200],
+    [409, 409],
   );
-  const current = await new DemoStore(database).get(parent.member.family);
-  assert.equal(current.cash, String(1000000000n - BigInt(quote.amount)));
-  assert.equal(current.sequence, 1);
-  assert.equal(current.approvals[0].state, "consumed");
-  assert.equal(current.policy.perTrade, pending.policy.perTrade);
-  assert.equal(current.decisions.length, 1);
-  assert.equal(current.memories.length, 1);
+  const after = await new DemoStore(database).get(parent.member.family);
+  assert.equal(after.cash, before.cash);
+  assert.equal(after.sequence, before.sequence);
+  assert.deepEqual(after.holdings, before.holdings);
+  assert.deepEqual(after.decisions, before.decisions);
 });
 
 test("PostgreSQL immutable memory operations survive publisher reconstruction and repeated confirmation", async () => {

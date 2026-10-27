@@ -67,7 +67,7 @@ The learning guide carries context across sessions through Walrus Memory. It con
 | ------------------ | --------------------------------------------------------------------------------------------------------- |
 | Portfolio          | Tracks cash, positions, cost basis, returns, and dated portfolio values.                                  |
 | Explore            | Searches twelve companies and broad-market funds, with official brand assets and interactive charts.      |
-| Practice orders    | Reviews a dated quote before executing an integer-based simulated buy or sale.                            |
+| Practice orders    | Reviews a dated quote and executes a wallet-signed simulated buy or sale on Sui Testnet.                  |
 | Guardian controls  | Sets per-trade and daily limits, pauses activity, and approves an exact one-time exception.               |
 | Decision journal   | Keeps original reasons alongside reflections, corrections, corporate actions, and transaction receipts.   |
 | Replay             | Compares allocations using the same starting capital and adjusted market observations.                    |
@@ -80,13 +80,13 @@ The learning guide carries context across sessions through Walrus Memory. It con
 
 1. **Create a family.** The guardian creates an account and generates a single-use learner invitation.
 2. **Join separately.** The learner accepts the invitation with their own credentials.
-3. **Set boundaries.** The guardian chooses trade limits and a daily allowance.
-4. **Make a choice.** The learner explores an instrument, enters an amount and a reason, then reviews the quote.
-5. **Ask at the boundary.** An above-limit choice goes to the guardian for approval of that exact order.
+3. **Activate the portfolio.** Both members connect separate wallets from Home. The guardian sets starting limits and signs activation of the shared Sui Testnet portfolio.
+4. **Make a choice.** The learner explores an instrument, enters an amount and a reason, reviews the quote, and signs the practice trade with their wallet.
+5. **Ask at the boundary.** The guardian signs approval of an exact above-limit order, then the learner signs its execution.
 6. **Learn from it.** The learner reviews the decision, compares alternatives, records a reflection, and completes a concept check.
 7. **Carry understanding forward.** With remembering enabled, the guide retrieves confirmed learning records in later sessions.
 
-Account settings connect each role to a separate Sui wallet. Starting Sui practice archives the earlier portfolio and opens a contract-backed simulated account. The guardian signs controls; the learner signs orders; the server sponsors Testnet gas.
+Wallet setup is part of onboarding on Home. The guardian signs controls, the learner signs orders, and the server sponsors Testnet gas. Existing families activate a fresh contract-backed portfolio with their supplied practice capital; earlier activity is archived and learning history stays with the family.
 
 ## Architecture
 
@@ -264,7 +264,6 @@ The application uses same-origin JSON endpoints under `/api`, with HttpOnly sess
 | POST          | `/api/account/funds`                                      | Parent-authorized, idempotent practice-cash additions.             |
 | POST          | `/api/account/market`                                     | Begin a market-backed practice portfolio.                          |
 | POST          | `/api/orders/preview`                                     | Prepare a short-lived, version-bound quote.                        |
-| POST          | `/api/orders/execute`                                     | Execute a local-ledger practice order.                             |
 | POST          | `/api/approvals`, `/api/approvals/:id`                    | Request and review an exact exception.                             |
 | POST          | `/api/policy`                                             | Update local-ledger guardian controls.                             |
 | POST / DELETE | `/api/memories`, `/api/memories/:id`                      | Record, correct, and remove learning context.                      |

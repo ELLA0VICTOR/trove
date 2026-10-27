@@ -23,7 +23,7 @@ In the parent browser:
 3. Expect Your portfolio, $1,000 in practice cash, and no holdings or decisions.
 4. Select Settings on Home. You can change the assigned username to something memorable, such as trove_parent_01, and select Save username. Select Create learner invitation and copy the invitation code.
 5. Your signup email is already verified and can recover your password. Existing username accounts can add one under Settings > Recovery email using their current password. See [email setup](EMAIL-SETUP.md). In the account panel, read and tick the Remember learning consent checkbox, then select Enable remembering. This enables storage of this family's learning records and the remembered guide for its learner.
-6. Close the account panel. Open Parent > Edit limits. Set Per investment to 50 and Daily allowance to 200, then Save limits.
+6. Close the account panel. Open Parent > Edit limits. Set Per investment to 50 and Daily allowance to 200, then Save limits. These are the starting limits for the shared wallet-backed portfolio.
 
 Pass when the parent has a saved family, an invitation, remembering enabled, and limits of $50 per investment and $200 per day.
 
@@ -38,6 +38,20 @@ In the separate learner browser:
 
 Pass when the two browsers remain signed in as different roles and share the same portfolio and limits.
 
+## 3b. Connect wallets and activate the portfolio
+
+Wallet setup is part of the main practice flow on Home. Complete it before placing any trade. Lessons and remembered coaching remain available during setup.
+
+1. Use two normal browser profiles, one for each role, with the [Slush browser extension](https://slush.app/get-started) installed in both. Create a different wallet address for each role and select Testnet in each wallet's network settings.
+2. Parent: open Home > Set up your family portfolio > Link Slush. Approve the wallet-link message.
+3. Learner: open Home and link their different Slush address. Approve the wallet-link message.
+4. Expect both wallet steps to show connected. The other role's connection appears when the page refreshes or regains focus.
+5. Parent: select Activate practice portfolio on Home and approve the wallet transaction. Testnet gas is sponsored.
+6. Wait for confirmation. Expect a fresh portfolio with the family's current practice capital: $1,000 by default, or $6,000 if the parent previously added $5,000. Any earlier holdings and trading activity are archived; saved learning stays associated with the family.
+7. Open Settings > Practice wallet > View practice contract account to inspect the Testnet object.
+
+Pass when setup is complete, the contract account exists, and parent and learner remain linked to their separate wallets. Signed execution is the only trading path. If wallet setup is unavailable, browsing and learning remain available while trading waits for setup.
+
 ## 4. Make an ordinary practice investment
 
 In the learner browser:
@@ -46,7 +60,7 @@ In the learner browser:
 2. Enter 25 as the practice amount.
 3. Enter: I want to understand how Apple earns money and how a company's price changes.
 4. Select Review my practice move. Check the company, amount, dated price, and reason.
-5. Select Confirm practice move, then Keep growing.
+5. Select Confirm practice move, approve the learner wallet transaction, and wait for confirmation. Then select Keep growing.
 6. Open Home. Expect an Apple holding and approximately $975 in available practice cash. Total account value should remain close to $1,000 because some cash is now held in Apple.
 7. Open Decisions and refresh. Expect the Apple purchase and its original reason to remain.
 
@@ -54,27 +68,26 @@ Pass when the order changes cash and holdings once and its reason survives refre
 
 ## 5. Test parent approval
 
-Send the request while the initial preview is valid. A local practice request then gives the parent 30 minutes to review the exact order. Changes to the portfolio, limits, or market dataset can require a fresh request.
+Keep both role windows and wallets ready. Signed order previews expire in about two minutes, so complete the approval and signing promptly.
 
 1. Learner: open Explore > Microsoft > Make a practice move and enter 75.
 2. Enter: I want to compare Microsoft with Apple and understand what risks they share.
 3. Select Review my practice move. Expect the $50 per-investment boundary, then select Ask for guidance.
-4. Switch to the parent browser. Open Parent, refreshing if necessary. Expect a $75 Microsoft request with the learner's reason.
-5. Select Approve and invest. This completes the requested practice trade immediately.
-6. Switch to the learner browser and open Home. The portfolio updates automatically while the request is pending, or when the browser window regains focus.
-7. Check that Microsoft appears, available cash is approximately $900, and the standing per-investment limit remains $50. No further learner confirmation is needed. If you added practice funds earlier, subtract $100 from your starting cash instead.
-8. Refresh Decisions and verify that the Microsoft trade and its reason are saved once.
+4. Parent: open Parent and find the exact Microsoft request and reason. Select Approve this choice and approve the parent wallet transaction.
+5. Learner: return to Home and select Sign approved trade. Approve the learner wallet transaction. The extra in-app review dialog is unnecessary.
+6. Wait for confirmation. Expect Microsoft in holdings and approximately $900 available cash from the original $1,000 capital. If you added practice funds, subtract $100 from your starting capital instead. The standing per-investment limit remains $50.
+7. Refresh Decisions and verify that the Microsoft trade and original reason are saved once, with a transaction receipt.
 
-If the request expires, Home keeps a visible message with a link to review a new choice. Make a fresh request and repeat the approval. Keep the same policy and avoid other orders while an exact approval is pending.
+Expired requests remain visible with a link to review a fresh choice. A changed portfolio or policy also requires a fresh request. Keep the same policy and avoid other orders while an exact approval is pending.
 
-Pass when a parent approves and completes one particular order without increasing the standing limit or requiring a second learner confirmation.
+Pass when the parent authorizes one exact exception, the learner signs its execution, and limits stay unchanged.
 
 ## 6. Test pause and resume
 
-1. Parent: select Pause practice.
+1. Parent: select Pause practice, approve the parent wallet transaction, and wait for confirmation.
 2. Learner: refresh, then review another small practice investment. Expect a paused message and no successful order execution.
 3. Close that order dialog.
-4. Parent: select Resume practice.
+4. Parent: select Resume practice and approve the parent wallet transaction.
 5. Learner: refresh and check that practice is available again.
 
 Pass when the parent's pause affects the learner and resuming restores access.
@@ -126,23 +139,17 @@ Pass when the explanation uses saved context and respects a correction rather th
 
 Pass when the family history and remembered explanation survive a new sign-in.
 
-## 10. Test Sui enforcement and Tatum reconciliation
+## 10. Inspect Sui enforcement and Tatum reconciliation
 
-Complete the earlier steps first. This stage requires a Sui-compatible wallet in each role's browser and two distinct wallet addresses. Use the wallet's Testnet setting. The app's Account panel lists compatible wallets and links to Slush if none are available. We can walk through wallet setup separately if needed.
+The trades in steps 4 and 5 already use Sui Testnet. This stage checks their evidence.
 
-1. Parent: click your username, find Sui practice, and select Link followed by your wallet name. Approve the wallet-link message for the parent address.
-2. Learner: do the same using a different address in the learner browser.
-3. Parent: reopen Account. Once both addresses are linked, select Start Sui practice and sign the transaction.
-4. Wait for confirmation and the View practice contract account link. Open it to inspect the Testnet object.
-5. Expect a fresh $1,000 practice portfolio. The earlier portfolio is archived when Sui practice starts; learning records remain associated with the family.
-6. Parent: review or set the practice limits and sign any policy change requested by the wallet.
-7. Learner: make a small practice investment and approve the wallet signature. Wait for the transaction to be confirmed.
-8. Open Decisions and select that order. Follow the transaction receipt link and check that the Testnet explorer shows a successful transaction.
-9. Repeat an above-limit request with a parent-signed one-time approval if needed for the final demo. The deployed Sui contract requires the learner's wallet signature for execution: parent selects Approve this choice, then learner opens Home and selects Sign approved trade. There is no extra in-app order-review dialog. Complete the wallet signing before the signed quote expires (about two minutes); expired requests remain visible with a fresh-preview link.
+1. Learner: open Decisions and select the ordinary trade from step 4.
+2. Follow its transaction receipt link. Confirm that the Testnet explorer shows a successful transaction.
+3. Check the company, practice amount, shares, and cash against the saved trade and portfolio.
+4. Inspect the above-limit trade from step 5 and confirm that the standing limit stayed unchanged after the exact exception.
+5. Parent: open Settings > Practice wallet > View practice contract account to inspect the shared account and its fixed role addresses.
 
-Gas is sponsored by the configured Testnet service. A successful order should produce a real Sui Testnet receipt reconciled through Tatum, while the investment balance remains simulated.
-
-Pass when the contract account, role-specific signatures, confirmed transaction, and saved portfolio agree. If a transaction stays pending, use Account > Recheck transaction and report its status instead of repeatedly signing new orders.
+Pass when role-specific signatures, Tatum-confirmed receipts, and the portfolio agree. If a transaction stays pending, use Settings > Practice wallet > Recheck transaction and report its status instead of repeatedly signing new orders.
 
 ## Report results
 

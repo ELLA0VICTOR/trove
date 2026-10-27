@@ -1,7 +1,7 @@
 import { practiceCapital } from "../../shared/funding.ts";
 import { money } from "../../shared/model.ts";
 import { useState } from "react";
-import { Copy, LogOut, ShieldCheck } from "lucide-react";
+import { ArrowRight, Copy, LogOut, ShieldCheck } from "lucide-react";
 import { api, useApp } from "../lib/app-context.tsx";
 import { Button, Modal } from "./UI.tsx";
 import { ChainAccount } from "./ChainAccount.tsx";
@@ -225,7 +225,16 @@ export function AccountDialog({
             </div>
           )}
           <RecoveryEmailSettings />
-          <ChainAccount />
+          {state.chain?.account ? (
+            <ChainAccount />
+          ) : (
+            <div className="account-setting">
+              <h3>Practice portfolio</h3>
+              <Button secondary to="/app" onClick={onClose}>
+                Finish wallet setup <ArrowRight size={16} />
+              </Button>
+            </div>
+          )}
           <div className="modal-actions">
             <button
               className="text-link"

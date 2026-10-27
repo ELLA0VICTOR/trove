@@ -309,60 +309,43 @@ test("fresh login retrieves the same family and logout invalidates the previous 
     await fixture.store.db.close();
   }
 });
-test("a separately signed-in parent approves and executes one exact learner choice without widening limits", async () => {
+test("parent and learner accounts cannot use unsigned endpoints to place a practice trade", async () => {
   const fixture = await setup();
   try {
-    const { parent, learner } = await family(fixture);
-    await parent.request("/policy", "POST", {
-      perTrade: "10",
-      daily: "100",
-      paused: false,
-    });
-    const quote = (await (
+    const { parent, learner, state } = await family(fixture);
+    const quote = await (
       await learner.request("/orders/preview", "POST", {
         symbol: "KO",
         side: "buy",
         amount: "25",
         reason: "Compare another business.",
       })
-    ).json()) as {
-      id: string;
-    };
-    const requested = (await (
-      await learner.request("/approvals", "POST", { quoteId: quote.id })
-    ).json()) as AppSnapshot;
-    const approvedResponse = await parent.request(
-      `/approvals/${requested.approvals[0].id}`,
-      "POST",
-      { approve: true },
-    );
-    assert.equal(approvedResponse.status, 200);
-    const approved = (await approvedResponse.json()) as AppSnapshot;
-    assert.equal(approved.sequence, 1);
-    assert.equal(approved.approvals[0].state, "consumed");
-    assert.equal(approved.decisions.length, 1);
-    assert.equal(approved.decisions[0].reason, "Compare another business.");
+    ).json();
     assert.equal(
       (await parent.request("/orders/execute", "POST", { quoteId: quote.id }))
         .status,
       403,
     );
-    const first = (await (
-      await learner.request("/orders/execute", "POST", { quoteId: quote.id })
-    ).json()) as AppSnapshot;
-    const second = (await (
-      await learner.request("/orders/execute", "POST", { quoteId: quote.id })
-    ).json()) as AppSnapshot;
-    assert.equal(first.role, "learner");
-    assert.equal(first.sequence, 1);
-    assert.equal(second.cash, first.cash);
-    assert.equal(first.cash, approved.cash);
-    assert.equal(first.policy.perTrade, "10000000");
-    assert.equal(first.approvals[0].state, "consumed");
+    assert.equal(
+      (await learner.request("/orders/execute", "POST", { quoteId: quote.id }))
+        .status,
+      409,
+    );
+    assert.equal(
+      (await learner.request("/approvals", "POST", { quoteId: quote.id }))
+        .status,
+      409,
+    );
+    const after = await fixture.store.get(state.id);
+    assert.equal(after.cash, state.cash);
+    assert.equal(after.sequence, state.sequence);
+    assert.deepEqual(after.decisions, []);
+    assert.deepEqual(after.holdings, []);
   } finally {
     await fixture.store.db.close();
   }
 });
+
 test("memory dispatch requires parent consent and never promotes guest seed/history", async () => {
   const fixture = await setup();
   try {

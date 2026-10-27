@@ -15,6 +15,7 @@ import { CompanyLogo } from "../components/CompanyLogo.tsx";
 import { Sparkline } from "../components/Sparkline.tsx";
 import { practiceCapital } from "../../shared/funding.ts";
 import { chainAction } from "../lib/wallet.ts";
+import { PracticeSetup } from "../components/PracticeSetup.tsx";
 
 const PortfolioChart = lazy(() =>
   import("../components/PortfolioChart.tsx").then((module) => ({
@@ -24,7 +25,7 @@ const PortfolioChart = lazy(() =>
 
 export function Home() {
   const { openAccount } = useOutletContext<{ openAccount: () => void }>();
-  const { state, update, refresh, notify } = useApp(),
+  const { state, refresh, notify } = useApp(),
     [period, setPeriod] = useState(Infinity),
     [signing, setSigning] = useState(false),
     [now, setNow] = useState(Date.now);
@@ -58,6 +59,16 @@ export function Home() {
           <h1>Your portfolio</h1>
           <p>
             {state.learner}'s practice account <span>USD</span>
+            {state.chain?.account && (
+              <a
+                className="portfolio-network"
+                href={`https://suiscan.xyz/testnet/object/${state.chain.account}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Sui Testnet <ArrowUpRight size={12} />
+              </a>
+            )}
           </p>
         </div>
         <div className="account-heading-actions">
@@ -70,10 +81,12 @@ export function Home() {
           </Button>
         </div>
       </header>
+      <PracticeSetup onAccount={openAccount} />
       {state.approvals
         .filter(
           (approval) =>
             state.role === "learner" &&
+            Boolean(state.chain?.account) &&
             (approval.state === "approved" || approval.state === "requested"),
         )
         .map((approval) => {
@@ -93,7 +106,7 @@ export function Home() {
                     ? " — Waiting for parent approval."
                     : state.chain?.account
                       ? " — Approved. Sign with your wallet to complete the trade."
-                      : " — Approved. Complete this practice trade."}
+                      : " — Approved. Sign with your wallet to complete the trade."}
               </span>
               {stale ? (
                 <Link to={`/app/explore/${approval.quote.symbol}`}>
@@ -105,26 +118,17 @@ export function Home() {
                     disabled={signing}
                     onClick={() => {
                       setSigning(true);
-                      void (
-                        state.chain?.account
-                          ? chainAction(
-                              { action: "order", quoteId: approval.quote.id },
-                              state.chain.wallet,
-                            ).then(() => refresh())
-                          : update("/orders/execute", {
-                              quoteId: approval.quote.id,
-                            })
+                      void chainAction(
+                        { action: "order", quoteId: approval.quote.id },
+                        state.chain?.wallet,
                       )
+                        .then(() => refresh())
                         .then(() => notify("Practice trade completed."))
                         .catch((error) => notify((error as Error).message))
                         .finally(() => setSigning(false));
                     }}
                   >
-                    {signing
-                      ? "Completing…"
-                      : state.chain?.account
-                        ? "Sign approved trade"
-                        : "Complete approved trade"}{" "}
+                    {signing ? "Completing…" : "Sign approved trade"}{" "}
                     <ArrowRight size={15} />
                   </Button>
                 )

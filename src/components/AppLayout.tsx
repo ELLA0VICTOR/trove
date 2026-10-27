@@ -96,10 +96,15 @@ export function AppLayout() {
           a.quote.sequence === state.sequence &&
           a.quote.revision === state.policy.revision,
       );
+    const setupPending =
+      state?.session?.mode === "account" &&
+      state.chain?.ready &&
+      !state.chain.account;
     if (
       !state?.market?.blocked &&
       !state?.chain?.pending?.length &&
-      !waitingForParent
+      !waitingForParent &&
+      !setupPending
     )
       return;
     const timer = setInterval(() => {
@@ -110,6 +115,8 @@ export function AppLayout() {
     state?.market?.blocked,
     state?.chain?.pending?.length,
     state?.approvals,
+    state?.chain?.ready,
+    state?.chain?.account,
     state?.session?.mode,
     state?.role,
     state?.sequence,

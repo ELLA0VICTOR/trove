@@ -207,14 +207,27 @@ export function Company() {
         </div>
         <Button
           secondary
+          to={
+            state.session?.mode === "account" && !state.chain?.account
+              ? "/app"
+              : state.session?.mode === "account" && state.role === "parent"
+                ? "/app/parent"
+                : undefined
+          }
           onClick={() =>
             state.session?.mode === "account"
-              ? setOrdering(true)
+              ? state.chain?.account &&
+                state.role === "learner" &&
+                setOrdering(true)
               : openAccount()
           }
         >
           {state.session?.mode === "account"
-            ? "Make a practice move"
+            ? !state.chain?.account
+              ? "Set up practice"
+              : state.role === "parent"
+                ? "Parent controls"
+                : "Make a practice move"
             : "Sign in to practice"}{" "}
           <ArrowUpRight size={18} />
         </Button>
@@ -361,13 +374,15 @@ export function OrderDialog({
     setWorking(true);
     setError("");
     try {
-      if (state!.chain?.account) {
-        await chainAction(
-          { action: "order", quoteId: quote!.id },
-          state!.chain.wallet,
+      if (!state!.chain?.account)
+        throw new Error(
+          "Complete family wallet setup on Home before investing.",
         );
-        await refresh();
-      } else await update("/orders/execute", { quoteId: quote!.id });
+      await chainAction(
+        { action: "order", quoteId: quote!.id },
+        state!.chain.wallet,
+      );
+      await refresh();
       setComplete(true);
     } catch (e) {
       setError((e as Error).message);
@@ -413,9 +428,7 @@ export function OrderDialog({
               : "You can add a reflection when you’re ready."}
           </p>
           <p className="fine-print">
-            {state.chain?.account
-              ? "Confirmed on Sui Testnet through Tatum. Practice units only; no real stock purchase."
-              : "Saved to your practice account. No real shares or stock transaction."}
+            Confirmed on Sui Testnet through Tatum. Practice funds only.
           </p>
           <Button onClick={onClose}>
             Keep growing <ArrowRight size={17} />
@@ -429,9 +442,8 @@ export function OrderDialog({
             {state.session?.mode === "account"
               ? "parent or guardian"
               : "sample parent"}{" "}
-            {state.chain?.account
-              ? "can approve this order. Then sign the trade with your wallet from Home."
-              : "can approve and complete this practice trade. You can check its status on Home."}
+            can approve this order. Then sign the trade with your wallet from
+            Home.
           </p>
           <Button to="/app" onClick={onClose}>
             Back to portfolio

@@ -20,7 +20,9 @@ export function availableWallets(): readonly Wallet[] {
     .filter(
       (wallet) =>
         wallet.chains.includes("sui:testnet") &&
-        isWalletWithRequiredFeatureSet(wallet, ["sui:signPersonalMessage"]),
+        isWalletWithRequiredFeatureSet(wallet, ["sui:signPersonalMessage"]) &&
+        ("sui:signTransaction" in wallet.features ||
+          "sui:signTransactionBlock" in wallet.features),
     );
 }
 export async function connectWallet(wallet: Wallet, expected?: string) {
@@ -71,7 +73,7 @@ export async function chainAction(
   if (!selected || !selectedAccount || selectedAccount.address !== expected) {
     const wallets = availableWallets();
     if (!wallets.length)
-      throw new Error("Open Account settings and connect a Sui wallet first.");
+      throw new Error("Connect your practice wallet before signing a trade.");
     const preferred =
       wallets.find((w) => w.accounts.some((a) => a.address === expected)) ??
       (wallets.length === 1 ? wallets[0] : undefined);

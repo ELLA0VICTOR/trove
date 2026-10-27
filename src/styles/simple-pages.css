@@ -617,6 +617,136 @@
   max-width: 1000px;
   margin: 0 auto;
 }
+
+.practice-setup {
+  padding: 24px;
+  margin: 0 0 30px;
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--spot);
+  background: var(--surface);
+}
+.portfolio-network {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 12px;
+  font-size: 10px;
+  color: var(--spot);
+}
+.practice-setup > header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.practice-setup-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  background: var(--background);
+  border: 1px solid var(--line);
+  color: var(--spot);
+}
+.practice-setup h2 {
+  font-size: 23px;
+  letter-spacing: -0.5px;
+}
+.practice-setup header p {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 7px;
+}
+.practice-network {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 10px;
+  color: var(--spot);
+  margin-left: auto;
+}
+.practice-setup-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  list-style: none;
+  padding: 0;
+  margin: 24px 0 0;
+  border: 1px solid var(--line);
+  background: var(--background);
+}
+.practice-setup-steps li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 15px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.practice-setup-steps li + li {
+  border-left: 1px solid var(--line);
+}
+.practice-setup-steps .complete {
+  color: var(--spot);
+}
+.practice-setup-steps svg {
+  flex-shrink: 0;
+}
+.practice-setup .account-setting {
+  margin-top: 20px;
+  padding-top: 0;
+  border-top: 0;
+}
+.practice-setup .account-setting > p {
+  font-size: 12px;
+  margin-bottom: 13px;
+}
+.practice-setup .button {
+  min-height: 42px;
+  padding: 11px 17px;
+  font-size: 12px;
+}
+.practice-setup-invite {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 20px;
+  font-size: 12px;
+}
+.practice-wallet-install {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 14px 0;
+}
+.practice-wallet-install p {
+  font-size: 12px;
+}
+.practice-setup-unavailable {
+  margin-top: 20px;
+  color: var(--muted);
+  font-size: 12px;
+}
+@media (max-width: 600px) {
+  .practice-setup {
+    padding: 19px 16px;
+  }
+  .practice-setup h2 {
+    font-size: 21px;
+  }
+  .practice-network {
+    margin-left: 0;
+  }
+  .practice-setup-steps {
+    grid-template-columns: 1fr;
+  }
+  .practice-setup-steps li + li {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+}
 .parent-entry {
   display: flex;
   flex-direction: column;
