@@ -386,10 +386,6 @@ export function AccountDialog({
                     onChange={(event) => setPassword(event.target.value)}
                   />
                 </label>
-                <p>
-                  Use at least 12 characters. Verify your email to activate your
-                  account.
-                </p>
                 {!state?.session?.recovery?.ready && (
                   <p>Email signup is not available yet.</p>
                 )}
