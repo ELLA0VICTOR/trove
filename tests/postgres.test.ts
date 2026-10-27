@@ -18,6 +18,9 @@ import { mkdtempSync, rmSync, rmdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { seedHostedData } from "../server/bootstrap-data.ts";
+import { AccountSignup } from "../server/account-signup.ts";
+import { emailFixture, emailToken } from "./signup-helpers.ts";
+import { AccountRecovery } from "../server/account-recovery.ts";
 
 // PostgreSQL's actual parser/transaction engine; provider calls remain mocked/off.
 const pg = await PGlite.create();
@@ -47,6 +50,54 @@ const store = new DemoStore(database, { liveMemory: true });
 await database.ready;
 after(async () => {
   await database.close();
+});
+
+test("PostgreSQL email identity and one-use password recovery survive fresh account services", async () => {
+  const accounts = new Accounts(store);
+  const registered = await accounts.register({
+    username: "pg_email_" + randomUUID().slice(0, 7),
+    password: "original-pg-password",
+  });
+  const work: Promise<unknown>[] = [];
+  let message = "";
+  const recovery = new AccountRecovery(store, {
+    origin: "https://trove.example",
+    defer: (p) => {
+      work.push(p);
+    },
+    mail: {
+      send: async (input) => {
+        message = input.text;
+        return "accepted";
+      },
+    },
+  });
+  const email = randomUUID() + "@example.com";
+  const token = () =>
+    new URLSearchParams(
+      new URL(message.match(/https:\/\/[^\s]+/)![0]).hash.slice(1),
+    ).get("token")!;
+  await recovery.requestVerification(registered.member, {
+    email,
+    password: "original-pg-password",
+  });
+  await Promise.all(work);
+  await recovery.verify(token());
+  const fresh = new Accounts(new DemoStore(database));
+  assert.equal(
+    (await fresh.login({ identifier: email, password: "original-pg-password" }))
+      .member.id,
+    registered.member.id,
+  );
+  await recovery.requestReset({ identifier: email });
+  await Promise.all(work);
+  const resetToken = token();
+  const results = await Promise.allSettled([
+    recovery.reset({ token: resetToken, password: "replacement-pg-password" }),
+    recovery.reset({ token: resetToken, password: "different-pg-password" }),
+  ]);
+  assert.equal(results.filter((r) => r.status === "fulfilled").length, 1);
+  assert.equal(await fresh.resolve(registered.token), null);
 });
 
 test("hosted preparation preserves cumulative AI costs across repeat imports", async () => {
@@ -277,9 +328,14 @@ test("Vercel handler restores PostgreSQL sessions across fresh runtimes and defe
     origin: "https://trove-test.vercel.app",
   });
   try {
+    const username = "pg_vercel_" + randomUUID().slice(0, 7);
+    await new Accounts(new DemoStore(database)).register({
+      username,
+      password: "postgres-test-password",
+    });
     const response = await handler.fetch(
       new Request(
-        "https://trove-test.vercel.app/api/index?__trove_path=auth/register",
+        "https://trove-test.vercel.app/api/index?__trove_path=auth/login",
         {
           method: "POST",
           headers: {
@@ -287,7 +343,7 @@ test("Vercel handler restores PostgreSQL sessions across fresh runtimes and defe
             Origin: "https://trove-test.vercel.app",
           },
           body: JSON.stringify({
-            username: "pg_vercel_" + randomUUID().slice(0, 7),
+            username,
             password: "postgres-test-password",
           }),
         },
@@ -397,4 +453,52 @@ test("PostgreSQL real-price snapshots and passive adjustments retain their share
   const advanced = await market.advance(family);
   assert.equal(advanced.portfolio!.datasetId, next.id);
   assert.equal(advanced.sequence, state.sequence + 1);
+});
+
+test("PostgreSQL email signup creates one verified account and retains renamed sessions across stores", async () => {
+  const store = new DemoStore(database),
+    email = emailFixture();
+  const signup = new AccountSignup(store, {
+    mail: email.mail,
+    defer: email.defer,
+    origin: "https://trove.example",
+  });
+  const address = `pg_signup_${randomUUID().slice(0, 8)}@example.com`;
+  await signup.request({ email: address });
+  await email.flush();
+  const token = emailToken(email.sent.at(-1)!.text);
+  const results = await Promise.allSettled([
+    signup.complete({ token, password: "postgres-signup-password" }),
+    signup.complete({ token, password: "postgres-signup-password" }),
+  ]);
+  assert.equal(
+    results.filter((result) => result.status === "fulfilled").length,
+    1,
+  );
+  const result = results.find((result) => result.status === "fulfilled")!;
+  assert.equal(result.status, "fulfilled");
+  if (result.status !== "fulfilled") return;
+  const accounts = new Accounts(store),
+    username = "pg_renamed_" + randomUUID().slice(0, 7);
+  await accounts.rename(result.value.member, { username });
+  const fresh = new Accounts(new DemoStore(database));
+  assert.equal((await fresh.resolve(result.value.token))!.username, username);
+  assert.equal(
+    (
+      await fresh.login({
+        identifier: address,
+        password: "postgres-signup-password",
+      })
+    ).member.id,
+    result.value.member.id,
+  );
+  assert.equal(
+    (
+      await fresh.login({
+        identifier: username,
+        password: "postgres-signup-password",
+      })
+    ).member.id,
+    result.value.member.id,
+  );
 });

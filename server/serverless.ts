@@ -42,6 +42,8 @@ export function createServerlessHandler(
         market: runtime.market,
         chain: runtime.chain,
         learning: runtime.learning,
+        mail: runtime.mail,
+        defer,
         publicOrigin: origin,
         afterRequest: () => defer(runtime.maintenance().catch(() => {})),
       });

@@ -18,6 +18,8 @@ const settings = [
   ["Coach model", "COACH_MODEL"],
   ["Coach allowance", "COACH_BUDGET_USD"],
   ["Hosted database", "DATABASE_URL"],
+  ["Account email", "RESEND_API_KEY"],
+  ["Account sender", "EMAIL_FROM"],
 ] as const;
 
 export function setupReport(env: Environment) {

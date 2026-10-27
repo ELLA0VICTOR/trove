@@ -3,6 +3,8 @@ import { Copy, LogOut, ShieldCheck } from "lucide-react";
 import { api, useApp } from "../lib/app-context.tsx";
 import { Button, Modal } from "./UI.tsx";
 import { ChainAccount } from "./ChainAccount.tsx";
+import { RecoveryEmailSettings } from "./RecoveryEmailSettings.tsx";
+import { UsernameSettings } from "./UsernameSettings.tsx";
 
 export function AccountDialog({
   onClose,
@@ -12,27 +14,58 @@ export function AccountDialog({
   initialMode?: "login" | "register" | "join";
 }) {
   const { state, update, busy, notify } = useApp();
-  const [mode, setMode] = useState(initialMode);
+  const [mode, setMode] = useState<"login" | "register" | "join" | "forgot">(
+    initialMode,
+  );
   const [username, setUsername] = useState(""),
     [password, setPassword] = useState(""),
     [code, setCode] = useState("");
   const [invitation, setInvitation] = useState(""),
     [error, setError] = useState("");
+  const [email, setEmail] = useState("");
+  const [resetMessage, setResetMessage] = useState("");
+  const [signupMessage, setSignupMessage] = useState("");
+  const [sending, setSending] = useState(false);
   const [consent, setConsent] = useState(false);
   const account = state?.session?.mode === "account";
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setError("");
+    setSending(true);
     try {
-      await update(`/auth/${mode}`, {
-        username,
-        password,
-        ...(mode === "join" ? { code } : {}),
-      });
-      setPassword("");
-      onClose();
+      if (mode === "login") {
+        await update("/auth/login", { identifier: username, password });
+        setPassword("");
+        onClose();
+      } else {
+        const result = await api<{ message: string }>(`/auth/${mode}`, "POST", {
+          email: email.trim(),
+          ...(mode === "join" ? { code } : {}),
+        });
+        setSignupMessage(result.message);
+      }
     } catch (cause) {
       setError((cause as Error).message);
+    } finally {
+      setSending(false);
+    }
+  }
+  async function forgot(event: React.FormEvent) {
+    event.preventDefault();
+    setSending(true);
+    setError("");
+    setResetMessage("");
+    try {
+      const result = await api<{ message: string }>(
+        "/auth/forgot-password",
+        "POST",
+        { identifier: username },
+      );
+      setResetMessage(result.message);
+    } catch (cause) {
+      setError((cause as Error).message);
+    } finally {
+      setSending(false);
     }
   }
   async function invite() {
@@ -45,7 +78,13 @@ export function AccountDialog({
   }
   return (
     <Modal
-      title={account ? "YOUR ACCOUNT" : "SIGN IN TO TROVE"}
+      title={
+        account
+          ? "YOUR ACCOUNT"
+          : mode === "forgot"
+            ? "RESET YOUR PASSWORD"
+            : "SIGN IN TO TROVE"
+      }
       onClose={onClose}
     >
       {account ? (
@@ -54,6 +93,7 @@ export function AccountDialog({
           <p>
             {state.role === "parent" ? "Parent account" : "Learner account"}
           </p>
+          <UsernameSettings />
           {state.role === "parent" && (
             <>
               <div className="account-setting">
@@ -87,7 +127,7 @@ export function AccountDialog({
                     </button>
                     <p>
                       Give this code to your learner. They choose “Join a
-                      family” and create their own username and password.
+                      family”, verify their email, and choose a password.
                     </p>
                   </div>
                 )}
@@ -181,6 +221,7 @@ export function AccountDialog({
               </Button>
             </div>
           )}
+          <RecoveryEmailSettings />
           <ChainAccount />
           <div className="modal-actions">
             <button
@@ -198,6 +239,50 @@ export function AccountDialog({
               <LogOut size={15} /> Sign out
             </button>
           </div>
+        </>
+      ) : mode === "forgot" ? (
+        <>
+          <h2>Forgot your password?</h2>
+          <p>
+            Enter your username or verified email. Learners without an email can
+            use their username to send a reset link to their parent’s verified
+            inbox.
+          </p>
+          <form
+            className="limits-form"
+            onSubmit={(event) => void forgot(event)}
+          >
+            <label className="field-label">
+              Username or email
+              <input
+                required
+                autoComplete="username"
+                value={username}
+                onChange={(event) => setUsername(event.target.value)}
+                maxLength={254}
+              />
+            </label>
+            <Button
+              type="submit"
+              disabled={sending || !state?.session?.recovery?.ready}
+            >
+              {sending ? "Requesting…" : "Send reset link"}
+            </Button>
+          </form>
+          {!state?.session?.recovery?.ready && (
+            <p>Email recovery is not enabled yet.</p>
+          )}
+          {resetMessage && <p role="status">{resetMessage}</p>}
+          <button
+            className="text-link"
+            type="button"
+            onClick={() => {
+              setMode("login");
+              setError("");
+            }}
+          >
+            Back to sign in
+          </button>
         </>
       ) : (
         <>
@@ -222,6 +307,7 @@ export function AccountDialog({
                 onClick={() => {
                   setMode(value);
                   setError("");
+                  setSignupMessage("");
                 }}
               >
                 {label}
@@ -244,44 +330,88 @@ export function AccountDialog({
                 />
               </label>
             )}
-            <label className="field-label">
-              Username
-              <input
-                required
-                value={username}
-                onChange={(event) => setUsername(event.target.value)}
-                minLength={3}
-                maxLength={32}
-                pattern="[A-Za-z0-9_]+"
-                autoComplete="username"
-              />
-            </label>
-            <label className="field-label">
-              Password
-              <input
-                required
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                minLength={12}
-                maxLength={128}
-                autoComplete={
-                  mode === "login" ? "current-password" : "new-password"
-                }
-              />
-            </label>
-            <p>
-              {mode === "register"
-                ? "Creates a parent account with $1,000 in practice funds. Use a username, not an email address."
-                : "Passwords need at least 12 characters."}
-            </p>
-            <Button type="submit" disabled={busy}>
-              {mode === "register"
-                ? "Create family account"
-                : mode === "join"
-                  ? "Join family"
-                  : "Sign in"}
+            {mode === "login" ? (
+              <>
+                <label className="field-label">
+                  Username or email
+                  <input
+                    required
+                    value={username}
+                    onChange={(event) => setUsername(event.target.value)}
+                    minLength={3}
+                    maxLength={254}
+                    autoComplete="username"
+                  />
+                </label>
+                <label className="field-label">
+                  Password
+                  <input
+                    required
+                    type="password"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    maxLength={128}
+                    autoComplete="current-password"
+                  />
+                </label>
+              </>
+            ) : (
+              <>
+                <label className="field-label">
+                  Email
+                  <input
+                    required
+                    type="email"
+                    autoComplete="email"
+                    maxLength={254}
+                    value={email}
+                    onChange={(event) => {
+                      setEmail(event.target.value);
+                      setSignupMessage("");
+                    }}
+                  />
+                </label>
+                <p>
+                  Verify your email, then choose a password. Your username is
+                  assigned automatically and can be changed in Settings.
+                </p>
+                {!state?.session?.recovery?.ready && (
+                  <p>Email signup is not available yet.</p>
+                )}
+              </>
+            )}
+            <Button
+              type="submit"
+              disabled={
+                busy ||
+                sending ||
+                (mode !== "login" && !state?.session?.recovery?.ready)
+              }
+            >
+              {sending
+                ? "Sending?"
+                : mode === "login"
+                  ? "Sign in"
+                  : signupMessage
+                    ? "Resend verification link"
+                    : "Send verification link"}
             </Button>
+            {mode !== "login" && signupMessage && (
+              <p role="status">{signupMessage}</p>
+            )}
+            {mode === "login" && (
+              <button
+                type="button"
+                className="text-link"
+                onClick={() => {
+                  setMode("forgot");
+                  setError("");
+                  setResetMessage("");
+                }}
+              >
+                Forgot password?
+              </button>
+            )}
           </form>
         </>
       )}

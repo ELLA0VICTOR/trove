@@ -13,7 +13,8 @@ export default defineConfig({
       : {},
   },
   webServer: {
-    command: "npm run dev",
+    command:
+      'npx concurrently -k "node --import tsx tests/browser/server.ts" "npm:dev:web"',
     url: baseURL + "/api/state",
     reuseExistingServer: false,
     env: {

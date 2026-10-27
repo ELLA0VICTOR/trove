@@ -14,6 +14,7 @@ import { MarketService } from "./market.ts";
 import { MarketstackGateway } from "./integrations/marketstack.ts";
 import { ChainService } from "./chain.ts";
 import { chainConfig } from "./chain-config.ts";
+import { ResendAccountMail } from "./integrations/account-mail.ts";
 
 export async function createRuntime(
   options: { database?: Database; serverless?: boolean } = {},
@@ -26,6 +27,19 @@ export async function createRuntime(
   const coachReady = Boolean(
     enabled && value("OPENAI_API_KEY") && value("COACH_MODEL"),
   );
+  let mail: ResendAccountMail | undefined;
+  if (enabled && value("RESEND_API_KEY") && value("EMAIL_FROM")) {
+    try {
+      mail = new ResendAccountMail(
+        value("RESEND_API_KEY")!,
+        value("EMAIL_FROM")!,
+      );
+    } catch {
+      console.error(
+        "[trove] Account email settings are invalid; email delivery is disabled.",
+      );
+    }
+  }
   const dataDir = resolve(value("TROVE_DATA_DIR") ?? ".trove");
   const database =
     options.database ??
@@ -162,6 +176,7 @@ export async function createRuntime(
     market,
     chain,
     learning,
+    mail,
     requestDriven,
     maintenance,
     start: () => {

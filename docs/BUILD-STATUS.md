@@ -33,15 +33,17 @@ The 32-case real-model evaluation covered no-history, original-history, correcte
 
 ## Validation suites
 
-- 90 Node tests: accounting, corporate actions, historical valuation, real-price guest entry and sample archival, family authority, durable memory, learning, cost control, market data, chain recovery, upgraded type identity, receipt validation, PostgreSQL transitions, repeatable hosted usage imports, and guest access restrictions. Guest coach requests are rejected before generation; expired sessions cannot reach the coach. Deterministic lessons remain available without sign-in.
+- 110 Node tests: accounting, corporate actions, historical valuation, real-price guest entry and sample archival, family authority, durable memory, learning, cost control, market data, chain recovery, upgraded type identity, receipt validation, PostgreSQL transitions, repeatable hosted usage imports, guest access restrictions, email-first signup with deferred account creation, automatic and editable usernames, verified email identity, one-use password resets, session revocation, and guardian email recovery. Guest coach requests are rejected before generation; expired sessions cannot reach the coach. Deterministic lessons remain available without sign-in.
 - 21 Move tests: signed financial transitions, authority, limits, one-time exceptions, replay/tampering, expiry, passive corporate entries, reverse-split remainders, and duplicate-event prevention.
-- 18 browser journeys: navigation, responsive layout, portfolio interactions, public lessons, authenticated coaching access, decisions, guardian controls, returning family accounts, and the product walkthrough.
+- 19 browser journeys: navigation, responsive layout, portfolio interactions, public lessons, authenticated coaching access, decisions, guardian controls, returning family accounts, the product walkthrough, and email signup, username settings, and verification/reset screens.
 - TypeScript production compilation and Oxlint.
 - Production Node smoke checks: health, SPA deep links, built assets and caching, API errors, trusted origin, secure cookie attributes, cross-origin refusal, and restart persistence.
 
 Runtime keys, private test identities, provider payloads, and generated artifacts remain in ignored storage.
 
 ## Deployment
+
+Account verification and password-reset delivery use Resend with a verified sending domain. The implementation and simulated-delivery tests pass; actual inbox delivery remains to be checked after DNS verification and provider-key setup. See [email setup](EMAIL-SETUP.md).
 
 The Vercel function entry point, same-origin rewrites, request-driven maintenance, Neon PostgreSQL adapter, environment export, and database preflight are implemented. Local PostgreSQL-engine checks cover stale writers, concurrent orders and invitations, cumulative budgets, immutable memories, and sessions across fresh function runtimes.
 

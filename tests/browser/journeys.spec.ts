@@ -1,16 +1,94 @@
 import { test, expect } from "@playwright/test";
-import type { Page } from "@playwright/test";
+import type { Page, APIRequestContext } from "@playwright/test";
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
-async function createPortfolioAccount(page: Page) {
-  const response = await page.request.post("/api/auth/register", {
-    data: {
-      username: `portfolio_${crypto.randomUUID().slice(0, 8)}`,
-      password: "browser-test-password",
-    },
-  });
-  expect(response.ok()).toBe(true);
+const mailFile = resolve(
+  process.env.TROVE_BROWSER_DATA_DIR ?? ".artifacts/browser-store",
+  "mail.jsonl",
+);
+async function signupToken(email: string) {
+  let token = "";
+  await expect
+    .poll(() => {
+      if (!existsSync(mailFile)) return "";
+      const messages = readFileSync(mailFile, "utf8")
+        .trim()
+        .split("\n")
+        .filter(Boolean)
+        .map((line) => JSON.parse(line));
+      const message = messages.findLast(
+        (item) =>
+          item.to === email && item.idempotencyKey.startsWith("trove-signup-"),
+      );
+      if (!message) return "";
+      token = new URLSearchParams(
+        new URL(message.text.match(/https?:\/\/[^\s]+/)![0]).hash.slice(1),
+      ).get("token")!;
+      return token;
+    })
+    .not.toBe("");
+  return token;
 }
-
+async function createVerifiedAccount(
+  request: APIRequestContext,
+  username = `portfolio_${crypto.randomUUID().slice(0, 8)}`,
+  code?: string,
+) {
+  const email = `${username}@example.com`;
+  const response = await request.post(
+    code ? "/api/auth/join" : "/api/auth/register",
+    { data: { email, ...(code ? { code } : {}) } },
+  );
+  expect(response.status()).toBe(202);
+  const token = await signupToken(email);
+  const complete = await request.post("/api/auth/complete-signup", {
+    data: { token, password: "browser-test-password" },
+  });
+  expect(complete.ok()).toBe(true);
+  const renamed = await request.post("/api/account/username", {
+    data: { username },
+  });
+  expect(renamed.ok()).toBe(true);
+  return renamed;
+}
+async function finishSignupScreen(page: Page, email: string, username: string) {
+  const token = await signupToken(email);
+  await page.goto(`/app/create-account#token=${token}`);
+  await expect(
+    page.getByRole("button", { name: "Create account", exact: true }),
+  ).toBeEnabled();
+  expect(new URL(page.url()).hash).toBe("");
+  await page
+    .getByLabel("Password", { exact: true })
+    .fill("browser-test-password");
+  await page
+    .getByLabel("Confirm password", { exact: true })
+    .fill("browser-test-password");
+  await page
+    .getByRole("button", { name: "Create account", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Welcome to Trove." }),
+  ).toBeVisible();
+  await page.getByRole("link", { name: "Continue to Trove" }).click();
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByLabel("Username", { exact: true })).toHaveValue(
+    /^trove_[a-f0-9]{10}$/,
+  );
+  await dialog.getByLabel("Username", { exact: true }).fill(username);
+  await dialog
+    .getByRole("button", { name: "Save username", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: username, exact: true }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+}
+async function createPortfolioAccount(page: Page) {
+  await createVerifiedAccount(page.request);
+}
 async function createLearnerAccount(page: Page) {
   await createPortfolioAccount(page);
   const invitation = await page.request.post("/api/account/invite", {
@@ -19,15 +97,112 @@ async function createLearnerAccount(page: Page) {
   expect(invitation.ok()).toBe(true);
   const code = (await invitation.json()).code;
   await page.request.post("/api/auth/logout", { data: {} });
-  const joined = await page.request.post("/api/auth/join", {
-    data: {
-      code,
-      username: `learner_${crypto.randomUUID().slice(0, 8)}`,
-      password: "browser-test-password",
-    },
-  });
-  expect(joined.ok()).toBe(true);
+  await createVerifiedAccount(
+    page.request,
+    `learner_${crypto.randomUUID().slice(0, 8)}`,
+    code,
+  );
 }
+
+test("email sign-in, forgot-password, verification and reset screens handle links without exposing URL tokens", async ({
+  page,
+}) => {
+  await page.route("**/api/state", async (route) => {
+    const response = await route.fetch();
+    const state = await response.json();
+    state.session.recovery = { ready: true };
+    await route.fulfill({ response, json: state });
+  });
+  await page.route("**/api/auth/forgot-password", (route) =>
+    route.fulfill({
+      status: 202,
+      json: {
+        message: "If an eligible account matches, a reset link will be sent.",
+      },
+    }),
+  );
+  await page.goto("/app?signin=1");
+  let dialog = page.getByRole("dialog", { name: "SIGN IN TO TROVE" });
+  await dialog
+    .getByLabel("Username or email", { exact: true })
+    .fill("parent@example.com");
+  expect(
+    await dialog
+      .getByLabel("Username or email", { exact: true })
+      .evaluate((input: HTMLInputElement) => input.checkValidity()),
+  ).toBe(true);
+  await page.route("**/api/auth/login", (route) =>
+    route.fulfill({
+      status: 401,
+      json: { error: "The username, email, or password is incorrect." },
+    }),
+  );
+  await dialog
+    .getByLabel("Password", { exact: true })
+    .fill("wrong-private-password");
+  await dialog
+    .getByRole("button", { name: "Sign in", exact: true })
+    .last()
+    .click();
+  await expect(dialog.getByRole("alert")).toContainText("incorrect");
+  await dialog
+    .getByRole("button", { name: "Forgot password?", exact: true })
+    .click();
+  dialog = page.getByRole("dialog", { name: "RESET YOUR PASSWORD" });
+  await expect(
+    dialog.getByRole("button", { name: "Send reset link", exact: true }),
+  ).toBeEnabled();
+  await dialog
+    .getByRole("button", { name: "Send reset link", exact: true })
+    .click();
+  await expect(dialog.getByRole("status")).toContainText(
+    "If an eligible account matches",
+  );
+  const token = "A".repeat(43);
+  let resetCalls = 0;
+  await page.route("**/api/auth/reset-password", async (route) => {
+    resetCalls++;
+    expect(route.request().postDataJSON().token).toBe(token);
+    await route.fulfill({ json: { ok: true } });
+  });
+  await page.goto(`/app/reset-password#token=${token}`);
+  await expect(
+    page.getByRole("heading", { name: "Choose a new password." }),
+  ).toBeVisible();
+  expect(page.url()).not.toContain(token);
+  await page
+    .getByLabel("New password", { exact: true })
+    .fill("replacement-private-password");
+  await page
+    .getByLabel("Confirm new password", { exact: true })
+    .fill("different-private-password");
+  await page.getByRole("button", { name: "Save new password" }).click();
+  await expect(page.getByRole("alert")).toHaveText(
+    "The passwords do not match.",
+  );
+  expect(resetCalls).toBe(0);
+  await page
+    .getByLabel("Confirm new password", { exact: true })
+    .fill("replacement-private-password");
+  await page.getByRole("button", { name: "Save new password" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Password updated." }),
+  ).toBeVisible();
+  expect(resetCalls).toBe(1);
+  await page.getByRole("link", { name: "Continue to sign in" }).click();
+  await expect(
+    page.getByRole("dialog", { name: "SIGN IN TO TROVE" }),
+  ).toBeVisible();
+  await page.route("**/api/auth/verify-email", (route) =>
+    route.fulfill({ json: { ok: true } }),
+  );
+  await page.goto(`/app/verify-email#token=${"B".repeat(43)}`);
+  await page.getByRole("button", { name: "Verify email", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Email verified." }),
+  ).toBeVisible();
+  expect(new URL(page.url()).hash).toBe("");
+});
 
 test("visitors can finish lessons and browse prices but must sign in for Ask Trove and personal actions", async ({
   page,
@@ -164,17 +339,20 @@ test("portfolio stays hidden until sign-in and returns to the welcome screen aft
     .getByRole("button", { name: "Create a family account", exact: true })
     .click();
   let dialog = page.getByRole("dialog");
-  await expect(
-    dialog.getByRole("button", { name: "Create family account", exact: true }),
-  ).toBeVisible();
+  await expect(dialog.getByLabel("Username", { exact: true })).toHaveCount(0);
+  await expect(dialog.getByLabel("Password", { exact: true })).toHaveCount(0);
   const username = `welcome_${crypto.randomUUID().slice(0, 8)}`;
-  await dialog.getByLabel("Username", { exact: true }).fill(username);
   await dialog
-    .getByLabel("Password", { exact: true })
-    .fill("browser-test-password");
+    .getByLabel("Email", { exact: true })
+    .fill(`${username}@example.com`);
   await dialog
-    .getByRole("button", { name: "Create family account", exact: true })
+    .getByRole("button", { name: "Send verification link", exact: true })
     .click();
+  await expect(dialog.getByRole("status")).toContainText("Check your inbox");
+  expect(
+    (await (await page.request.get("/api/state")).json()).session.mode,
+  ).toBe("sample");
+  await finishSignupScreen(page, `${username}@example.com`, username);
   await expect(
     main.getByRole("heading", { name: "Your portfolio", exact: true }),
   ).toBeVisible();
@@ -222,14 +400,14 @@ test("family sign-in and learner invitations preserve separate roles and returni
   await dialog
     .getByRole("button", { name: "Create family", exact: true })
     .click();
-  await dialog.getByLabel("Username", { exact: true }).fill(parent);
-  await dialog.getByLabel("Password", { exact: true }).fill(password);
   await dialog
-    .getByRole("button", { name: "Create family account", exact: true })
+    .getByLabel("Email", { exact: true })
+    .fill(`${parent}@example.com`);
+  await dialog
+    .getByRole("button", { name: "Send verification link", exact: true })
     .click();
-  await expect(
-    page.getByRole("button", { name: parent, exact: true }),
-  ).toBeVisible();
+  await expect(dialog.getByRole("status")).toContainText("Check your inbox");
+  await finishSignupScreen(page, `${parent}@example.com`, parent);
   await page.getByRole("button", { name: parent, exact: true }).click();
   dialog = page.getByRole("dialog");
   await dialog
@@ -257,14 +435,14 @@ test("family sign-in and learner invitations preserve separate roles and returni
       .getByRole("button", { name: "Join a family", exact: true })
       .click();
     await join.getByLabel("Invitation code", { exact: true }).fill(code);
-    await join.getByLabel("Username", { exact: true }).fill(learner);
-    await join.getByLabel("Password", { exact: true }).fill(password);
     await join
-      .getByRole("button", { name: "Join family", exact: true })
+      .getByLabel("Email", { exact: true })
+      .fill(`${learner}@example.com`);
+    await join
+      .getByRole("button", { name: "Send verification link", exact: true })
       .click();
-    await expect(
-      child.getByRole("button", { name: learner, exact: true }),
-    ).toBeVisible();
+    await expect(join.getByRole("status")).toContainText("Check your inbox");
+    await finishSignupScreen(child, `${learner}@example.com`, learner);
     expect(
       (
         await child.request.post("/api/preview-role", {
@@ -284,7 +462,7 @@ test("family sign-in and learner invitations preserve separate roles and returni
       .getByRole("button", { name: "Sign out", exact: true })
       .click();
     const login = child.getByRole("dialog");
-    await login.getByLabel("Username", { exact: true }).fill(learner);
+    await login.getByLabel("Username or email", { exact: true }).fill(learner);
     await login.getByLabel("Password", { exact: true }).fill(password);
     await login
       .getByRole("button", { name: "Sign in", exact: true })
@@ -446,25 +624,19 @@ test("the exact parent-approved action can return to the learner and execute onc
   const parentContext = await browser.newContext({ baseURL });
   try {
     const suffix = crypto.randomUUID().slice(0, 8);
-    const registered = await parentContext.request.post("/api/auth/register", {
-      data: {
-        username: `approval_parent_${suffix}`,
-        password: "browser-test-password",
-      },
-    });
-    expect(registered.ok()).toBe(true);
+    await createVerifiedAccount(
+      parentContext.request,
+      `approval_parent_${suffix}`,
+    );
     const invitation = await parentContext.request.post("/api/account/invite", {
       data: {},
     });
     expect(invitation.ok()).toBe(true);
-    const joined = await page.request.post("/api/auth/join", {
-      data: {
-        code: (await invitation.json()).code,
-        username: `approval_child_${suffix}`,
-        password: "browser-test-password",
-      },
-    });
-    expect(joined.ok()).toBe(true);
+    await createVerifiedAccount(
+      page.request,
+      `approval_child_${suffix}`,
+      (await invitation.json()).code,
+    );
     await page.goto("/app/explore/KO");
     await page.getByRole("button", { name: "Make a practice move" }).click();
     await page.getByLabel("Practice amount").fill("150");

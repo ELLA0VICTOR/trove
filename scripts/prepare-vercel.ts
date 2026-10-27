@@ -46,6 +46,10 @@ const env: Record<string, string | undefined> = {
 const missing = Object.entries(env)
   .filter(([, entry]) => !entry)
   .map(([key]) => key);
+if (value("RESEND_API_KEY") && value("EMAIL_FROM")) {
+  env.RESEND_API_KEY = value("RESEND_API_KEY");
+  env.EMAIL_FROM = value("EMAIL_FROM");
+}
 if (missing.length)
   throw new Error(
     `Complete these local settings first: ${missing.join(", ")}. Secret values were not printed.`,

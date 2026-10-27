@@ -147,6 +147,13 @@ export interface AppSnapshot extends DemoState {
     role: "parent" | "learner";
     memoryEnabled: boolean;
     servicesReady: boolean;
+    recovery?: {
+      ready: boolean;
+      email?: string;
+      pendingEmail?: string;
+      delivery?: "pending" | "sent" | "failed" | "expired";
+      guardianRecovery?: boolean;
+    };
   };
 }
 export interface GuideReply {

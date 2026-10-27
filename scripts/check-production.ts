@@ -2,6 +2,8 @@ import { spawn } from "node:child_process";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import assert from "node:assert/strict";
+import { Accounts } from "../server/auth.ts";
+import { DemoStore } from "../server/store.ts";
 
 mkdirSync(".artifacts", { recursive: true });
 const directory = mkdtempSync(resolve(".artifacts/production-check-"));
@@ -48,6 +50,12 @@ async function stop() {
   await exited;
 }
 try {
+  const seeded = new DemoStore(resolve(directory, "local.sqlite"));
+  await new Accounts(seeded).register({
+    username: "production_smoke",
+    password: "synthetic-production-smoke-password",
+  });
+  await seeded.db.close();
   await start();
   assert.deepEqual(await fetch(base + "/health").then((r) => r.json()), {
     status: "ok",
@@ -60,7 +68,7 @@ try {
   assert.equal(assetResponse.status, 200);
   assert.match(assetResponse.headers.get("cache-control") ?? "", /immutable/);
   assert.equal((await fetch(base + "/api/not-an-endpoint")).status, 404);
-  const registered = await fetch(base + "/api/auth/register", {
+  const registered = await fetch(base + "/api/auth/login", {
     method: "POST",
     headers: { "Content-Type": "application/json", Origin: origin },
     body: JSON.stringify({

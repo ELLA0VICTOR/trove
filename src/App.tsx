@@ -16,6 +16,7 @@ import { Decisions } from "./pages/Decisions.tsx";
 import { Guide } from "./pages/Learning.tsx";
 import { Replay } from "./pages/Replay.tsx";
 import { Parent } from "./pages/Parent.tsx";
+import { AccountLink } from "./pages/AccountLink.tsx";
 import "./App.css";
 function PageTitle() {
   const { pathname } = useLocation();
@@ -31,6 +32,18 @@ export default function App() {
         <PageTitle />
         <Routes>
           <Route path="/" element={<Landing />} />
+          <Route
+            path="/app/create-account"
+            element={<AccountLink purpose="signup" />}
+          />
+          <Route
+            path="/app/verify-email"
+            element={<AccountLink purpose="verify" />}
+          />
+          <Route
+            path="/app/reset-password"
+            element={<AccountLink purpose="reset" />}
+          />
           <Route path="/app" element={<AppLayout />}>
             <Route index element={<Home />} />
             <Route path="explore" element={<Explore />} />

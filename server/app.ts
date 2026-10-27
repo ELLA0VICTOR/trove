@@ -17,6 +17,9 @@ import type { DemoState } from "../shared/model.ts";
 import { MarketService } from "./market.ts";
 import { ChainService } from "./chain.ts";
 import { StateConflict } from "./database.ts";
+import { AccountRecovery } from "./account-recovery.ts";
+import { AccountSignup } from "./account-signup.ts";
+import type { AccountMail } from "./integrations/account-mail.ts";
 const textSchema = z.string().trim().min(1).max(1500);
 type Environment = {
   Variables: {
@@ -32,9 +35,21 @@ export function createApp(
     chain?: ChainService;
     publicOrigin?: string;
     afterRequest?: () => void;
+    mail?: AccountMail;
+    defer?: (work: Promise<unknown>) => void;
   } = {},
 ) {
   const accounts = new Accounts(store);
+  const recovery = new AccountRecovery(store, {
+    mail: options.mail,
+    origin: options.publicOrigin ?? "http://127.0.0.1:5173",
+    defer: options.defer,
+  });
+  const signup = new AccountSignup(store, {
+    mail: options.mail,
+    origin: options.publicOrigin ?? "http://127.0.0.1:5173",
+    defer: options.defer,
+  });
   const market = options.market ?? new MarketService(store);
   const chain = options.chain ?? new ChainService(store, market);
   const app = new Hono<Environment>();
@@ -86,6 +101,9 @@ export function createApp(
         servicesReady: Boolean(
           options.learning?.ready && options.learning?.coachReady,
         ),
+        recovery: member
+          ? await recovery.status(member)
+          : { ready: recovery.ready },
       },
     };
   };
@@ -226,10 +244,25 @@ export function createApp(
       500,
     );
   });
-  app.post(
-    "/api/auth/register",
-    async (c) => await signIn(c, await accounts.register(await c.req.json())),
+  app.post("/api/auth/register", async (c) => {
+    await signup.request(await c.req.json());
+    return c.json(
+      {
+        message:
+          "Check your inbox for a verification link. If you already have an account, sign in instead.",
+      },
+      202,
+    );
+  });
+  app.post("/api/auth/signup-details", async (c) =>
+    c.json(await signup.details(await c.req.json())),
   );
+  app.post("/api/auth/complete-signup", async (c) => {
+    const result = await signup.complete(await c.req.json());
+    const previous = getCookie(c, "trove_session");
+    if (previous) await accounts.logout(previous);
+    return signIn(c, result);
+  });
   app.post(
     "/api/auth/login",
     async (c) =>
@@ -238,10 +271,45 @@ export function createApp(
         await accounts.login(await c.req.json(), getCookie(c, "trove_session")),
       ),
   );
-  app.post(
-    "/api/auth/join",
-    async (c) => await signIn(c, await accounts.join(await c.req.json())),
-  );
+  app.post("/api/auth/join", async (c) => {
+    await signup.request(await c.req.json(), true);
+    return c.json(
+      {
+        message:
+          "Check your inbox for a verification link to join your family.",
+      },
+      202,
+    );
+  });
+  app.post("/api/account/username", async (c) => {
+    const member = await accounts.rename(requireMember(c), await c.req.json());
+    return c.json(await snapshot(await stateFor(c), c, member));
+  });
+  app.post("/api/account/email", async (c) => {
+    const member = requireMember(c);
+    await recovery.requestVerification(member, await c.req.json());
+    return c.json(await snapshot(await stateFor(c), c));
+  });
+  app.post("/api/auth/forgot-password", async (c) => {
+    await recovery.requestReset(await c.req.json());
+    return c.json(
+      {
+        message:
+          "If an eligible account matches, a password-reset link will be sent to its verified recovery email. Learner recovery may be sent to the parent's verified email.",
+      },
+      202,
+    );
+  });
+  app.post("/api/auth/verify-email", async (c) => {
+    const { token } = z.object({ token: z.string() }).parse(await c.req.json());
+    await recovery.verify(token);
+    return c.json({ ok: true });
+  });
+  app.post("/api/auth/reset-password", async (c) => {
+    await recovery.reset(await c.req.json());
+    deleteCookie(c, "trove_session", { path: "/" });
+    return c.json({ ok: true });
+  });
   app.post("/api/auth/logout", async (c) => {
     const token = getCookie(c, "trove_session");
     if (token) await accounts.logout(token);

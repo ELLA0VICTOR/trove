@@ -66,21 +66,23 @@ The repository already defines API routing, SPA deep links, function duration, t
 
 The preparation helper fills this list from local settings and the ignored Testnet key file.
 
-| Variable                  | Source                                                        |
-| ------------------------- | ------------------------------------------------------------- |
-| `DATABASE_URL`            | Neon pooled PostgreSQL URI.                                   |
-| `TATUM_API_KEY`           | Existing Tatum Testnet key.                                   |
-| `MARKETSTACK_API_KEY`     | Existing market-data key.                                     |
-| `MEMWAL_ACCOUNT_ID`       | Existing Walrus Memory account.                               |
-| `MEMWAL_PRIVATE_KEY`      | Existing memory delegate key.                                 |
-| `MEMWAL_SERVER_URL`       | Existing relayer URL.                                         |
-| `OPENAI_API_KEY`          | Existing OpenAI key.                                          |
-| `COACH_MODEL`             | `gpt-6-luna`.                                                 |
-| `COACH_BUDGET_USD`        | Existing allowance, enforced against the hosted usage ledger. |
-| `SUI_PACKAGE_ID`          | Current package from the deployment manifest.                 |
-| `SUI_ORIGINAL_PACKAGE_ID` | Original account type identity.                               |
-| `SUI_TESTNET_SPONSOR_KEY` | Existing sponsor in `.trove/sui-testnet-keys.json`.           |
-| `SUI_QUOTE_ATTESTOR_KEY`  | Existing attestor from that file.                             |
+| Variable                  | Source                                                                                  |
+| ------------------------- | --------------------------------------------------------------------------------------- |
+| `DATABASE_URL`            | Neon pooled PostgreSQL URI.                                                             |
+| `RESEND_API_KEY`          | Account verification and password-reset sending key; see [email setup](EMAIL-SETUP.md). |
+| `EMAIL_FROM`              | Verified sender, such as `Trove <accounts@dixmail.xyz>`.                                |
+| `TATUM_API_KEY`           | Existing Tatum Testnet key.                                                             |
+| `MARKETSTACK_API_KEY`     | Existing market-data key.                                                               |
+| `MEMWAL_ACCOUNT_ID`       | Existing Walrus Memory account.                                                         |
+| `MEMWAL_PRIVATE_KEY`      | Existing memory delegate key.                                                           |
+| `MEMWAL_SERVER_URL`       | Existing relayer URL.                                                                   |
+| `OPENAI_API_KEY`          | Existing OpenAI key.                                                                    |
+| `COACH_MODEL`             | `gpt-6-luna`.                                                                           |
+| `COACH_BUDGET_USD`        | Existing allowance, enforced against the hosted usage ledger.                           |
+| `SUI_PACKAGE_ID`          | Current package from the deployment manifest.                                           |
+| `SUI_ORIGINAL_PACKAGE_ID` | Original account type identity.                                                         |
+| `SUI_TESTNET_SPONSOR_KEY` | Existing sponsor in `.trove/sui-testnet-keys.json`.                                     |
+| `SUI_QUOTE_ATTESTOR_KEY`  | Existing attestor from that file.                                                       |
 
 Vercel supplies its deployment host and production environment. The API derives its trusted HTTPS origin from those settings. Set `PUBLIC_ORIGIN` explicitly when using a custom domain.
 

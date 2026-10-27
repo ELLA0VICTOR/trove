@@ -1,4 +1,42 @@
 /* Consumer navigation and catalog layout. */
+.account-link-page {
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: 32px 16px;
+}
+.account-link-panel {
+  width: min(100%, 460px);
+  border: 1px solid var(--line);
+  padding: clamp(22px, 5vw, 38px);
+}
+.account-link-panel > .brand {
+  margin-bottom: 42px;
+}
+.account-link-panel h1 {
+  font-size: 32px;
+  line-height: 1.1;
+  letter-spacing: -1px;
+}
+.account-link-panel p {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.8;
+  margin: 18px 0;
+}
+.account-link-icon {
+  color: var(--spot);
+  margin-bottom: 18px;
+}
+.recovery-verified {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-wrap: anywhere;
+}
+.recovery-settings .limits-form {
+  margin-top: 20px;
+}
 .how-it-works-modal {
   width: min(460px, calc(100vw - 32px));
   aspect-ratio: 1;
@@ -1109,4 +1147,10 @@
   .holding-row {
     grid-template-columns: minmax(100px, 1fr) 67px 67px;
   }
+}
+.account-heading-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
 }

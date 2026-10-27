@@ -250,26 +250,30 @@ The OpenAI adapter uses bounded context, structured output, citation validation,
 
 The application uses same-origin JSON endpoints under `/api`, with HttpOnly session cookies.
 
-| Method        | Endpoint                                           | Purpose                                                            |
-| ------------- | -------------------------------------------------- | ------------------------------------------------------------------ |
-| GET           | `/health`                                          | Process health.                                                    |
-| POST          | `/api/auth/{register,login,join,logout}`           | Family registration and account sessions.                          |
-| GET           | `/api/state`                                       | Portfolio, market context, decisions, learning state, and session. |
-| POST          | `/api/account/invite`                              | Create a learner invitation.                                       |
-| POST          | `/api/account/memory`                              | Guardian memory-consent control.                                   |
-| POST          | `/api/account/market`                              | Begin a market-backed practice portfolio.                          |
-| POST          | `/api/orders/preview`                              | Prepare a short-lived, version-bound quote.                        |
-| POST          | `/api/orders/execute`                              | Execute a local-ledger practice order.                             |
-| POST          | `/api/approvals`, `/api/approvals/:id`             | Request and review an exact exception.                             |
-| POST          | `/api/policy`                                      | Update local-ledger guardian controls.                             |
-| POST / DELETE | `/api/memories`, `/api/memories/:id`               | Record, correct, and remove learning context.                      |
-| POST          | `/api/guide`                                       | Ask the learning guide.                                            |
-| GET / POST    | `/api/exercise`                                    | Retrieve and answer the next concept check.                        |
-| GET           | `/api/memory/status`                               | Memory publication and confirmation state.                         |
-| POST          | `/api/chain/{challenge,link}`                      | Prove control of a role's wallet.                                  |
-| POST          | `/api/chain/{prepare,submit}`                      | Prepare and submit a wallet-signed practice call.                  |
-| GET           | `/api/chain/status`, `/api/chain/transactions/:id` | Account and transaction state.                                     |
-| POST          | `/api/chain/{reconcile,cancel}`                    | Recheck receipts or cancel unsigned previews.                      |
+| Method        | Endpoint                                                  | Purpose                                                            |
+| ------------- | --------------------------------------------------------- | ------------------------------------------------------------------ |
+| GET           | `/health`                                                 | Process health.                                                    |
+| POST          | `/api/auth/{register,login,join,logout}`                  | Email signup requests, sign-in, and account sessions.              |
+| POST          | `/api/auth/{forgot-password,reset-password,verify-email}` | Verified email ownership and one-use password recovery.            |
+| POST          | `/api/auth/{signup-details,complete-signup}`              | Validate an email challenge and create the verified account.       |
+| POST          | `/api/account/username`                                   | Update the signed-in member's username.                            |
+| POST          | `/api/account/email`                                      | Request recovery email verification using the current password.    |
+| GET           | `/api/state`                                              | Portfolio, market context, decisions, learning state, and session. |
+| POST          | `/api/account/invite`                                     | Create a learner invitation.                                       |
+| POST          | `/api/account/memory`                                     | Guardian memory-consent control.                                   |
+| POST          | `/api/account/market`                                     | Begin a market-backed practice portfolio.                          |
+| POST          | `/api/orders/preview`                                     | Prepare a short-lived, version-bound quote.                        |
+| POST          | `/api/orders/execute`                                     | Execute a local-ledger practice order.                             |
+| POST          | `/api/approvals`, `/api/approvals/:id`                    | Request and review an exact exception.                             |
+| POST          | `/api/policy`                                             | Update local-ledger guardian controls.                             |
+| POST / DELETE | `/api/memories`, `/api/memories/:id`                      | Record, correct, and remove learning context.                      |
+| POST          | `/api/guide`                                              | Ask the learning guide.                                            |
+| GET / POST    | `/api/exercise`                                           | Retrieve and answer the next concept check.                        |
+| GET           | `/api/memory/status`                                      | Memory publication and confirmation state.                         |
+| POST          | `/api/chain/{challenge,link}`                             | Prove control of a role's wallet.                                  |
+| POST          | `/api/chain/{prepare,submit}`                             | Prepare and submit a wallet-signed practice call.                  |
+| GET           | `/api/chain/status`, `/api/chain/transactions/:id`        | Account and transaction state.                                     |
+| POST          | `/api/chain/{reconcile,cancel}`                           | Recheck receipts or cancel unsigned previews.                      |
 
 Inputs are validated with Zod. Family membership determines account access. Contract-backed portfolios execute financial changes through the chain endpoints.
 

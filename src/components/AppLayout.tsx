@@ -26,7 +26,9 @@ export function AppLayout() {
   const { state, error, refresh, toast } = useApp(),
     location = useLocation(),
     [menuOpen, setMenuOpen] = useState(false),
-    [accountOpen, setAccountOpen] = useState(false),
+    [accountOpen, setAccountOpen] = useState(
+      () => new URLSearchParams(location.search).get("signin") === "1",
+    ),
     [explanationOpen, setExplanationOpen] = useState(false),
     [accountMode, setAccountMode] = useState<"login" | "register">("login"),
     [sidebarHidden, setSidebarHidden] = useState(() => {

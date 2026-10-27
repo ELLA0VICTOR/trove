@@ -1,13 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
+import { emailFixture, emailToken } from "./signup-helpers.ts";
 import { createApp } from "../server/app.ts";
 import { DemoStore } from "../server/store.ts";
 import type { AppSnapshot } from "../shared/model.ts";
 async function setup() {
   const store = new DemoStore(":memory:", { liveMemory: true });
   let coachCalls = 0;
+  const email = emailFixture();
   const app = await createApp(store, {
+    mail: email.mail,
+    defer: email.defer,
     learning: {
       ready: true,
       coachReady: true,
@@ -47,7 +51,31 @@ async function setup() {
     };
     return { request, cookies };
   }
-  return { store, app, client, coachCalls: () => coachCalls };
+  async function signup(
+    target: ReturnType<typeof client>,
+    username: string,
+    code?: string,
+  ) {
+    const response = await target.request(
+      code ? "/auth/join" : "/auth/register",
+      "POST",
+      { email: `${username}@example.com`, ...(code ? { code } : {}) },
+    );
+    assert.equal(response.status, 202);
+    await email.flush();
+    const token = emailToken(
+      email.sent.findLast(
+        (message) => message.to === `${username}@example.com`,
+      )!.text,
+    );
+    const created = await target.request("/auth/complete-signup", "POST", {
+      token,
+      password,
+    });
+    assert.equal(created.status, 200);
+    return target.request("/account/username", "POST", { username });
+  }
+  return { store, app, client, signup, coachCalls: () => coachCalls };
 }
 const password = "a-long-test-password";
 test("guests can complete free lessons but cannot ask the coach or change financial and personal records", async () => {
@@ -121,10 +149,10 @@ test("guests can complete free lessons but cannot ask the coach or change financ
 async function family(fixture: Awaited<ReturnType<typeof setup>>) {
   const parent = fixture.client(),
     learner = fixture.client();
-  const registered = await parent.request("/auth/register", "POST", {
-    username: `parent_${randomUUID().slice(0, 8)}`,
-    password,
-  });
+  const registered = await fixture.signup(
+    parent,
+    `parent_${randomUUID().slice(0, 8)}`,
+  );
   assert.equal(registered.status, 200);
   const state = (await registered.json()) as AppSnapshot;
   const invitation = (await (
@@ -134,13 +162,7 @@ async function family(fixture: Awaited<ReturnType<typeof setup>>) {
   };
   const learnerName = `learner_${randomUUID().slice(0, 8)}`;
   assert.equal(
-    (
-      await learner.request("/auth/join", "POST", {
-        code: invitation.code,
-        username: learnerName,
-        password,
-      })
-    ).status,
+    (await fixture.signup(learner, learnerName, invitation.code)).status,
     200,
   );
   return { parent, learner, state, invitation, learnerName };
@@ -184,8 +206,7 @@ test("family invitations are single use and roles cannot be switched or borrowed
       (
         await other.request("/auth/join", "POST", {
           code: invitation.code,
-          username: "another_learner",
-          password,
+          email: "another_learner@example.com",
         })
       ).status,
       409,

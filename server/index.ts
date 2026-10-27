@@ -21,6 +21,7 @@ if (
 }
 const app = await createApp(runtime.store, {
   learning: runtime.learning,
+  mail: runtime.mail,
   market: runtime.market,
   chain: runtime.chain,
   publicOrigin,

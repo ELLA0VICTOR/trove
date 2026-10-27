@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { ArrowRight, ArrowUpRight, Plus } from "lucide-react";
+import { Link, useOutletContext } from "react-router-dom";
+import { ArrowRight, ArrowUpRight, Plus, Settings } from "lucide-react";
 import { useApp } from "../lib/app-context.tsx";
 import {
   money,
@@ -24,6 +24,7 @@ const PortfolioChart = lazy(() =>
 );
 
 export function Home() {
+  const { openAccount } = useOutletContext<{ openAccount: () => void }>();
   const { state } = useApp(),
     [period, setPeriod] = useState(Infinity),
     [approvedQuote, setApprovedQuote] = useState<Quote | null>(null),
@@ -59,10 +60,15 @@ export function Home() {
             {state.learner}'s practice account <span>USD</span>
           </p>
         </div>
-        <Button to="/app/explore">
-          <Plus size={16} />
-          Explore companies
-        </Button>
+        <div className="account-heading-actions">
+          <Button secondary onClick={() => openAccount()}>
+            <Settings size={16} /> Settings
+          </Button>
+          <Button to="/app/explore">
+            <Plus size={16} />
+            Explore companies
+          </Button>
+        </div>
       </header>
       {state.approvals
         .filter(

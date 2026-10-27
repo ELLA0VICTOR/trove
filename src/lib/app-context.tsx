@@ -112,7 +112,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setState(next);
       return next;
     } catch (e) {
-      if (e instanceof ApiError && e.status === 401) {
+      if (
+        e instanceof ApiError &&
+        e.status === 401 &&
+        !path.startsWith("/auth/")
+      ) {
         generation.current++;
         setState(null);
         setError(e.message);
