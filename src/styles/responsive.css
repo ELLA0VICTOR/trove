@@ -705,11 +705,11 @@
   .sample-strip .sample-separator {
     padding: 0 6px;
   }
-  .sample-strip > a {
+  .sample-strip > :is(a, button) {
     font-size: 7px;
     gap: 5px;
   }
-  .sample-strip > a > svg {
+  .sample-strip > :is(a, button) > svg {
     display: none;
   }
   .sample-strip .live-dot {

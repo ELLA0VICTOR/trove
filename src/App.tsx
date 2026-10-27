@@ -1,6 +1,7 @@
 import {
   BrowserRouter,
   Link,
+  Navigate,
   Route,
   Routes,
   useLocation,
@@ -15,7 +16,6 @@ import { Decisions } from "./pages/Decisions.tsx";
 import { Guide } from "./pages/Learning.tsx";
 import { Replay } from "./pages/Replay.tsx";
 import { Parent } from "./pages/Parent.tsx";
-import { Evidence } from "./pages/Evidence.tsx";
 import "./App.css";
 function PageTitle() {
   const { pathname } = useLocation();
@@ -39,7 +39,7 @@ export default function App() {
             <Route path="guide" element={<Guide />} />
             <Route path="replay" element={<Replay />} />
             <Route path="parent" element={<Parent />} />
-            <Route path="evidence" element={<Evidence />} />
+            <Route path="evidence" element={<Navigate to="/app" replace />} />
           </Route>
           <Route
             path="*"

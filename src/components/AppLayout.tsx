@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 import {
   ArrowRight,
   BookOpen,
@@ -20,12 +20,14 @@ import { Brand, Sapling } from "./Brand.tsx";
 import { Button } from "./UI.tsx";
 import { useApp } from "../lib/app-context.tsx";
 import { AccountDialog } from "./AccountDialog.tsx";
+import { HowItWorksDialog } from "./HowItWorksDialog.tsx";
 
 export function AppLayout() {
   const { state, error, refresh, toast } = useApp(),
     location = useLocation(),
     [menuOpen, setMenuOpen] = useState(false),
     [accountOpen, setAccountOpen] = useState(false),
+    [explanationOpen, setExplanationOpen] = useState(false),
     [accountMode, setAccountMode] = useState<"login" | "register">("login"),
     [sidebarHidden, setSidebarHidden] = useState(() => {
       try {
@@ -52,13 +54,11 @@ export function AppLayout() {
     ? "Parent controls"
     : location.pathname.includes("replay")
       ? "Decision replay"
-      : location.pathname.includes("evidence")
-        ? "About this build"
-        : (navigation.find((item) =>
-            item.end
-              ? location.pathname === item.to
-              : location.pathname.startsWith(item.to),
-          )?.label ?? "Home");
+      : (navigation.find((item) =>
+          item.end
+            ? location.pathname === item.to
+            : location.pathname.startsWith(item.to),
+        )?.label ?? "Home");
   useEffect(() => {
     void refresh();
   }, [refresh]);
@@ -252,9 +252,13 @@ export function AppLayout() {
                 ? `${state.market.provider} · ${state.market.asOf}${state.market.blocked ? " · UPDATING" : state.market.stale ? " · STALE" : ""}`
                 : "authored sample prices"}
             </span>
-            <Link to="/app/evidence">
-              About this build <ArrowRight size={13} />
-            </Link>
+            <button
+              type="button"
+              aria-haspopup="dialog"
+              onClick={() => setExplanationOpen(true)}
+            >
+              What this does <ArrowRight size={13} aria-hidden="true" />
+            </button>
           </div>
         )}
         <main id="app-main" className="app-main">
@@ -290,6 +294,14 @@ export function AppLayout() {
                     Sign in
                   </Button>
                 </div>
+                <button
+                  className="text-link portfolio-welcome-help"
+                  type="button"
+                  aria-haspopup="dialog"
+                  onClick={() => setExplanationOpen(true)}
+                >
+                  What this does <ArrowRight size={14} aria-hidden="true" />
+                </button>
               </div>
             </section>
           ) : (
@@ -309,6 +321,9 @@ export function AppLayout() {
           initialMode={accountMode}
           onClose={() => setAccountOpen(false)}
         />
+      )}
+      {explanationOpen && (
+        <HowItWorksDialog onClose={() => setExplanationOpen(false)} />
       )}
     </div>
   );

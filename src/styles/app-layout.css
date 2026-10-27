@@ -1,4 +1,68 @@
 /* Consumer navigation and catalog layout. */
+.how-it-works-modal {
+  width: min(460px, calc(100vw - 32px));
+  aspect-ratio: 1;
+  border-radius: 0;
+}
+.how-it-works-modal[open] {
+  display: flex;
+  flex-direction: column;
+}
+.how-it-works-content {
+  flex: 1;
+  padding: 8px 0 28px;
+}
+.how-it-works-icon {
+  color: var(--spot);
+  margin-bottom: 24px;
+}
+.how-it-works-modal h2 {
+  font-size: clamp(27px, 4vw, 34px);
+  line-height: 1.12;
+  margin-bottom: 18px;
+}
+.how-it-works-progress {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 22px;
+}
+.how-it-works-progress > span:not(.how-it-works-count) {
+  width: 22px;
+  height: 3px;
+  background: var(--line);
+}
+.how-it-works-progress > span.active {
+  background: var(--spot);
+}
+.how-it-works-count {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 10px;
+}
+.how-it-works-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.how-it-works-actions .button {
+  padding: 12px 20px;
+}
+.portfolio-welcome-help {
+  margin: 24px auto 0;
+  font-size: 11px;
+}
+@media (max-width: 520px) {
+  .how-it-works-modal {
+    aspect-ratio: auto;
+    min-height: min(460px, calc(100svh - 40px));
+  }
+  .how-it-works-modal .modal-top,
+  .how-it-works-actions,
+  .how-it-works-progress {
+    flex-shrink: 0;
+  }
+}
 .portfolio-welcome {
   min-height: calc(100svh - 180px);
   display: grid;
@@ -826,7 +890,7 @@
   .sample-strip .sample-separator {
     display: none;
   }
-  .sample-strip > a {
+  .sample-strip > :is(a, button) {
     font-size: 8px;
     white-space: nowrap;
   }

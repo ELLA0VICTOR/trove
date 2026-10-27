@@ -11,6 +11,75 @@ async function createPortfolioAccount(page: Page) {
   expect(response.ok()).toBe(true);
 }
 
+test("product walkthrough opens in place, supports steps, and closes by button, backdrop, or Escape", async ({
+  page,
+}) => {
+  await page.goto("/app/explore");
+  const trigger = page.getByRole("button", {
+    name: "What this does",
+    exact: true,
+  });
+  await trigger.click();
+  let dialog = page.getByRole("dialog", { name: "WHAT THIS DOES" });
+  await expect(
+    dialog.getByRole("heading", { name: "Practice investing as a family." }),
+  ).toBeVisible();
+  await expect(
+    dialog.getByRole("button", { name: "Back", exact: true }),
+  ).toBeDisabled();
+  const bounds = await dialog.boundingBox();
+  expect(bounds).not.toBeNull();
+  expect(Math.abs(bounds!.width - bounds!.height)).toBeLessThan(2);
+  await page.screenshot({ path: ".artifacts/what-this-does-desktop.png" });
+  await dialog.getByRole("button", { name: "Next", exact: true }).click();
+  await expect(
+    dialog.getByRole("heading", { name: "Make your first move." }),
+  ).toBeVisible();
+  await dialog.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(
+    dialog.getByRole("heading", { name: "Practice investing as a family." }),
+  ).toBeVisible();
+  for (let i = 0; i < 3; i++)
+    await dialog.getByRole("button", { name: "Next", exact: true }).click();
+  await expect(
+    dialog.getByRole("heading", { name: "Learn from every choice." }),
+  ).toBeVisible();
+  await dialog.getByRole("button", { name: "Got it", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+  await expect(page).toHaveURL(/\/app\/explore$/);
+  await trigger.click();
+  await page.getByRole("button", { name: "Close dialog", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await trigger.click();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await page.setViewportSize({ width: 360, height: 800 });
+  await trigger.click();
+  dialog = page.getByRole("dialog", { name: "WHAT THIS DOES" });
+  for (let i = 0; i < 3; i++)
+    await dialog.getByRole("button", { name: "Next", exact: true }).click();
+  await expect(
+    dialog.getByRole("button", { name: "Got it", exact: true }),
+  ).toBeVisible();
+  const mobile = await dialog.boundingBox();
+  await expect(
+    dialog.getByRole("button", { name: "Close dialog", exact: true }),
+  ).toBeInViewport({ ratio: 1 });
+  expect(mobile!.x).toBeGreaterThanOrEqual(0);
+  expect(mobile!.x + mobile!.width).toBeLessThanOrEqual(360);
+  await page.screenshot({ path: ".artifacts/what-this-does-mobile.png" });
+  await page.mouse.click(5, 5);
+  await expect(dialog).toHaveCount(0);
+  await page.goto("/app");
+  await trigger.click();
+  await expect(
+    page
+      .getByRole("dialog", { name: "WHAT THIS DOES" })
+      .getByRole("heading", { name: "Practice investing as a family." }),
+  ).toBeVisible();
+});
+
 test("portfolio stays hidden until sign-in and returns to the welcome screen after logout", async ({
   page,
 }) => {
