@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { AccountRequired } from "../components/AccountRequired.tsx";
 import {
@@ -20,6 +20,7 @@ import { useApp, api } from "../lib/app-context.tsx";
 import { exercises, nextExercise } from "../../shared/learning.ts";
 import type { GuideReply } from "../../shared/model.ts";
 import { Button, Modal } from "../components/UI.tsx";
+import { Sapling } from "../components/Brand.tsx";
 
 const lessons = [
   {
@@ -169,6 +170,16 @@ export function Guide() {
     [memories, setMemories] = useState(false),
     [exercise, setExercise] = useState(false),
     [selectedLesson, setSelectedLesson] = useState<LessonId | null>(null);
+  const conversation = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (tab !== "guide") return;
+    conversation.current?.scrollTo({
+      top: conversation.current.scrollHeight,
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ? "auto"
+        : "smooth",
+    });
+  }, [messages.length, busy, tab]);
   if (!state) return null;
   const signedIn = state.session?.mode === "account";
   const canAsk = signedIn && state.role === "learner";
@@ -360,89 +371,123 @@ export function Guide() {
           role="tabpanel"
           aria-labelledby="learn-tab-guide"
         >
-          <div className="simple-section-heading">
-            <h2>Ask Trove</h2>
-            <span>
-              {state.session?.mode === "account" && state.session.memoryEnabled
-                ? "Remembered guide"
+          <header className="guide-header">
+            <div className="guide-identity">
+              <span className="guide-brand-mark">
+                <Sapling />
+              </span>
+              <div>
+                <h2>Ask Trove</h2>
+                <p>Your investing guide</p>
+              </div>
+            </div>
+            <span className="guide-memory-badge">
+              <NotebookPen size={13} aria-hidden="true" />
+              {state.session?.memoryEnabled && state.session.servicesReady
+                ? "Memory enabled"
                 : "Local guide"}
             </span>
+          </header>
+          <div className="guide-conversation" ref={conversation}>
+            {messages.length === 0 ? (
+              <div className="guide-starters">
+                <p>What would you like to understand?</p>
+                {[
+                  "Have I really spread my risk?",
+                  "What if my investments fall?",
+                ].map((text) => (
+                  <button key={text} onClick={() => void ask(text)}>
+                    {text}
+                    <ArrowRight size={15} />
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div
+                className="messages"
+                role="log"
+                aria-label="Conversation with Trove"
+                aria-live="polite"
+                aria-relevant="additions text"
+              >
+                {messages.map((message, index) => (
+                  <article
+                    className={"message message-" + message.role}
+                    key={index}
+                  >
+                    <div className="message-heading">
+                      <span className="message-author">
+                        {message.role === "guide" && (
+                          <Sapling className="message-mark" />
+                        )}
+                        {message.role === "you" ? "You" : "Trove"}
+                      </span>
+                      {message.mode === "live" && (
+                        <span className="message-context">
+                          <NotebookPen size={12} aria-hidden="true" />
+                          {message.sources?.length ?? 0} saved thoughts
+                          {message.cached ? " · Saved reply" : ""}
+                        </span>
+                      )}
+                    </div>
+                    <p>{message.text}</p>
+                    {!!message.sources?.length && (
+                      <button
+                        className="source-link"
+                        onClick={() => setMemories(true)}
+                      >
+                        View saved thoughts <ArrowUpRight size={13} />
+                      </button>
+                    )}
+                  </article>
+                ))}
+              </div>
+            )}
+            {busy && (
+              <div className="guide-thinking" role="status">
+                <span className="guide-thinking-dots" aria-hidden="true">
+                  <i />
+                  <i />
+                  <i />
+                </span>
+                Trove is thinking
+              </div>
+            )}
           </div>
-          {messages.length === 0 ? (
-            <div className="guide-starters">
-              <p>What would you like to understand?</p>
-              {[
-                "Have I really spread my risk?",
-                "What if my investments fall?",
-              ].map((text) => (
-                <button key={text} onClick={() => void ask(text)}>
-                  {text}
-                  <ArrowRight size={15} />
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="messages" aria-live="polite">
-              {messages.map((message, index) => (
-                <article
-                  className={"message message-" + message.role}
-                  key={index}
-                >
-                  <span className="mini-label">
-                    {message.role === "you"
-                      ? "YOU"
-                      : message.mode === "live"
-                        ? `TROVE / ${message.sources?.length ?? 0} SAVED THOUGHTS${message.cached ? " / SAVED REPLY" : ""}`
-                        : "TROVE"}
-                  </span>
-                  <p>{message.text}</p>
-                  {!!message.sources?.length && (
-                    <button
-                      className="source-link"
-                      onClick={() => setMemories(true)}
-                    >
-                      View saved thoughts <ArrowUpRight size={13} />
-                    </button>
-                  )}
-                </article>
-              ))}
-            </div>
-          )}
-          {busy && (
-            <p className="guide-thinking" role="status">
-              Thinking...
-            </p>
-          )}
-          <form
-            className="guide-input"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void ask(question);
-            }}
-          >
-            <label className="sr-only" htmlFor="guide-question">
-              Ask your learning guide
+          <div className="guide-composer">
+            <label className="guide-question-label" htmlFor="guide-question">
+              Your question
             </label>
-            <input
-              id="guide-question"
-              placeholder="Ask a question"
-              maxLength={1500}
-              value={question}
-              onChange={(event) => setQuestion(event.target.value)}
-            />
-            <button
-              aria-label="Send question"
-              type="submit"
-              disabled={!question.trim() || busy}
+            <form
+              className="guide-input"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void ask(question);
+              }}
             >
-              <Send size={18} />
-            </button>
-          </form>
-          <p className="guide-mode-note">
-            {state.session?.memoryEnabled && state.session.servicesReady
-              ? "Uses your saved learning context. Explains ideas; never changes your limits or places orders."
-              : "Local guide. Enable remembering from the parent account for memory-backed AI explanations."}
-          </p>
+              <input
+                id="guide-question"
+                aria-label="Ask your learning guide"
+                placeholder="What would you like to understand?"
+                maxLength={1500}
+                value={question}
+                onChange={(event) => setQuestion(event.target.value)}
+              />
+              <button
+                aria-label="Send question"
+                type="submit"
+                disabled={!question.trim() || busy}
+              >
+                <span>Send</span>
+                <Send size={18} />
+              </button>
+            </form>
+            <p className="guide-mode-note">
+              {state.session?.memoryEnabled && state.session.servicesReady
+                ? "Your saved thoughts help shape each reply."
+                : "Enable remembering in parent settings to use saved learning."}
+            </p>
+          </div>
         </section>
       )}
       {selectedLesson && (
