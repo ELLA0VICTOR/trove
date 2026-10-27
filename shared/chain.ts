@@ -26,6 +26,13 @@ export const CreatedBcs = bcs.struct("Created", {
   guardian: bcs.Address,
   learner: bcs.Address,
 });
+export const FundedBcs = bcs.struct("Funded", {
+  account: bcs.Address,
+  id: bcs.vector(bcs.u8()),
+  amount: bcs.u64(),
+  cash: bcs.u64(),
+  sequence: bcs.u64(),
+});
 export const CorporateTermsBcs = bcs.struct("CorporateTerms", {
   domain: bcs.vector(bcs.u8()),
   package_id: bcs.Address,
@@ -100,6 +107,7 @@ export const AccountBcs = bcs.struct("Account", {
 });
 export type ChainStatus = {
   ready: boolean;
+  fundingReady?: boolean;
   network: "testnet";
   account?: string;
   wallet?: string;

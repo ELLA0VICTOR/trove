@@ -91,3 +91,24 @@ fun selling_does_not_replenish_daily_buy_allowance() {
     assert!(practice::cash(&a) == 1000000000);
     order(&mut a, &clock, true, 25000000, 2, signatures::buy25seq2(), s.ctx()); end(s, a, clock);
 }
+
+#[test]
+fun replenishing_preserves_positions_and_already_used_daily_allowance() {
+    let (mut s, clock) = setup(25000000, 25000000); let mut a = s.take_shared<Account>();
+    order(&mut a, &clock, true, 25000000, 0, signatures::buy25(), s.ctx());
+    let (before_units, before_cost) = practice::position(&a);
+    test_scenario::return_shared(a); s.next_tx(@0xA); a = s.take_shared<Account>();
+    practice::fund(&mut a, vector[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16], 1000000000, 1, s.ctx());
+    let (units, cost) = practice::position(&a);
+    assert!(practice::spent(&a) == 25000000 && units == before_units && cost == before_cost && practice::cash(&a) == 1975000000);
+    end(s, a, clock);
+}
+#[test, expected_failure(abort_code=5, location=trove::practice)]
+fun replenishing_does_not_restore_daily_buy_allowance() {
+    let (mut s, clock) = setup(25000000, 25000000); let mut a = s.take_shared<Account>();
+    order(&mut a, &clock, true, 25000000, 0, signatures::buy25(), s.ctx());
+    test_scenario::return_shared(a); s.next_tx(@0xA); a = s.take_shared<Account>();
+    practice::fund(&mut a, vector[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16], 1000000000, 1, s.ctx());
+    test_scenario::return_shared(a); s.next_tx(@0xB); a = s.take_shared<Account>();
+    order(&mut a, &clock, true, 25000000, 2, signatures::buy25seq2(), s.ctx()); end(s, a, clock);
+}

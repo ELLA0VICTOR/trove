@@ -202,6 +202,7 @@ test("email sign-in, forgot-password, verification and reset screens handle link
     page.getByRole("heading", { name: "Email verified." }),
   ).toBeVisible();
   expect(new URL(page.url()).hash).toBe("");
+  await page.unrouteAll({ behavior: "ignoreErrors" });
 });
 
 test("visitors can finish lessons and browse prices but must sign in for Ask Trove and personal actions", async ({
@@ -967,4 +968,39 @@ test("consumer pages fit a narrow mobile viewport without runtime errors", async
     ).toBeLessThanOrEqual(360);
   }
   expect(errors).toEqual([]);
+});
+
+test("parent practice refills update the shared portfolio without manufacturing profit or changing limits", async ({
+  page,
+}) => {
+  await createPortfolioAccount(page);
+  await page.goto("/app/parent");
+  const before = await (await page.request.get("/api/state")).json();
+  await page
+    .getByRole("button", { name: "Add practice funds", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog", { name: "PRACTICE FUNDS" });
+  await dialog.getByLabel("Amount ($)", { exact: true }).fill("4000");
+  await dialog.getByRole("button", { name: "Add funds", exact: true }).click();
+  await expect(
+    page.getByRole("region", { name: "Practice funds" }),
+  ).toContainText("$5,000.00");
+  await page.reload();
+  await expect(
+    page.getByRole("region", { name: "Practice funds" }),
+  ).toContainText("$5,000.00");
+  const after = await (await page.request.get("/api/state")).json();
+  expect(after.policy).toEqual(before.policy);
+  expect(after.daySpent).toBe(before.daySpent);
+  expect(after.funding).toHaveLength(1);
+  await page.goto("/app");
+  await expect(page.locator(".account-total")).toContainText("$5,000.00");
+  await expect(page.locator(".account-metrics")).toContainText("+$0.00");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/app/parent");
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
 });

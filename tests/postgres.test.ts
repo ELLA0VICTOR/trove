@@ -1,3 +1,5 @@
+import { createApp } from "../server/app.ts";
+import { practiceCapital } from "../shared/funding.ts";
 import test, { after } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -501,4 +503,30 @@ test("PostgreSQL email signup creates one verified account and retains renamed s
     ).member.id,
     result.value.member.id,
   );
+});
+
+test("PostgreSQL parent refills survive restart and duplicate submissions credit the shared cash once", async () => {
+  const store = new DemoStore(database),
+    accounts = new Accounts(store);
+  const parent = await accounts.register({
+    username: "pg_fund_" + randomUUID().slice(0, 8),
+    password: "postgres-funding-password",
+  });
+  const app = createApp(store),
+    id = randomUUID();
+  const add = () =>
+    app.request("/api/account/funds", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: `trove_session=${parent.token}`,
+      },
+      body: JSON.stringify({ id, amount: "4000" }),
+    });
+  const replies = await Promise.all([add(), add()]);
+  assert.ok(replies.every((reply) => reply.status === 200));
+  const after = await new DemoStore(database).get(parent.member.family);
+  assert.equal(after.cash, "5000000000");
+  assert.equal(after.funding!.length, 1);
+  assert.equal(practiceCapital(after), 5000000000n);
 });

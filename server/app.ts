@@ -19,6 +19,7 @@ import { ChainService } from "./chain.ts";
 import { StateConflict } from "./database.ts";
 import { AccountRecovery } from "./account-recovery.ts";
 import { AccountSignup } from "./account-signup.ts";
+import { applyFunding, fundingAmount } from "../shared/funding.ts";
 import type { AccountMail } from "./integrations/account-mail.ts";
 const textSchema = z.string().trim().min(1).max(1500);
 type Environment = {
@@ -86,6 +87,7 @@ export function createApp(
             memories: [],
             approvals: [],
             adjustments: [],
+            funding: [],
           }
         : {}),
       role: member?.role ?? state.role,
@@ -411,6 +413,28 @@ export function createApp(
     await chain.assertLocal(member.family);
     const state = await market.enroll(member.family, true);
     return c.json(await snapshot(state, c));
+  });
+  app.post("/api/account/funds", async (c) => {
+    const member = requireMember(c, "parent");
+    const { id, amount } = z
+      .object({ id: z.uuid(), amount: z.string().max(20) })
+      .parse(await c.req.json());
+    const units = fundingAmount(amount);
+    await accounts.limit(`practice-funds:${member.family}`, 30, 3600000);
+    await store.atomic(async () => {
+      await store.db.lock(`chain-authority:${member.family}`);
+      await chain.assertLocal(member.family);
+      const state = await store.get(member.family);
+      if (
+        applyFunding(state, {
+          id,
+          amount: String(units),
+          recordedAt: new Date().toISOString(),
+        })
+      )
+        await store.set(state);
+    });
+    return c.json(await snapshot(await stateFor(c), c));
   });
   app.post("/api/preview-role", async () => {
     throw new AccessError(

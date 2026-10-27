@@ -6,11 +6,13 @@ import {
   ChevronRight,
   Pause,
   Play,
+  Plus,
   Settings2,
   ShieldCheck,
   X,
 } from "lucide-react";
 import { useApp } from "../lib/app-context.tsx";
+import { practiceCapital } from "../../shared/funding.ts";
 import { money, USD_SCALE } from "../../shared/model.ts";
 import { Button, Modal } from "../components/UI.tsx";
 import { CompanyLogo } from "../components/CompanyLogo.tsx";
@@ -21,6 +23,7 @@ export function Parent() {
   const { state, update, busy, notify, refresh } = useApp(),
     navigate = useNavigate(),
     [editing, setEditing] = useState(false),
+    [fundingOpen, setFundingOpen] = useState(false),
     [accountOpen, setAccountOpen] = useState(false),
     [now, setNow] = useState(Date.now);
   useEffect(() => {
@@ -142,6 +145,30 @@ export function Parent() {
                 Edit limits
               </button>
             </div>
+          </section>
+          <section
+            className="parent-funding-summary"
+            aria-label="Practice funds"
+          >
+            <div>
+              <span>Available cash</span>
+              <strong>{money(state.cash)}</strong>
+            </div>
+            <div>
+              <span>Practice capital</span>
+              <strong>{money(practiceCapital(state))}</strong>
+            </div>
+            <Button
+              secondary
+              disabled={
+                busy ||
+                Boolean(state.chain?.pending?.length) ||
+                Boolean(state.chain?.account && !state.chain.fundingReady)
+              }
+              onClick={() => setFundingOpen(true)}
+            >
+              <Plus size={16} /> Add practice funds
+            </Button>
           </section>
           <section className="parent-requests">
             <div className="simple-section-heading">
@@ -271,6 +298,7 @@ export function Parent() {
           </p>
         </>
       )}
+      {fundingOpen && <FundsDialog onClose={() => setFundingOpen(false)} />}
       {editing && <LimitsDialog onClose={() => setEditing(false)} />}
       {accountOpen && <AccountDialog onClose={() => setAccountOpen(false)} />}
     </div>
@@ -342,6 +370,79 @@ function LimitsDialog({ onClose }: { onClose: () => void }) {
           </button>
           <Button type="submit" disabled={busy}>
             Save limits <Check size={16} />
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function FundsDialog({ onClose }: { onClose: () => void }) {
+  const { state, update, refresh, notify, busy } = useApp();
+  const [amount, setAmount] = useState("1000");
+  const [id] = useState(() => crypto.randomUUID());
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState("");
+  async function add(event: React.FormEvent) {
+    event.preventDefault();
+    setSending(true);
+    setError("");
+    try {
+      if (state!.chain?.account) {
+        await chainAction({ action: "fund", id, amount }, state!.chain.wallet);
+        await refresh();
+      } else await update("/account/funds", { id, amount });
+      notify("Practice funds added.");
+      onClose();
+    } catch (cause) {
+      setError((cause as Error).message);
+    } finally {
+      setSending(false);
+    }
+  }
+  return (
+    <Modal title="PRACTICE FUNDS" onClose={onClose}>
+      <h2>Add practice funds</h2>
+      <p>Add simulated cash to {state!.learner}'s portfolio.</p>
+      <form className="limits-form" onSubmit={(event) => void add(event)}>
+        <label className="field-label">
+          Amount ($)
+          <input
+            required
+            type="number"
+            min="0.01"
+            max="1000000"
+            step="0.01"
+            value={amount}
+            onChange={(event) => setAmount(event.target.value)}
+          />
+        </label>
+        <div className="funding-presets">
+          {[500, 1000, 5000].map((value) => (
+            <button
+              key={value}
+              type="button"
+              className={Number(amount) === value ? "active" : ""}
+              aria-pressed={Number(amount) === value}
+              onClick={() => setAmount(String(value))}
+            >
+              ${value.toLocaleString()}
+            </button>
+          ))}
+        </div>
+        <p>Available cash: {money(state!.cash)}</p>
+        {error && (
+          <p className="form-error" role="alert">
+            {error}
+          </p>
+        )}
+        <div className="modal-actions">
+          <button type="button" className="text-link" onClick={onClose}>
+            Cancel
+          </button>
+          <Button type="submit" disabled={busy || sending}>
+            {sending ? "Adding funds?" : "Add funds"}
+            <Plus size={16} />
           </Button>
         </div>
       </form>

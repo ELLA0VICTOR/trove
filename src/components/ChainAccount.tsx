@@ -1,3 +1,5 @@
+import { practiceCapital } from "../../shared/funding.ts";
+import { money } from "../../shared/model.ts";
 import { useEffect, useState } from "react";
 import { getWallets } from "@mysten/wallet-standard";
 import type { Wallet } from "@mysten/wallet-standard";
@@ -91,9 +93,10 @@ export function ChainAccount() {
       ) : chain.guardian && chain.learner && state.role === "parent" ? (
         <>
           <p>
-            Start a new $1,000 practice portfolio enforced on Sui. Your earlier
-            activity remains archived. Limits require your wallet; orders
-            require the learner’s wallet. Gas is sponsored.
+            Start a new {money(practiceCapital(state))} practice portfolio
+            enforced on Sui. Your earlier activity remains archived. Limits
+            require your wallet; orders require the learner’s wallet. Gas is
+            sponsored.
           </p>
           <Button
             disabled={busy || state.market?.mode !== "market"}

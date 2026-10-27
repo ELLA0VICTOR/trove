@@ -120,6 +120,13 @@ export interface DemoState {
   daySpent: string;
   spendDay: string;
   adjustments?: Adjustment[];
+  funding?: {
+    id: string;
+    amount: string;
+    recordedAt: string;
+    portfolioId: string;
+    transactionDigest?: string;
+  }[];
   portfolio?: {
     id: string;
     startedAt: string;

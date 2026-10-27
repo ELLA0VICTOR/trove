@@ -1,3 +1,4 @@
+import type { DemoState } from "../../shared/model.ts";
 import { useEffect, useRef, useState } from "react";
 import { ChartArea, ChartLine, Minus, Plus, RotateCcw } from "lucide-react";
 import {
@@ -43,7 +44,13 @@ type Engine = {
   baseline: IPriceLine;
 };
 
-export function PortfolioChart({ points }: { points: ChartPoint[] }) {
+export function PortfolioChart({
+  points,
+  funding = [],
+}: {
+  points: ChartPoint[];
+  funding?: DemoState["funding"];
+}) {
   const host = useRef<HTMLDivElement>(null),
     engine = useRef<Engine | null>(null);
   const lookup = useRef(new Map<string, ChartPoint>()),
@@ -238,7 +245,14 @@ export function PortfolioChart({ points }: { points: ChartPoint[] }) {
     );
   const reading = selected ?? points.at(-1)!,
     first = points[0];
-  const change = reading.value - first.value,
+  const contributed = funding
+    .filter(
+      (entry) =>
+        entry.recordedAt.slice(0, 10) > first.date &&
+        entry.recordedAt.slice(0, 10) <= reading.date,
+    )
+    .reduce((sum, entry) => sum + Number(BigInt(entry.amount)) / 1_000_000, 0);
+  const change = reading.value - first.value - contributed,
     percentage = first.value > 0 ? (change / first.value) * 100 : null;
   const dates = windowDates ?? [first.date, points.at(-1)!.date];
   return (
@@ -265,7 +279,7 @@ export function PortfolioChart({ points }: { points: ChartPoint[] }) {
                   {percentage.toFixed(2)}%)
                 </>
               )}
-              <small>since period start</small>
+              <small>net gain since period start</small>
             </span>
           </div>
         </div>

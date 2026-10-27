@@ -98,42 +98,68 @@ try {
       mode: 0o600,
     });
   }
-  let result;
-  try {
-    result = await gateway.client.getTransaction({
-      digest: intent.digest,
+  if (process.argv.includes("--prepare-only")) {
+    const simulated = await gateway.client.simulateTransaction({
+      transaction: fromBase64(intent.bytes),
       include: { effects: true },
     });
-  } catch {}
-  result ??= await gateway.client.executeTransaction({
-    transaction: fromBase64(intent.bytes),
-    signatures: [intent.signature],
-    include: { effects: true },
-  });
-  if (!result.Transaction) throw new Error("The package upgrade aborted.");
-  const confirmed = await gateway.client.waitForTransaction({
-    result,
-    include: { effects: true },
-    timeout: 60_000,
-  });
-  if (!confirmed.Transaction) throw new Error("The upgrade has not confirmed.");
-  const published = confirmed.Transaction.effects.changedObjects.find(
-    (o) => o.outputState === "PackageWrite",
-  );
-  if (!published) throw new Error("The upgrade receipt has no package.");
-  const next = {
-    ...manifest,
-    originalPackageId: manifest.originalPackageId ?? manifest.packageId,
-    packageId: published.objectId,
-    previousPackageId: manifest.packageId,
-    digest: intent.digest,
-    upgradeCap: intent.cap,
-    version: intent.version,
-    moduleHash,
-    publishedAt: new Date().toISOString(),
-  };
-  writeFileSync(path, JSON.stringify(next, null, 2) + "\n");
-  console.log(JSON.stringify(next, null, 2));
+    if (!simulated.Transaction)
+      throw new Error("The compatible upgrade simulation failed.");
+    console.log(
+      JSON.stringify(
+        {
+          status: "prepared",
+          network: "testnet",
+          version: intent.version,
+          moduleHash,
+          digest: intent.digest,
+          compatibleSimulation: "passed",
+          published: false,
+        },
+        null,
+        2,
+      ),
+    );
+    process.exitCode = 0;
+  } else {
+    let result;
+    try {
+      result = await gateway.client.getTransaction({
+        digest: intent.digest,
+        include: { effects: true },
+      });
+    } catch {}
+    result ??= await gateway.client.executeTransaction({
+      transaction: fromBase64(intent.bytes),
+      signatures: [intent.signature],
+      include: { effects: true },
+    });
+    if (!result.Transaction) throw new Error("The package upgrade aborted.");
+    const confirmed = await gateway.client.waitForTransaction({
+      result,
+      include: { effects: true },
+      timeout: 60_000,
+    });
+    if (!confirmed.Transaction)
+      throw new Error("The upgrade has not confirmed.");
+    const published = confirmed.Transaction.effects.changedObjects.find(
+      (o) => o.outputState === "PackageWrite",
+    );
+    if (!published) throw new Error("The upgrade receipt has no package.");
+    const next = {
+      ...manifest,
+      originalPackageId: manifest.originalPackageId ?? manifest.packageId,
+      packageId: published.objectId,
+      previousPackageId: manifest.packageId,
+      digest: intent.digest,
+      upgradeCap: intent.cap,
+      version: intent.version,
+      moduleHash,
+      publishedAt: new Date().toISOString(),
+    };
+    writeFileSync(path, JSON.stringify(next, null, 2) + "\n");
+    console.log(JSON.stringify(next, null, 2));
+  }
 } finally {
   gateway.destroy();
 }

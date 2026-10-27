@@ -1154,3 +1154,52 @@
   align-items: center;
   gap: 12px;
 }
+
+.parent-funding-summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 24px;
+  padding: 24px 0;
+  border-bottom: 1px solid var(--line);
+}
+.parent-funding-summary > div {
+  display: grid;
+  gap: 8px;
+  margin-right: 20px;
+}
+.parent-funding-summary span {
+  font-size: 0.75rem;
+}
+.parent-funding-summary strong {
+  font-family: Arial, sans-serif;
+  font-size: 1.6rem;
+  font-weight: 500;
+}
+.parent-funding-summary .button {
+  margin-left: auto;
+}
+.funding-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.funding-presets button {
+  padding: 8px 16px;
+  border: 1px solid var(--line);
+  color: inherit;
+  background: transparent;
+}
+.funding-presets button:hover,
+.funding-presets button.active {
+  border-color: var(--spot);
+  color: var(--spot);
+}
+@media (max-width: 600px) {
+  .parent-funding-summary {
+    gap: 20px;
+  }
+  .parent-funding-summary .button {
+    margin-left: 0;
+  }
+}

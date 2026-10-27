@@ -159,3 +159,13 @@ Prepare the two role sessions and confirmed memory history before filming. A 2-3
 - A corrected thought followed by an updated explanation after returning to the account.
 
 Record clean clips of the successful flow and add the voiceover afterward. Account creation, the full ten-record preparation, and confirmation waits belong in rehearsal and setup rather than consuming the entire video.
+
+## Practice capital and replenishment
+
+Each family shares one learner portfolio. It starts with $1,000 in simulated cash; the parent manages the allowance and the learner places investments. The parent account views that same portfolio.
+
+To increase capital or replenish cash, sign in as the parent and open **Parent > Add practice funds**. Enter the amount and select **Add funds**. For example, adding $4,000 before investing raises the default practice capital to $5,000. Refills preserve holdings, learning records, losses, limits, pause, and daily spending. Supplied cash is excluded from investment profit. A signed Sui account requires a parent wallet signature and a confirmed Tatum receipt before cash changes.
+
+A zero cash balance may mean the cash is invested in holdings. A learner can sell holdings to release cash or ask the parent to add practice funds. Refills do not erase the earlier performance record.
+
+For an optional rehearsal after the numbered order tests, record the current cash, limits, and return; add $100 from the parent session; reload both sessions. Cash and practice capital should rise by $100, while the investment return, holdings, limits, and day spending stay unchanged. A repeated submission of the same request must credit once. Learner and signed-out requests must be rejected.

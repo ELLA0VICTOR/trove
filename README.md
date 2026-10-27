@@ -158,7 +158,7 @@ npm run dev
 
 Open **http://127.0.0.1:5173**. Vite runs on port 5173 and proxies API requests to the Node server on port 3001. On Windows, use `npm.cmd` if PowerShell execution policy blocks `npm.ps1`.
 
-Visitors can browse market prices and complete investing lessons. Family sign-in opens the portfolio, practice investing, saved decisions, and parent controls. Ask Trove requires a signed-in learner; parent-enabled remembering connects the guide to saved learning. Family portfolios start with $1,000 in practice cash and real daily closing prices from a fresh Marketstack snapshot. Earlier example portfolios are archived before switching price basis. Offline development uses authored market history.
+Visitors can browse market prices and complete investing lessons. Family sign-in opens the portfolio, practice investing, saved decisions, and parent controls. Ask Trove requires a signed-in learner; parent-enabled remembering connects the guide to saved learning. Each family shares a learner portfolio starting with $1,000 in practice cash and real daily closing prices from a fresh Marketstack snapshot. Parents can add simulated funds while preserving learning history, holdings, and spending controls. Investment returns exclude supplied capital. Earlier example portfolios are archived before switching price basis. Offline development uses authored market history.
 
 ### Connect services
 
@@ -261,6 +261,7 @@ The application uses same-origin JSON endpoints under `/api`, with HttpOnly sess
 | GET           | `/api/state`                                              | Portfolio, market context, decisions, learning state, and session. |
 | POST          | `/api/account/invite`                                     | Create a learner invitation.                                       |
 | POST          | `/api/account/memory`                                     | Guardian memory-consent control.                                   |
+| POST          | `/api/account/funds`                                      | Parent-authorized, idempotent practice-cash additions.             |
 | POST          | `/api/account/market`                                     | Begin a market-backed practice portfolio.                          |
 | POST          | `/api/orders/preview`                                     | Prepare a short-lived, version-bound quote.                        |
 | POST          | `/api/orders/execute`                                     | Execute a local-ledger practice order.                             |

@@ -95,3 +95,9 @@ The guide receives bounded verified evidence and deterministic facts. Structured
 ## Delivery
 
 The default deployment uses Vercel and Neon. Request-driven maintenance runs with waitUntil; PostgreSQL leases coordinate instances, and persisted operation state resumes on later requests. See [Vercel deployment](VERCEL-DEPLOY.md). The optional Docker server also supports PostgreSQL.
+
+## Practice capital
+
+A family has one learner investment ledger, initialized with $1,000 in simulated cash. Parent-only funding entries identify the request, amount, portfolio, and posting time. Duplicate requests credit once, and funding advances the sequence to invalidate older quotes and approvals. Positions, losses, learning records, policy, pause, and already-used daily allowance are preserved. Returns subtract initial and subsequently supplied practice capital; account history books refills on their posting date.
+
+Local funding uses the family transaction lock and refuses any wallet-backed or pending chain account. Sui funding requires the guardian signature, a fresh sequence, a single-use dynamic-field request ID, amount bounds, a Funded event, and matching Tatum object balances. New Sui portfolios carry the supplied capital into create_with_funds. The existing Account layout and original type identity are preserved by the compatible package upgrade. Runtime capability detection refuses funding against earlier package versions.

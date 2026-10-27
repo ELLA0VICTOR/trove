@@ -33,6 +33,8 @@ public struct Quote has copy, drop, store {
 }
 public struct Created has copy, drop { account: address, guardian: address, learner: address }
 public struct PolicyChanged has copy, drop { account: address, revision: u64, per_trade: u64, daily: u64, paused: bool }
+public struct FundingKey has copy, drop, store { id: vector<u8> }
+public struct Funded has copy, drop { account: address, id: vector<u8>, amount: u64, cash: u64, sequence: u64 }
 public struct ApprovalGranted has copy, drop { account: address, quote_hash: vector<u8> }
 public struct Executed has copy, drop {
     account: address, nonce: vector<u8>, symbol: vector<u8>, buy: bool,
@@ -88,15 +90,32 @@ public fun adjust(account: &mut Account, event_id: vector<u8>, symbol: vector<u8
 }
 
 public fun create(learner: address, attestor: vector<u8>, per_trade: u64, daily: u64, allowed: vector<vector<u8>>, ctx: &mut TxContext) {
+    create_with_funds(learner, attestor, per_trade, daily, allowed, 1000000000, false, ctx);
+}
+public fun create_with_funds(learner: address, attestor: vector<u8>, per_trade: u64, daily: u64, allowed: vector<vector<u8>>, initial_cash: u64, paused: bool, ctx: &mut TxContext) {
     assert!(learner != ctx.sender() && learner != @0x0 && attestor.length() == 32, EAuthority);
     assert!(per_trade > 0 && daily >= per_trade && allowed.length() > 0 && allowed.length() <= 32, EPolicy);
+    assert!(initial_cash >= 10000 && initial_cash <= 1000000000000000, EBalance);
     let account = Account {
         id: object::new(ctx), guardian: ctx.sender(), learner, attestor,
-        cash: 1000000000, positions: vector[], per_trade, daily, paused: false,
+        cash: initial_cash, positions: vector[], per_trade, daily, paused,
         allowed, revision: 0, sequence: 0, day_spent: 0, spend_day: 0, approval: vector[],
     };
     event::emit(Created { account: object::id_address(&account), guardian: account.guardian, learner });
     transfer::share_object(account);
+}
+/// Guardian-issued simulated funds. Preserves holdings, spending, pause, and limits.
+public fun fund(account: &mut Account, id: vector<u8>, amount: u64, sequence: u64, ctx: &TxContext) {
+    assert!(ctx.sender() == account.guardian, EAuthority);
+    assert!(id.length() == 16 && sequence == account.sequence, EQuote);
+    let key = FundingKey { id };
+    assert!(!dynamic_field::exists(&account.id, key), EApplied);
+    assert!(amount >= 10000 && amount <= 1000000000000 && (account.cash as u128) + (amount as u128) <= 1000000000000000, EBalance);
+    account.cash = account.cash + amount;
+    account.sequence = account.sequence + 1;
+    account.approval = vector[];
+    dynamic_field::add(&mut account.id, key, true);
+    event::emit(Funded { account: object::id_address(account), id, amount, cash: account.cash, sequence: account.sequence });
 }
 public fun policy(account: &mut Account, per_trade: u64, daily: u64, paused: bool, ctx: &TxContext) {
     assert!(ctx.sender() == account.guardian, EAuthority);

@@ -1,3 +1,5 @@
+import { practiceCapital } from "../../shared/funding.ts";
+import { money } from "../../shared/model.ts";
 import { useState } from "react";
 import { Copy, LogOut, ShieldCheck } from "lucide-react";
 import { api, useApp } from "../lib/app-context.tsx";
@@ -207,9 +209,9 @@ export function AccountDialog({
             <div className="account-section">
               <h3>Market-price practice</h3>
               <p>
-                Start with $1,000 in fresh practice cash and real daily closes.
-                Your earlier sample activity stays in your journal and an
-                archived portfolio.
+                Start with {money(practiceCapital(state))} in practice capital
+                and real daily closes. Your earlier sample activity stays in
+                your journal and an archived portfolio.
               </p>
               <Button
                 disabled={busy}

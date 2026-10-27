@@ -1,3 +1,4 @@
+import { practiceCapital } from "../shared/funding.ts";
 import { createHash, randomUUID } from "node:crypto";
 import type { DemoStore } from "./store.ts";
 import type {
@@ -276,7 +277,7 @@ export class MarketService {
       state.portfolio = {
         id: randomUUID(),
         startedAt: new Date().toISOString(),
-        initialCash: "1000000000",
+        initialCash: String(practiceCapital(state)),
         datasetId: data.id,
       };
       state.cash = state.portfolio.initialCash;
@@ -441,7 +442,15 @@ export function accountHistory(
   const adjustments = (state.adjustments ?? []).filter(
     (a) => a.portfolioId === state.portfolio!.id,
   );
+  const funding = (state.funding ?? []).filter(
+    (entry) => entry.portfolioId === state.portfolio!.id,
+  );
   const events = [
+    ...funding.map((entry) => ({
+      time: entry.recordedAt,
+      type: "funding" as const,
+      value: entry,
+    })),
     ...decisions.map((d) => ({
       time: d.recordedAt,
       type: "trade" as const,
@@ -490,6 +499,8 @@ export function accountHistory(
           (positions.get(d.symbol) ?? 0n) +
             BigInt(d.units) * (d.side === "buy" ? 1n : -1n),
         );
+      } else if (event.type === "funding") {
+        cash += BigInt(event.value.amount);
       } else {
         const a = event.value;
         cash += BigInt(a.cashDelta);

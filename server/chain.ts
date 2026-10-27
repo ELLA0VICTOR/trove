@@ -10,6 +10,7 @@ import { z } from "zod";
 import {
   AccountBcs,
   CreatedBcs,
+  FundedBcs,
   ExecutedBcs,
   QuoteBcs,
   ClockBcs,
@@ -18,6 +19,11 @@ import {
 } from "../shared/chain.ts";
 import type { ChainStatus } from "../shared/chain.ts";
 import type { Quote } from "../shared/model.ts";
+import {
+  applyFunding,
+  fundingAmount,
+  practiceCapital,
+} from "../shared/funding.ts";
 import { parseDollars } from "../shared/model.ts";
 import type { DemoStore } from "./store.ts";
 import type { MarketService } from "./market.ts";
@@ -36,6 +42,11 @@ const address = z
 const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("corporate") }),
   z.object({ action: z.literal("create") }),
+  z.object({
+    action: z.literal("fund"),
+    id: z.uuid(),
+    amount: z.string().max(20),
+  }),
   z.object({ action: z.literal("order"), quoteId: z.uuid() }),
   z.object({ action: z.literal("approve"), approvalId: z.uuid() }),
   z.object({
@@ -61,6 +72,7 @@ type Intent = {
 export type ChainConfig = {
   packageId: string;
   originalPackageId?: string;
+  fundingReady?: boolean;
   sponsorKey: string;
   attestorKey: string;
   gateway: TatumSuiGateway;
@@ -116,6 +128,7 @@ export class ChainService {
   async status(member: Member): Promise<ChainStatus> {
     return {
       ready: Boolean(this.config),
+      fundingReady: Boolean(this.config?.fundingReady),
       network: "testnet",
       account: (await this.account(member.family))?.object_id,
       wallet: await this.wallet(member.family, member.role),
@@ -248,6 +261,20 @@ export class ChainService {
       );
     if ((input.action === "order" ? "learner" : "parent") !== member.role)
       throw new AccessError("This action belongs to the other family role.");
+    if (
+      (input.action === "fund" || input.action === "create") &&
+      !this.config!.fundingReady
+    ) {
+      const current = await this.store.get(member.family);
+      if (
+        input.action === "fund" ||
+        practiceCapital(current) !== 1000000000n ||
+        current.policy.paused
+      )
+        throw new DomainError(
+          "This Sui account needs its practice-funds update before continuing.",
+        );
+    }
     const sender =
         input.action === "corporate"
           ? this.sponsor!.toSuiAddress()
@@ -277,6 +304,19 @@ export class ChainService {
       throw new DomainError(
         "Start a fresh market-price practice portfolio first.",
       );
+    if (input.action === "fund") {
+      const projected = structuredClone(state);
+      if (
+        !applyFunding(projected, {
+          id: input.id,
+          amount: String(fundingAmount(input.amount)),
+          recordedAt: new Date().toISOString(),
+        })
+      )
+        throw new DomainError(
+          "This practice funding request is already recorded.",
+        );
+    }
     let quote: Quote | undefined;
     if (input.action === "order") {
       const found = await this.store.getQuote(member.family, input.quoteId);
@@ -327,6 +367,14 @@ export class ChainService {
       );
     await this.store.atomic(async () => {
       await this.store.db.lock(`chain-authority:${member.family}`);
+      const current = await this.store.get(member.family);
+      if (
+        current.sequence !== state.sequence ||
+        current.policy.revision !== state.policy.revision
+      )
+        throw new DomainError(
+          "This portfolio changed. Refresh before preparing this action.",
+        );
       if (
         (await this.wallet(member.family, "parent")) !== guardian ||
         (await this.wallet(member.family, "learner")) !== learner
@@ -430,7 +478,7 @@ export class ChainService {
         };
       } else if (input.action === "create") {
         tx.moveCall({
-          target: `${this.config!.packageId}::practice::create`,
+          target: `${this.config!.packageId}::practice::${this.config!.fundingReady ? "create_with_funds" : "create"}`,
           arguments: [
             tx.pure.address(learner),
             tx.pure.vector(
@@ -440,8 +488,35 @@ export class ChainService {
             tx.pure.u64(state.policy.perTrade),
             tx.pure.u64(state.policy.daily),
             tx.pure.vector("vector<u8>", state.policy.allowed.map(bytes)),
+            ...(this.config!.fundingReady
+              ? [
+                  tx.pure.u64(practiceCapital(state)),
+                  tx.pure.bool(state.policy.paused),
+                ]
+              : []),
           ],
         });
+        payload = { ...input, initialCash: String(practiceCapital(state)) };
+      } else if (input.action === "fund") {
+        const amount = String(fundingAmount(input.amount));
+        tx.moveCall({
+          target: `${this.config!.packageId}::practice::fund`,
+          arguments: [
+            tx.object(account!.object_id),
+            tx.pure.vector(
+              "u8",
+              Array.from(Buffer.from(input.id.replaceAll("-", ""), "hex")),
+            ),
+            tx.pure.u64(amount),
+            tx.pure.u64(state.sequence),
+          ],
+        });
+        payload = {
+          ...input,
+          amount,
+          sequence: state.sequence,
+          portfolioId: state.portfolio?.id,
+        };
       } else if (input.action === "policy") {
         tx.moveCall({
           target: `${this.config!.packageId}::practice::policy`,
@@ -760,6 +835,19 @@ export class ChainService {
           "The transaction is not awaiting reconciliation.",
         );
       if (intent.action === "create") {
+        if (
+          onchain.cash !== (payload.initialCash ?? "1000000000") ||
+          onchain.positions.length ||
+          onchain.sequence !== "0" ||
+          onchain.day_spent !== "0" ||
+          onchain.per_trade !== state.policy.perTrade ||
+          onchain.daily !== state.policy.daily ||
+          onchain.paused !== state.policy.paused ||
+          onchain.revision !== "0"
+        )
+          throw new DomainError(
+            "The created practice account does not match its starting capital and limits.",
+          );
         await this.store.db
           .prepare("INSERT INTO chain_accounts VALUES(?,?,?)")
           .run(intent.family, objectId, intent.digest);
@@ -775,9 +863,71 @@ export class ChainService {
           ...state.portfolio!,
           id: randomUUID(),
           startedAt: new Date().toISOString(),
-          initialCash: "1000000000",
+          initialCash: payload.initialCash ?? "1000000000",
         };
         state.approvals = [];
+      }
+      if (intent.action === "fund") {
+        const ev = events.find((event) => isType(event, "Funded"));
+        if (
+          !ev ||
+          payload.sequence !== state.sequence ||
+          payload.portfolioId !== state.portfolio?.id
+        )
+          throw new DomainError(
+            "The funding receipt does not match this portfolio version.",
+          );
+        const event = FundedBcs.parse(ev.bcs);
+        const projected = structuredClone(state);
+        applyFunding(projected, {
+          id: payload.id,
+          amount: payload.amount,
+          recordedAt: new Date(
+            Number(transaction.timestampMs ?? Date.now()),
+          ).toISOString(),
+          transactionDigest: intent.digest,
+        });
+        const normalize = (positions: typeof state.holdings) =>
+          JSON.stringify(
+            [...positions].sort((a, b) => a.symbol.localeCompare(b.symbol)),
+          );
+        const positions = onchain.positions
+          .filter((position) => BigInt(position.units) > 0n)
+          .map((position) => ({
+            symbol: Buffer.from(position.symbol).toString(),
+            units: position.units,
+            cost: position.cost,
+          }));
+        if (
+          event.account !== objectId ||
+          hex(Uint8Array.from(event.id)) !== payload.id.replaceAll("-", "") ||
+          event.amount !== payload.amount ||
+          event.cash !== projected.cash ||
+          event.sequence !== String(projected.sequence) ||
+          onchain.cash !== projected.cash ||
+          onchain.sequence !== String(projected.sequence) ||
+          normalize(positions) !== normalize(state.holdings) ||
+          onchain.day_spent !== state.daySpent ||
+          onchain.spend_day !==
+            String(
+              Math.floor(Date.parse(state.spendDay + "T00:00:00Z") / 86400000),
+            ) ||
+          onchain.revision !== String(state.policy.revision) ||
+          onchain.per_trade !== state.policy.perTrade ||
+          onchain.daily !== state.policy.daily ||
+          onchain.paused !== state.policy.paused ||
+          JSON.stringify(
+            onchain.allowed
+              .map((value) => Buffer.from(value).toString())
+              .sort(),
+          ) !== JSON.stringify([...state.policy.allowed].sort()) ||
+          onchain.approval.length !== 0
+        )
+          throw new DomainError(
+            "The funding receipt failed cash and authority validation.",
+          );
+        state.funding = projected.funding;
+        state.approvals = projected.approvals;
       }
       if (intent.action === "order") {
         const ev = events.find((e) => isType(e, "Executed"));

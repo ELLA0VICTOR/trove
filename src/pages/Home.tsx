@@ -9,13 +9,13 @@ import {
   portfolioValue,
   portfolioSeries,
   valueOf,
-  USD_SCALE,
 } from "../../shared/model.ts";
 import { Button } from "../components/UI.tsx";
 import { OrderDialog } from "./Explore.tsx";
 import type { Quote } from "../../shared/model.ts";
 import { CompanyLogo } from "../components/CompanyLogo.tsx";
 import { Sparkline } from "../components/Sparkline.tsx";
+import { practiceCapital } from "../../shared/funding.ts";
 
 const PortfolioChart = lazy(() =>
   import("../components/PortfolioChart.tsx").then((module) => ({
@@ -47,7 +47,8 @@ export function Home() {
   const value = portfolioValue(state, state.instruments),
     cash = BigInt(state.cash),
     invested = value - cash;
-  const gain = value - 1000n * USD_SCALE;
+  const capital = practiceCapital(state),
+    gain = value - capital;
   const hasLocalDecisions = state.decisions.some(
     (decision) => decision.origin === "local",
   );
@@ -111,7 +112,7 @@ export function Home() {
             {money(gain)}
             <small>
               {gain >= 0 ? "+" : ""}
-              {((Number(gain) / Number(1000n * USD_SCALE)) * 100).toFixed(2)}%
+              {((Number(gain) / Number(capital)) * 100).toFixed(2)}%
             </small>
           </strong>
         </div>
@@ -147,7 +148,13 @@ export function Home() {
             </div>
           }
         >
-          <PortfolioChart points={series} />
+          <PortfolioChart
+            points={series}
+            funding={(state.funding ?? []).filter(
+              (entry) =>
+                entry.portfolioId === (state.portfolio?.id ?? state.id),
+            )}
+          />
         </Suspense>
         <p className="performance-note">
           {state.market?.mode === "market"
