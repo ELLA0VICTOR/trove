@@ -486,53 +486,87 @@ export function createApp(
     );
   });
   app.post("/api/approvals", async (c) => {
-    requireMember(c, "learner");
+    const member = requireMember(c, "learner");
     await learnerAction(c);
     const { quoteId } = z
       .object({ quoteId: z.uuid() })
       .parse(await c.req.json());
-    const { quote } = await store.getQuote(c.get("family"), quoteId);
-    if (Date.now() >= quote.expiresAt)
-      throw new DomainError(
-        "This order preview expired. Please review a fresh one.",
-      );
-    const state = await stateFor(c);
-    if (!state.approvals.some((a) => a.quote.id === quoteId))
+    const state = await store.atomic(async () => {
+      await store.db.lock(`chain-authority:${member.family}`);
+      const state = await store.get(member.family);
+      const { quote, decision } = await store.getQuote(member.family, quoteId);
+      if (state.approvals.some((a) => a.quote.id === quoteId)) return state;
+      if (decision || Date.now() >= quote.expiresAt)
+        throw new DomainError(
+          "This order preview expired or was completed. Please review a fresh one.",
+        );
+      if (
+        quote.revision !== state.policy.revision ||
+        quote.sequence !== state.sequence ||
+        quote.portfolioId !== state.portfolio?.id ||
+        quote.datasetId !== state.portfolio?.datasetId
+      )
+        throw new DomainError(
+          "Your account changed. Please review a fresh order.",
+        );
+      // Daily-close requests can wait for a parent without keeping the original
+      // two-minute confirmation window. Signed Sui quotes keep their expiry.
+      if (!(await chain.account(member.family))) {
+        await chain.assertLocal(member.family);
+        quote.expiresAt = Date.now() + 30 * 60000;
+        await store.db
+          .prepare(
+            "UPDATE quotes SET payload=? WHERE id=? AND family=? AND decision IS NULL",
+          )
+          .run(JSON.stringify(quote), quote.id, member.family);
+      }
       state.approvals.unshift({
         id: randomUUID(),
         quote,
         state: "requested",
         createdAt: new Date().toISOString(),
       });
-    await store.set(state);
+      await store.set(state);
+      return state;
+    });
     return c.json(await snapshot(state, c));
   });
   app.post("/api/approvals/:id", async (c) => {
-    requireMember(c, "parent");
+    const member = requireMember(c, "parent");
     const { approve } = z
       .object({ approve: z.boolean() })
       .parse(await c.req.json());
-    const state = await stateFor(c);
-    if (state.role !== "parent")
-      return c.json(
-        { error: "This control belongs to the parent preview." },
-        403,
+    const state = await store.atomic(async () => {
+      await store.db.lock(`chain-authority:${member.family}`);
+      if (approve) await chain.assertLocal(member.family);
+      const current = await store.get(member.family);
+      const approval = current.approvals.find(
+        (a) => a.id === c.req.param("id"),
       );
-    const approval = state.approvals.find((a) => a.id === c.req.param("id"));
-    if (approve) await chain.assertLocal(state.id);
-    if (!approval || approval.state !== "requested")
-      throw new DomainError("This request is no longer awaiting approval.");
-    if (
-      approve &&
-      (Date.now() >= approval.quote.expiresAt ||
-        approval.quote.revision !== state.policy.revision ||
-        approval.quote.sequence !== state.sequence)
-    )
-      throw new DomainError(
-        "The order changed or expired. Ask the learner to make a fresh request.",
-      );
-    approval.state = approve ? "approved" : "declined";
-    await store.set(state);
+      // A retried approval returns the completed result without a second trade.
+      if (approve && approval?.state === "consumed") return current;
+      if (!approval || approval.state !== "requested")
+        throw new DomainError("This request is no longer awaiting approval.");
+      if (approve) {
+        if (
+          Date.now() >= approval.quote.expiresAt ||
+          approval.quote.revision !== current.policy.revision ||
+          approval.quote.sequence !== current.sequence
+        )
+          throw new DomainError(
+            "The order changed or expired. Ask the learner to make a fresh request.",
+          );
+        await market.assertTradable(current);
+      }
+      approval.state = approve ? "approved" : "declined";
+      await store.set(current);
+      // The learner already reviewed and requested this exact order. Approval
+      // and execution share one transaction, including all normal cash/policy
+      // checks. A failure rolls the approval back as well as the ledger.
+      return approve
+        ? execute(store, member.family, approval.quote.id, "learner")
+        : current;
+    });
     return c.json(await snapshot(state, c));
   });
   app.post("/api/policy", async (c) => {

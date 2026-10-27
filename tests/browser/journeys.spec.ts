@@ -642,7 +642,7 @@ test("a practice buy persists after reload with its original explanation", async
     snapshot.decisions.filter((d: { origin: string }) => d.origin === "local"),
   ).toHaveLength(1);
 });
-test("the exact parent-approved action can return to the learner and execute once", async ({
+test("parent approval completes the requested trade and updates the learner without another confirmation", async ({
   page,
   browser,
   baseURL,
@@ -671,28 +671,101 @@ test("the exact parent-approved action can return to the learner and execute onc
       page.getByText("This is above your per-investment limit."),
     ).toBeVisible();
     await page.getByRole("button", { name: "Ask for guidance" }).click();
+    await page.getByRole("link", { name: "Back to portfolio" }).click();
+    await expect(
+      page
+        .getByRole("status")
+        .filter({ hasText: "Waiting for parent approval" }),
+    ).toBeVisible();
     const parentPage = await parentContext.newPage();
     await parentPage.goto("/app/parent");
     await parentPage
-      .getByRole("button", { name: "Approve this choice" })
+      .getByRole("button", { name: "Approve and invest" })
       .click();
-    await page.goto("/app");
-    await page
-      .getByRole("button", { name: "Review this approved choice" })
-      .click();
-    await page.getByRole("button", { name: "Confirm practice move" }).click();
     await expect(
-      page.getByRole("heading", {
-        name: "One small move. Something to learn.",
+      parentPage.getByText("Approved. Practice trade completed.", {
+        exact: true,
       }),
     ).toBeVisible();
+    await page.bringToFront();
+    await expect(
+      page.locator(".holding-row").filter({ hasText: "Coca-Cola" }),
+    ).toBeVisible({ timeout: 15000 });
+    await expect(
+      page
+        .getByRole("status")
+        .filter({ hasText: "Waiting for parent approval" }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Confirm practice move" }),
+    ).toHaveCount(0);
     const snapshot = await (await page.request.get("/api/state")).json();
     expect(snapshot.approvals[0].state).toBe("consumed");
     expect(snapshot.policy.perTrade).toBe("100000000");
+    expect(snapshot.sequence).toBe(1);
+    expect(
+      snapshot.decisions.filter(
+        (d: { origin: string }) => d.origin === "local",
+      ),
+    ).toHaveLength(1);
+    const repeat = await parentContext.request.post(
+      `/api/approvals/${snapshot.approvals[0].id}`,
+      { data: { approve: true } },
+    );
+    expect(repeat.ok()).toBe(true);
+    expect((await repeat.json()).cash).toBe(snapshot.cash);
   } finally {
     await parentContext.close();
   }
 });
+test("an expired approval stays visible with a fresh-preview link after reload", async ({
+  page,
+}) => {
+  await createLearnerAccount(page);
+  const quoteResponse = await page.request.post("/api/orders/preview", {
+    data: {
+      symbol: "KO",
+      side: "buy",
+      amount: "150",
+      reason: "An expired request stays understandable.",
+    },
+  });
+  expect(quoteResponse.ok()).toBe(true);
+  const quote = await quoteResponse.json();
+  expect(
+    (
+      await page.request.post("/api/approvals", { data: { quoteId: quote.id } })
+    ).ok(),
+  ).toBe(true);
+  // Show the state returned for a previously approved quote whose signing
+  // window has passed. It must not silently disappear from Home.
+  await page.route("**/api/state", async (route) => {
+    const response = await route.fetch();
+    const state = await response.json();
+    state.approvals[0].state = "approved";
+    state.approvals[0].quote.expiresAt = Date.now() - 1000;
+    await route.fulfill({ response, json: state });
+  });
+  await page.goto("/app");
+  await expect(
+    page
+      .getByRole("status")
+      .filter({ hasText: "This request needs a fresh preview" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Review a new choice" }),
+  ).toHaveAttribute("href", "/app/explore/KO");
+  await page.reload();
+  await expect(
+    page
+      .getByRole("status")
+      .filter({ hasText: "This request needs a fresh preview" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Complete approved trade" }),
+  ).toHaveCount(0);
+});
+
 test("a learning attempt changes the next task without changing spending authority", async ({
   page,
 }) => {

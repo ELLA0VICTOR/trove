@@ -1,4 +1,11 @@
 /* Consumer navigation and catalog layout. */
+.auth-form-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px 24px;
+}
+
 .account-link-page {
   min-height: 100svh;
   display: grid;

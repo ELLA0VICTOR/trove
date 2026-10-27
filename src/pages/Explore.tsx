@@ -325,6 +325,13 @@ export function OrderDialog({
     [complete, setComplete] = useState(false),
     [requested, setRequested] = useState(false);
   if (!state) return null;
+  const finished =
+    complete ||
+    (requested &&
+      state.approvals.some(
+        (approval) =>
+          approval.quote.id === quote?.id && approval.state === "consumed",
+      ));
   const needsApproval =
     !!quote?.violations.length &&
     !state.approvals.some(
@@ -373,7 +380,7 @@ export function OrderDialog({
     try {
       await update("/approvals", { quoteId: quote!.id });
       setRequested(true);
-      notify("Your request is waiting in the parent preview.");
+      notify("Your request has been sent to your parent.");
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -383,13 +390,13 @@ export function OrderDialog({
   return (
     <Modal
       title={
-        complete
+        finished
           ? "A NEW SEED PLANTED"
           : `${instrument.symbol} / YOUR PRACTICE MOVE`
       }
       onClose={onClose}
     >
-      {complete ? (
+      {finished ? (
         <div className="order-success">
           <span className="success-mark">
             <Check />
@@ -416,22 +423,18 @@ export function OrderDialog({
         </div>
       ) : requested ? (
         <div className="order-success">
-          <Eyebrow>A LITTLE GUIDANCE</Eyebrow>
-          <h2>
-            A chance to
-            <br />
-            talk it through.
-          </h2>
+          <h2>Request sent</h2>
           <p>
             Your{" "}
             {state.session?.mode === "account"
               ? "parent or guardian"
               : "sample parent"}{" "}
-            can review this exact order. A preview lasts up to two minutes; an
-            expired request needs a fresh review.
+            {state.chain?.account
+              ? "can approve this order. Then sign the trade with your wallet from Home."
+              : "can approve and complete this practice trade. You can check its status on Home."}
           </p>
-          <Button to="/app/parent" onClick={onClose}>
-            Open parent preview
+          <Button to="/app" onClick={onClose}>
+            Back to portfolio
           </Button>
         </div>
       ) : quote ? (

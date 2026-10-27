@@ -102,6 +102,147 @@ test("execution debits once when the same reviewed quote is submitted twice", as
   assert.equal(second.sequence, 1);
   assert.equal(second.decisions.filter((d) => d.origin === "local").length, 1);
 });
+
+test("parent requests survive the original preview deadline and concurrent approval debits once", async (t) => {
+  const { store, family, request, parentRequest } = await setup();
+  try {
+    const initial = await store.get(family);
+    const previewResponse = await request("/orders/preview", "POST", {
+      symbol: "KO",
+      side: "buy",
+      amount: "150",
+      reason: "Compare a different industry.",
+    });
+    assert.equal(previewResponse.status, 200);
+    const quote = await previewResponse.json();
+    const submitted = await request("/approvals", "POST", {
+      quoteId: quote.id,
+    });
+    assert.equal(submitted.status, 200);
+    const pending = (await submitted.json()) as AppSnapshot;
+    const approval = pending.approvals[0];
+    assert.ok(approval.quote.expiresAt > quote.expiresAt + 20 * 60000);
+    assert.equal(
+      (await store.getQuote(family, quote.id)).quote.expiresAt,
+      approval.quote.expiresAt,
+    );
+    const repeated = await request("/approvals", "POST", { quoteId: quote.id });
+    assert.equal(((await repeated.json()) as AppSnapshot).approvals.length, 1);
+    // The parent's review happens three minutes later, without reviving an
+    // expired two-minute preview or requiring a second learner action.
+    t.mock.timers.enable({ apis: ["Date"], now: Date.now() });
+    t.mock.timers.tick(3 * 60000);
+    const replies = await Promise.all([
+      parentRequest(`/approvals/${approval.id}`, { approve: true }),
+      parentRequest(`/approvals/${approval.id}`, { approve: true }),
+    ]);
+    assert.deepEqual(
+      replies.map((r) => r.status),
+      [200, 200],
+    );
+    const after = await store.get(family);
+    assert.equal(
+      after.cash,
+      String(BigInt(initial.cash) - BigInt(quote.amount)),
+    );
+    assert.equal(after.sequence, initial.sequence + 1);
+    assert.equal(after.decisions.filter((d) => d.origin === "local").length, 1);
+    assert.equal(after.approvals[0].state, "consumed");
+    assert.equal(after.policy.perTrade, initial.policy.perTrade);
+    assert.equal(after.policy.daily, initial.policy.daily);
+    const replay = await request("/orders/execute", "POST", {
+      quoteId: quote.id,
+    });
+    assert.equal(replay.status, 200);
+    assert.equal(((await replay.json()) as AppSnapshot).cash, after.cash);
+  } finally {
+    t.mock.timers.reset();
+    await store.db.close();
+  }
+});
+
+test("approve-and-invest rolls back approval on expired, changed, paused, or unfunded requests", async () => {
+  for (const variant of ["expired", "revision", "sequence", "paused", "cash"]) {
+    const { store, family, request, parentRequest } = await setup();
+    try {
+      const quote = await (
+        await request("/orders/preview", "POST", {
+          symbol: "KO",
+          side: "buy",
+          amount: "150",
+          reason: "A guarded request.",
+        })
+      ).json();
+      const pending = (await (
+        await request("/approvals", "POST", { quoteId: quote.id })
+      ).json()) as AppSnapshot;
+      const approvalId = pending.approvals[0].id;
+      const state = await store.get(family);
+      if (variant === "expired") state.approvals[0].quote.expiresAt = 0;
+      if (variant === "revision") state.policy.revision++;
+      if (variant === "sequence") state.sequence++;
+      if (variant === "paused") state.policy.paused = true;
+      if (variant === "cash") state.cash = "0";
+      await store.set(state);
+      const before = await store.get(family);
+      assert.equal(
+        (await parentRequest(`/approvals/${approvalId}`, { approve: true }))
+          .status,
+        409,
+        variant,
+      );
+      const after = await store.get(family);
+      assert.equal(after.approvals[0].state, "requested", variant);
+      assert.equal(after.cash, before.cash, variant);
+      assert.equal(after.sequence, before.sequence, variant);
+      assert.deepEqual(after.holdings, before.holdings, variant);
+      assert.deepEqual(after.decisions, before.decisions, variant);
+    } finally {
+      await store.db.close();
+    }
+  }
+});
+
+test("learner and another family cannot approve a request, while declining never trades", async () => {
+  const { store, family, request, parentRequest } = await setup();
+  try {
+    const initial = await store.get(family);
+    const quote = await (
+      await request("/orders/preview", "POST", {
+        symbol: "KO",
+        side: "buy",
+        amount: "150",
+        reason: "Family-scoped request.",
+      })
+    ).json();
+    const pending = (await (
+      await request("/approvals", "POST", { quoteId: quote.id })
+    ).json()) as AppSnapshot;
+    const path = `/approvals/${pending.approvals[0].id}`;
+    assert.equal((await request(path, "POST", { approve: true })).status, 403);
+    const other = await seededFamily(store);
+    assert.equal(
+      (
+        await request(
+          path,
+          "POST",
+          { approve: true },
+          { Cookie: `trove_session=${other.parent.token}` },
+        )
+      ).status,
+      409,
+    );
+    assert.equal((await parentRequest(path, { approve: false })).status, 200);
+    const after = await store.get(family);
+    assert.equal(after.approvals[0].state, "declined");
+    assert.equal(after.cash, initial.cash);
+    assert.equal(after.sequence, initial.sequence);
+    assert.deepEqual(after.holdings, initial.holdings);
+    assert.equal((await parentRequest(path, { approve: true })).status, 409);
+  } finally {
+    await store.db.close();
+  }
+});
 test("stale policy revision, changed sequence, and expired quotes cannot execute", async () => {
   for (const variant of ["revision", "sequence", "expiry"]) {
     const { store, family } = await setup(),

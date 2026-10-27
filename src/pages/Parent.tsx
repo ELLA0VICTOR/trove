@@ -266,13 +266,19 @@ export function Parent() {
                                   })
                             )
                               .then(() =>
-                                notify("Approved for this action only."),
+                                notify(
+                                  state.chain?.account
+                                    ? "Approved. The learner can sign this trade."
+                                    : "Approved. Practice trade completed.",
+                                ),
                               )
                               .catch((e) => notify((e as Error).message))
                           }
                         >
                           <Check size={15} />
-                          Approve this choice
+                          {state.chain?.account
+                            ? "Approve this choice"
+                            : "Approve and invest"}
                         </Button>
                       </div>
                     )}

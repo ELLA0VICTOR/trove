@@ -391,37 +391,39 @@ export function AccountDialog({
                 )}
               </>
             )}
-            <Button
-              type="submit"
-              disabled={
-                busy ||
-                sending ||
-                (mode !== "login" && !state?.session?.recovery?.ready)
-              }
-            >
-              {sending
-                ? "Sending..."
-                : mode === "login"
-                  ? "Sign in"
-                  : signupMessage
-                    ? "Resend verification link"
-                    : "Sign up"}
-            </Button>
+            <div className="auth-form-actions">
+              <Button
+                type="submit"
+                disabled={
+                  busy ||
+                  sending ||
+                  (mode !== "login" && !state?.session?.recovery?.ready)
+                }
+              >
+                {sending
+                  ? "Sending..."
+                  : mode === "login"
+                    ? "Sign in"
+                    : signupMessage
+                      ? "Resend verification link"
+                      : "Sign up"}
+              </Button>
+              {mode === "login" && (
+                <button
+                  type="button"
+                  className="text-link"
+                  onClick={() => {
+                    setMode("forgot");
+                    setError("");
+                    setResetMessage("");
+                  }}
+                >
+                  Forgot password?
+                </button>
+              )}
+            </div>
             {mode !== "login" && signupMessage && (
               <p role="status">{signupMessage}</p>
-            )}
-            {mode === "login" && (
-              <button
-                type="button"
-                className="text-link"
-                onClick={() => {
-                  setMode("forgot");
-                  setError("");
-                  setResetMessage("");
-                }}
-              >
-                Forgot password?
-              </button>
             )}
           </form>
         </>

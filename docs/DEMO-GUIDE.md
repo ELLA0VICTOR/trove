@@ -54,20 +54,20 @@ Pass when the order changes cash and holdings once and its reason survives refre
 
 ## 5. Test parent approval
 
-Do these steps promptly: an order preview expires in about two minutes.
+Send the request while the initial preview is valid. A local practice request then gives the parent 30 minutes to review the exact order. Changes to the portfolio, limits, or market dataset can require a fresh request.
 
 1. Learner: open Explore > Microsoft > Make a practice move and enter 75.
 2. Enter: I want to compare Microsoft with Apple and understand what risks they share.
 3. Select Review my practice move. Expect the $50 per-investment boundary, then select Ask for guidance.
 4. Switch to the parent browser. Open Parent, refreshing if necessary. Expect a $75 Microsoft request with the learner's reason.
-5. Select Approve this choice.
-6. Switch to the learner browser, open Home, and select Review this approved choice.
-7. Select Confirm practice move and then Keep growing.
-8. Check that Microsoft appears, available cash is approximately $900, and the standing per-investment limit remains $50.
+5. Select Approve and invest. This completes the requested practice trade immediately.
+6. Switch to the learner browser and open Home. The portfolio updates automatically while the request is pending, or when the browser window regains focus.
+7. Check that Microsoft appears, available cash is approximately $900, and the standing per-investment limit remains $50. No further learner confirmation is needed. If you added practice funds earlier, subtract $100 from your starting cash instead.
+8. Refresh Decisions and verify that the Microsoft trade and its reason are saved once.
 
-If the request expires, make a fresh request and repeat the approval. Keep the same policy and avoid other orders while an exact approval is pending.
+If the request expires, Home keeps a visible message with a link to review a new choice. Make a fresh request and repeat the approval. Keep the same policy and avoid other orders while an exact approval is pending.
 
-Pass when a parent approves one particular order without increasing the standing limit.
+Pass when a parent approves and completes one particular order without increasing the standing limit or requiring a second learner confirmation.
 
 ## 6. Test pause and resume
 
@@ -138,7 +138,7 @@ Complete the earlier steps first. This stage requires a Sui-compatible wallet in
 6. Parent: review or set the practice limits and sign any policy change requested by the wallet.
 7. Learner: make a small practice investment and approve the wallet signature. Wait for the transaction to be confirmed.
 8. Open Decisions and select that order. Follow the transaction receipt link and check that the Testnet explorer shows a successful transaction.
-9. Repeat an above-limit request with a parent-signed one-time approval if needed for the final demo. Complete any exact request before it expires.
+9. Repeat an above-limit request with a parent-signed one-time approval if needed for the final demo. The deployed Sui contract requires the learner's wallet signature for execution: parent selects Approve this choice, then learner opens Home and selects Sign approved trade. There is no extra in-app order-review dialog. Complete the wallet signing before the signed quote expires (about two minutes); expired requests remain visible with a fresh-preview link.
 
 Gas is sponsored by the configured Testnet service. A successful order should produce a real Sui Testnet receipt reconciled through Tatum, while the investment balance remains simulated.
 

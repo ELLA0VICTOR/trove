@@ -86,12 +86,36 @@ export function AppLayout() {
     void refresh();
   }, [refresh]);
   useEffect(() => {
-    if (!state?.market?.blocked && !state?.chain?.pending?.length) return;
+    const waitingForParent =
+      state?.session?.mode === "account" &&
+      state.role === "learner" &&
+      state.approvals.some(
+        (a) =>
+          a.state === "requested" &&
+          a.quote.expiresAt > Date.now() &&
+          a.quote.sequence === state.sequence &&
+          a.quote.revision === state.policy.revision,
+      );
+    if (
+      !state?.market?.blocked &&
+      !state?.chain?.pending?.length &&
+      !waitingForParent
+    )
+      return;
     const timer = setInterval(() => {
       if (!document.hidden) void refresh();
     }, 3000);
     return () => clearInterval(timer);
-  }, [state?.market?.blocked, state?.chain?.pending?.length, refresh]);
+  }, [
+    state?.market?.blocked,
+    state?.chain?.pending?.length,
+    state?.approvals,
+    state?.session?.mode,
+    state?.role,
+    state?.sequence,
+    state?.policy.revision,
+    refresh,
+  ]);
   useEffect(() => {
     const resumed = () => {
       if (!document.hidden) void refresh();

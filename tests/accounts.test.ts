@@ -309,7 +309,7 @@ test("fresh login retrieves the same family and logout invalidates the previous 
     await fixture.store.db.close();
   }
 });
-test("a separately signed-in parent approves one exact learner choice without widening limits", async () => {
+test("a separately signed-in parent approves and executes one exact learner choice without widening limits", async () => {
   const fixture = await setup();
   try {
     const { parent, learner } = await family(fixture);
@@ -331,16 +331,17 @@ test("a separately signed-in parent approves one exact learner choice without wi
     const requested = (await (
       await learner.request("/approvals", "POST", { quoteId: quote.id })
     ).json()) as AppSnapshot;
-    assert.equal(
-      (
-        await parent.request(
-          `/approvals/${requested.approvals[0].id}`,
-          "POST",
-          { approve: true },
-        )
-      ).status,
-      200,
+    const approvedResponse = await parent.request(
+      `/approvals/${requested.approvals[0].id}`,
+      "POST",
+      { approve: true },
     );
+    assert.equal(approvedResponse.status, 200);
+    const approved = (await approvedResponse.json()) as AppSnapshot;
+    assert.equal(approved.sequence, 1);
+    assert.equal(approved.approvals[0].state, "consumed");
+    assert.equal(approved.decisions.length, 1);
+    assert.equal(approved.decisions[0].reason, "Compare another business.");
     assert.equal(
       (await parent.request("/orders/execute", "POST", { quoteId: quote.id }))
         .status,
@@ -355,6 +356,7 @@ test("a separately signed-in parent approves one exact learner choice without wi
     assert.equal(first.role, "learner");
     assert.equal(first.sequence, 1);
     assert.equal(second.cash, first.cash);
+    assert.equal(first.cash, approved.cash);
     assert.equal(first.policy.perTrade, "10000000");
     assert.equal(first.approvals[0].state, "consumed");
   } finally {

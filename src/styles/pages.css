@@ -871,9 +871,11 @@
 }
 .approved-notice {
   display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  font-size: 10px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 13px;
   color: var(--spot);
   padding: 15px;
   border: 1px solid var(--line);

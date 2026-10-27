@@ -11,11 +11,10 @@ import {
   valueOf,
 } from "../../shared/model.ts";
 import { Button } from "../components/UI.tsx";
-import { OrderDialog } from "./Explore.tsx";
-import type { Quote } from "../../shared/model.ts";
 import { CompanyLogo } from "../components/CompanyLogo.tsx";
 import { Sparkline } from "../components/Sparkline.tsx";
 import { practiceCapital } from "../../shared/funding.ts";
+import { chainAction } from "../lib/wallet.ts";
 
 const PortfolioChart = lazy(() =>
   import("../components/PortfolioChart.tsx").then((module) => ({
@@ -25,9 +24,9 @@ const PortfolioChart = lazy(() =>
 
 export function Home() {
   const { openAccount } = useOutletContext<{ openAccount: () => void }>();
-  const { state } = useApp(),
+  const { state, update, refresh, notify } = useApp(),
     [period, setPeriod] = useState(Infinity),
-    [approvedQuote, setApprovedQuote] = useState<Quote | null>(null),
+    [signing, setSigning] = useState(false),
     [now, setNow] = useState(Date.now);
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
@@ -74,24 +73,65 @@ export function Home() {
       {state.approvals
         .filter(
           (approval) =>
-            approval.state === "approved" && approval.quote.expiresAt > now,
+            state.role === "learner" &&
+            (approval.state === "approved" || approval.state === "requested"),
         )
-        .map((approval) => (
-          <div className="approved-notice" key={approval.id}>
-            <span>
-              Your{" "}
-              {state.session?.mode === "account" ? "parent" : "sample parent"}{" "}
-              approved {money(approval.quote.amount)} in {approval.quote.symbol}
-              .
-            </span>
-            <button
-              className="text-link"
-              onClick={() => setApprovedQuote(approval.quote)}
-            >
-              Review this approved choice <ArrowRight size={15} />
-            </button>
-          </div>
-        ))}
+        .map((approval) => {
+          const stale =
+            approval.quote.expiresAt <= now ||
+            approval.quote.sequence !== state.sequence ||
+            approval.quote.revision !== state.policy.revision;
+          return (
+            <div className="approved-notice" key={approval.id} role="status">
+              <span>
+                <strong>
+                  {money(approval.quote.amount)} / {approval.quote.symbol}
+                </strong>
+                {stale
+                  ? " — This request needs a fresh preview."
+                  : approval.state === "requested"
+                    ? " — Waiting for parent approval."
+                    : state.chain?.account
+                      ? " — Approved. Sign with your wallet to complete the trade."
+                      : " — Approved. Complete this practice trade."}
+              </span>
+              {stale ? (
+                <Link to={`/app/explore/${approval.quote.symbol}`}>
+                  Review a new choice <ArrowRight size={15} />
+                </Link>
+              ) : (
+                approval.state === "approved" && (
+                  <Button
+                    disabled={signing}
+                    onClick={() => {
+                      setSigning(true);
+                      void (
+                        state.chain?.account
+                          ? chainAction(
+                              { action: "order", quoteId: approval.quote.id },
+                              state.chain.wallet,
+                            ).then(() => refresh())
+                          : update("/orders/execute", {
+                              quoteId: approval.quote.id,
+                            })
+                      )
+                        .then(() => notify("Practice trade completed."))
+                        .catch((error) => notify((error as Error).message))
+                        .finally(() => setSigning(false));
+                    }}
+                  >
+                    {signing
+                      ? "Completing…"
+                      : state.chain?.account
+                        ? "Sign approved trade"
+                        : "Complete approved trade"}{" "}
+                    <ArrowRight size={15} />
+                  </Button>
+                )
+              )}
+            </div>
+          );
+        })}
       <section className="account-metrics" aria-label="Account summary">
         <div className="account-total">
           <span>Total value</span>
@@ -231,15 +271,6 @@ export function Home() {
           </div>
         )}
       </section>
-      {approvedQuote && (
-        <OrderDialog
-          instrument={state.instruments.find(
-            (instrument) => instrument.symbol === approvedQuote.symbol,
-          )!}
-          initialQuote={approvedQuote}
-          onClose={() => setApprovedQuote(null)}
-        />
-      )}
     </div>
   );
 }
