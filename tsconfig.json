@@ -1,4 +1,9 @@
 {
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "NodeNext",
+    "rewriteRelativeImportExtensions": true
+  },
   "files": [],
   "references": [
     { "path": "./tsconfig.app.json" },

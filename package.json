@@ -17,6 +17,7 @@
     "dev:web": "vite",
     "start": "node --import tsx server/index.ts",
     "check:production": "node --import tsx scripts/check-production.ts",
+    "check:serverless-build": "node --import tsx scripts/check-serverless-build.ts",
     "deploy:prepare": "node --env-file-if-exists=.env.local --import tsx scripts/prepare-vercel.ts",
     "check:database": "node --env-file-if-exists=.env.local --import tsx scripts/check-database.ts",
     "sui:setup": "node --env-file-if-exists=.env.local --import tsx scripts/sui-setup.ts",
