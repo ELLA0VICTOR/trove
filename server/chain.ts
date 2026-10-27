@@ -26,7 +26,6 @@ import { AccessError, Accounts } from "./auth.ts";
 import type { Member } from "./auth.ts";
 import { DomainError } from "./domain.ts";
 import { applyAdjustment } from "../shared/corporate-actions.ts";
-
 const hex = (bytes: Uint8Array) => Buffer.from(bytes).toString("hex");
 const bytes = (text: string) => Array.from(Buffer.from(text));
 const hash = (text: string) => createHash("sha256").update(text).digest();
@@ -66,7 +65,6 @@ export type ChainConfig = {
   attestorKey: string;
   gateway: TatumSuiGateway;
 };
-
 /** Only fixed, server-built Testnet calls can be sponsored. Wallet signatures remain mandatory. */
 export class ChainService {
   readonly store: DemoStore;
@@ -87,74 +85,75 @@ export class ChainService {
       this.sponsor = Ed25519Keypair.fromSecretKey(config.sponsorKey);
       this.attestor = Ed25519Keypair.fromSecretKey(config.attestorKey);
     }
-    store.db
-      .exec(`CREATE TABLE IF NOT EXISTS chain_wallets(family TEXT NOT NULL,role TEXT NOT NULL,address TEXT NOT NULL,PRIMARY KEY(family,role),UNIQUE(family,address));
-      CREATE TABLE IF NOT EXISTS chain_challenges(id TEXT PRIMARY KEY,member TEXT NOT NULL,message TEXT NOT NULL,address TEXT NOT NULL,expires_at INTEGER NOT NULL,consumed INTEGER NOT NULL DEFAULT 0);
-      CREATE TABLE IF NOT EXISTS chain_accounts(family TEXT PRIMARY KEY,object_id TEXT NOT NULL UNIQUE,created_digest TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS chain_quote_attestations(quote_id TEXT PRIMARY KEY,payload TEXT NOT NULL,salt TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS chain_dispatch(id TEXT PRIMARY KEY,attempts INTEGER NOT NULL DEFAULT 0,next_at INTEGER NOT NULL DEFAULT 0,lease_until INTEGER NOT NULL DEFAULT 0,token TEXT);
-      CREATE TABLE IF NOT EXISTS corporate_retry(family TEXT PRIMARY KEY,fingerprint TEXT NOT NULL,attempts INTEGER NOT NULL,next_at INTEGER NOT NULL);
-      CREATE TABLE IF NOT EXISTS chain_intents(id TEXT PRIMARY KEY,family TEXT NOT NULL,member TEXT NOT NULL,action TEXT NOT NULL,payload TEXT NOT NULL,bytes TEXT,digest TEXT NOT NULL,signature TEXT,state TEXT NOT NULL,expires_at INTEGER NOT NULL,error TEXT);
-      CREATE UNIQUE INDEX IF NOT EXISTS chain_one_active ON chain_intents((1)) WHERE state IN ('building','prepared','submitting','pending');`);
   }
-  account(family: string) {
-    return this.store.db
+  async account(family: string) {
+    return (await this.store.db
       .prepare("SELECT object_id FROM chain_accounts WHERE family=?")
-      .get(family) as { object_id: string } | undefined;
+      .get(family)) as
+      | {
+          object_id: string;
+        }
+      | undefined;
   }
-  wallet(family: string, role: string) {
+  async wallet(family: string, role: string) {
     return (
-      this.store.db
+      (await this.store.db
         .prepare("SELECT address FROM chain_wallets WHERE family=? AND role=?")
-        .get(family, role) as { address: string } | undefined
+        .get(family, role)) as
+        | {
+            address: string;
+          }
+        | undefined
     )?.address;
   }
-  pending(family: string) {
-    return this.store.db
+  async pending(family: string) {
+    return (await this.store.db
       .prepare(
         "SELECT * FROM chain_intents WHERE family=? AND state IN ('building','prepared','submitting','pending')",
       )
-      .all(family) as Intent[];
+      .all(family)) as Intent[];
   }
-  status(member: Member): ChainStatus {
+  async status(member: Member): Promise<ChainStatus> {
     return {
       ready: Boolean(this.config),
       network: "testnet",
-      account: this.account(member.family)?.object_id,
-      wallet: this.wallet(member.family, member.role),
-      guardian: this.wallet(member.family, "parent"),
-      learner: this.wallet(member.family, "learner"),
-      pending: this.pending(member.family).map(({ id, state, digest }) => ({
-        id,
-        state,
-        digest,
-      })),
+      account: (await this.account(member.family))?.object_id,
+      wallet: await this.wallet(member.family, member.role),
+      guardian: await this.wallet(member.family, "parent"),
+      learner: await this.wallet(member.family, "learner"),
+      pending: (await this.pending(member.family)).map(
+        ({ id, state, digest }) => ({
+          id,
+          state,
+          digest,
+        }),
+      ),
     };
   }
   private get typePackage() {
     return this.config!.originalPackageId ?? this.config!.packageId;
   }
-  challenge(member: Member, input: unknown) {
+  async challenge(member: Member, input: unknown) {
     this.requireReady();
-    this.accounts.limit(`wallet-link:${member.id}`, 10, 60_000);
+    await this.accounts.limit(`wallet-link:${member.id}`, 10, 60000);
     const wallet = address.parse(input);
-    if (this.account(member.family))
+    if (await this.account(member.family))
       throw new DomainError(
         "This practice account already has fixed wallet authorities.",
       );
     const id = randomUUID(),
-      expires = Date.now() + 300_000;
+      expires = Date.now() + 300000;
     const message = `Trove Testnet wallet link\nMember: ${member.id}\nFamily: ${member.family}\nRole: ${member.role}\nWallet: ${wallet}\nNonce: ${randomBytes(32).toString("hex")}\nExpires: ${expires}\nThis links a practice wallet; it does not prove adulthood or a legal relationship.`;
-    this.store.db
+    await this.store.db
       .prepare("INSERT INTO chain_challenges VALUES(?,?,?,?,?,0)")
       .run(id, member.id, message, wallet, expires);
     return { id, message, expiresAt: expires };
   }
   async link(member: Member, id: string, signature: string) {
     this.requireReady();
-    const row = this.store.db
+    const row = (await this.store.db
       .prepare("SELECT * FROM chain_challenges WHERE id=? AND member=?")
-      .get(id, member.id) as
+      .get(id, member.id)) as
       | {
           message: string;
           address: string;
@@ -173,31 +172,35 @@ export class ChainService {
     } catch {
       throw new AccessError("The wallet signature could not be verified.");
     }
-    this.store.atomic(() => {
-      if (this.account(member.family) || this.pending(member.family).length)
+    await this.store.atomic(async () => {
+      await this.store.db.lock(`chain-authority:${member.family}`);
+      if (
+        (await this.account(member.family)) ||
+        (await this.pending(member.family)).length
+      )
         throw new DomainError(
           "Wallet authority is locked while an account or transaction exists.",
         );
-      const changed = this.store.db
+      const changed = await this.store.db
         .prepare(
           "UPDATE chain_challenges SET consumed=1 WHERE id=? AND consumed=0 AND expires_at>?",
         )
         .run(id, Date.now());
       if (!changed.changes)
         throw new DomainError("This wallet link was already used or expired.");
-      const other = this.wallet(
+      const other = await this.wallet(
         member.family,
         member.role === "parent" ? "learner" : "parent",
       );
       if (other === row.address)
         throw new DomainError("Parent and learner need separate wallets.");
-      this.store.db
+      await this.store.db
         .prepare(
           "INSERT INTO chain_wallets VALUES(?,?,?) ON CONFLICT(family,role) DO UPDATE SET address=excluded.address",
         )
         .run(member.family, member.role, row.address);
     });
-    return this.status(member);
+    return await this.status(member);
   }
   private requireReady() {
     if (!this.config)
@@ -205,8 +208,8 @@ export class ChainService {
         "Sui Testnet is not configured on this server yet.",
       );
   }
-  assertLocal(family: string) {
-    if (this.account(family) || this.pending(family).length)
+  async assertLocal(family: string) {
+    if ((await this.account(family)) || (await this.pending(family)).length)
       throw new DomainError(
         "This account requires a wallet-signed Sui transaction. Reconcile any pending action first.",
       );
@@ -220,13 +223,13 @@ export class ChainService {
       );
       if (
         !Number.isSafeInteger(timestamp) ||
-        Math.abs(Date.now() - timestamp) > 30_000
+        Math.abs(Date.now() - timestamp) > 30000
       )
         throw new Error("Clock outside the supported skew window.");
       // A host-clock expiry of now+120s can exceed the contract's now+120s
       // ceiling while its last checkpoint is a few seconds behind the host.
       // Anchor to consensus and leave 20s for different provider checkpoint lags.
-      return Math.min(Date.now() + 120_000, timestamp + 100_000);
+      return Math.min(Date.now() + 120000, timestamp + 100000);
     } catch {
       throw new DomainError(
         "The Sui clock could not be checked. Please review a fresh order shortly.",
@@ -248,35 +251,35 @@ export class ChainService {
     const sender =
         input.action === "corporate"
           ? this.sponsor!.toSuiAddress()
-          : this.wallet(member.family, member.role),
-      guardian = this.wallet(member.family, "parent"),
-      learner = this.wallet(member.family, "learner");
+          : await this.wallet(member.family, member.role),
+      guardian = await this.wallet(member.family, "parent"),
+      learner = await this.wallet(member.family, "learner");
     if (!sender || !guardian || !learner)
       throw new DomainError(
         "Both parent and learner must link separate Sui wallets first.",
       );
     if (input.action === "corporate")
-      this.accounts.limit("chain-maintenance:global", 100, 86400_000);
+      await this.accounts.limit("chain-maintenance:global", 100, 86400000);
     else {
-      this.accounts.limit(`chain:${member.family}`, 40, 86400_000);
-      this.accounts.limit("chain:global", 200, 86400_000);
+      await this.accounts.limit(`chain:${member.family}`, 40, 86400000);
+      await this.accounts.limit("chain:global", 200, 86400000);
     }
-    const state = this.store.get(member.family),
-      account = this.account(member.family);
+    const state = await this.store.get(member.family),
+      account = await this.account(member.family);
     if (input.action === "create" ? Boolean(account) : !account)
       throw new DomainError(
         "This action does not match the Sui practice account status.",
       );
     if (
       input.action === "create" &&
-      (!state.portfolio || this.market.status(state).stale)
+      (!state.portfolio || (await this.market.status(state)).stale)
     )
       throw new DomainError(
         "Start a fresh market-price practice portfolio first.",
       );
     let quote: Quote | undefined;
     if (input.action === "order") {
-      const found = this.store.getQuote(member.family, input.quoteId);
+      const found = await this.store.getQuote(member.family, input.quoteId);
       if (found.decision)
         throw new DomainError("This practice order is already recorded.");
       quote = found.quote;
@@ -299,7 +302,7 @@ export class ChainService {
       throw new DomainError(
         "The order changed or expired. Review a fresh preview.",
       );
-    if (quote) this.market.assertTradable(state);
+    if (quote) await this.market.assertTradable(state);
     if (input.action === "policy") {
       const per = parseDollars(input.perTrade),
         day = parseDollars(input.daily);
@@ -309,7 +312,7 @@ export class ChainService {
         );
     }
     const corporatePlan =
-      input.action === "corporate" ? this.market.plan(state) : undefined;
+      input.action === "corporate" ? await this.market.plan(state) : undefined;
     if (
       corporatePlan &&
       (!corporatePlan.entries.length || corporatePlan.entries.length > 48)
@@ -319,16 +322,24 @@ export class ChainService {
       input.action === "corporate" ? await this.quoteExpiry() : undefined;
     const id = randomUUID(),
       expires = Math.min(
-        consensusExpiry ?? quote?.expiresAt ?? Date.now() + 120_000,
-        Date.now() + 120_000,
+        consensusExpiry ?? quote?.expiresAt ?? Date.now() + 120000,
+        Date.now() + 120000,
       );
-    this.store.atomic(() => {
-      this.store.db
+    await this.store.atomic(async () => {
+      await this.store.db.lock(`chain-authority:${member.family}`);
+      if (
+        (await this.wallet(member.family, "parent")) !== guardian ||
+        (await this.wallet(member.family, "learner")) !== learner
+      )
+        throw new DomainError(
+          "The linked wallets changed. Refresh before preparing this action.",
+        );
+      await this.store.db
         .prepare(
           "UPDATE chain_intents SET state='failed',error='Unsigned preview expired' WHERE state IN ('building','prepared') AND expires_at<=?",
         )
         .run(Date.now());
-      const active = this.store.db
+      const active = await this.store.db
         .prepare(
           "SELECT 1 FROM chain_intents WHERE state IN ('building','prepared','submitting','pending')",
         )
@@ -337,7 +348,7 @@ export class ChainService {
         throw new DomainError(
           "Another sponsored action is awaiting a signature or confirmation. Finish or cancel it first.",
         );
-      this.store.db
+      await this.store.db
         .prepare(
           "INSERT INTO chain_intents VALUES(?,?,?,?,?,NULL,'',NULL,'building',?,NULL)",
         )
@@ -355,7 +366,7 @@ export class ChainService {
       const tx = new Transaction();
       tx.setSender(sender);
       tx.setGasOwner(this.sponsor!.toSuiAddress());
-      tx.setGasBudget(30_000_000);
+      tx.setGasBudget(30000000);
       let payload: Record<string, unknown> = { ...input };
       if (input.action === "corporate") {
         const plan = corporatePlan!;
@@ -368,7 +379,7 @@ export class ChainService {
             symbol: bytes(entry.symbol),
             kind: entry.kind === "split" ? 0 : 1,
             effective_day: String(
-              Math.floor(Date.parse(entry.date + "T00:00:00Z") / 86400_000),
+              Math.floor(Date.parse(entry.date + "T00:00:00Z") / 86400000),
             ),
             numerator: entry.numerator,
             denominator: entry.denominator,
@@ -409,7 +420,7 @@ export class ChainService {
             ],
           });
         }
-        tx.setGasBudget(80_000_000);
+        tx.setGasBudget(80000000);
         payload = {
           action: "corporate",
           entries: plan.entries,
@@ -445,11 +456,15 @@ export class ChainService {
         preparationStage = "attestation";
         const q = quote!;
         // Keep this salt local; a public hash of a short private thought is guessable without it.
-        let attested = this.store.db
+        let attested = (await this.store.db
           .prepare(
             "SELECT payload FROM chain_quote_attestations WHERE quote_id=?",
           )
-          .get(q.id) as { payload: string } | undefined;
+          .get(q.id)) as
+          | {
+              payload: string;
+            }
+          | undefined;
         if (!attested) {
           const salt = randomBytes(32).toString("hex");
           const data = {
@@ -466,14 +481,14 @@ export class ChainService {
             revision: String(q.revision),
             sequence: String(q.sequence),
             market_day: String(
-              Math.floor(Date.parse(q.marketDate + "T00:00:00Z") / 86400_000),
+              Math.floor(Date.parse(q.marketDate + "T00:00:00Z") / 86400000),
             ),
             snapshot: Array.from(Buffer.from(q.datasetId!, "hex")),
             commitment: Array.from(hash(`${salt}:${q.id}:${q.reason}`)),
             nonce: Array.from(Buffer.from(q.id.replaceAll("-", ""), "hex")),
           };
           attested = { payload: JSON.stringify(data) };
-          this.store.db
+          await this.store.db
             .prepare("INSERT INTO chain_quote_attestations VALUES(?,?,?)")
             .run(q.id, attested.payload, salt);
         }
@@ -516,8 +531,7 @@ export class ChainService {
         owner: this.sponsor!.toSuiAddress(),
         coinType: "0x2::sui::SUI",
       });
-      const gasBudget =
-        input.action === "corporate" ? 80_000_000n : 30_000_000n;
+      const gasBudget = input.action === "corporate" ? 80000000n : 30000000n;
       const coin = coins.objects.find((c) => BigInt(c.balance) >= gasBudget);
       const balance = (
         await this.config!.gateway.client.getBalance({
@@ -540,7 +554,7 @@ export class ChainService {
       preparationStage = "transaction-build";
       const built = await tx.build({ client: this.config!.gateway.client }),
         digest = await tx.getDigest();
-      this.store.db
+      await this.store.db
         .prepare(
           "UPDATE chain_intents SET payload=?,bytes=?,digest=?,state='prepared' WHERE id=? AND state='building'",
         )
@@ -567,7 +581,7 @@ export class ChainService {
             message = message.replaceAll(value, "[redacted]");
         console.error(message.slice(0, 700));
       }
-      this.store.db
+      await this.store.db
         .prepare(
           "UPDATE chain_intents SET state='failed',error='Preparation failed' WHERE id=? AND state='building'",
         )
@@ -580,17 +594,17 @@ export class ChainService {
   }
   async submit(member: Member, id: string, signature: string) {
     this.requireReady();
-    const intent = this.store.db
+    const intent = (await this.store.db
       .prepare(
         "SELECT * FROM chain_intents WHERE id=? AND family=? AND member=?",
       )
-      .get(id, member.family, member.id) as Intent | undefined;
+      .get(id, member.family, member.id)) as Intent | undefined;
     if (!intent?.bytes)
       throw new DomainError("This transaction preview was not found.");
     if (intent.state === "confirmed")
       return { state: "confirmed", digest: intent.digest };
     if (["submitting", "pending"].includes(intent.state))
-      return this.reconcile(intent);
+      return await this.reconcile(intent);
     if (intent.state !== "prepared" || intent.expires_at <= Date.now())
       throw new DomainError(
         "This unsigned transaction expired. Review a fresh action.",
@@ -600,7 +614,7 @@ export class ChainService {
         address:
           intent.action === "corporate"
             ? this.sponsor!.toSuiAddress()
-            : this.wallet(member.family, member.role),
+            : await this.wallet(member.family, member.role),
         client: this.config!.gateway.client,
       });
     } catch {
@@ -608,7 +622,7 @@ export class ChainService {
         "The signed transaction does not match this wallet and preview.",
       );
     }
-    const changed = this.store.db
+    const changed = await this.store.db
       .prepare(
         "UPDATE chain_intents SET signature=?,state='submitting' WHERE id=? AND state='prepared' AND expires_at>?",
       )
@@ -616,15 +630,15 @@ export class ChainService {
     if (!changed.changes)
       throw new DomainError("This preview was already submitted or expired.");
     await this.dispatch({ ...intent, signature, state: "submitting" });
-    this.store.db
+    await this.store.db
       .prepare(
         "UPDATE chain_intents SET state='pending' WHERE id=? AND state='submitting'",
       )
       .run(id);
-    return this.reconcile({ ...intent, state: "pending" });
+    return await this.reconcile({ ...intent, state: "pending" });
   }
-  cancel(member: Member, id: string) {
-    const changed = this.store.db
+  async cancel(member: Member, id: string) {
+    const changed = await this.store.db
       .prepare(
         "UPDATE chain_intents SET state='failed',error='Cancelled before submission' WHERE id=? AND member=? AND family=? AND state IN ('prepared','building')",
       )
@@ -637,22 +651,24 @@ export class ChainService {
   private async dispatch(intent: Intent) {
     if (!intent.bytes || !intent.signature) return;
     const token = randomUUID();
-    const claimed = this.store.atomic(() => {
-      this.store.db
+    const claimed = await this.store.atomic(async () => {
+      await this.store.db
         .prepare("INSERT OR IGNORE INTO chain_dispatch(id) VALUES(?)")
         .run(intent.id);
-      return this.store.db
-        .prepare(
-          "UPDATE chain_dispatch SET attempts=attempts+1,next_at=?,lease_until=?,token=? WHERE id=? AND attempts<8 AND next_at<=? AND lease_until<=?",
-        )
-        .run(
-          Date.now() + 30_000,
-          Date.now() + 45_000,
-          token,
-          intent.id,
-          Date.now(),
-          Date.now(),
-        ).changes;
+      return (
+        await this.store.db
+          .prepare(
+            "UPDATE chain_dispatch SET attempts=attempts+1,next_at=?,lease_until=?,token=? WHERE id=? AND attempts<8 AND next_at<=? AND lease_until<=?",
+          )
+          .run(
+            Date.now() + 30000,
+            Date.now() + 45000,
+            token,
+            intent.id,
+            Date.now(),
+            Date.now(),
+          )
+      ).changes;
     });
     if (!claimed) return;
     try {
@@ -667,7 +683,7 @@ export class ChainService {
     } catch {
       /* Re-send only identical signed bytes. One digest cannot execute twice. */
     } finally {
-      this.store.db
+      await this.store.db
         .prepare(
           "UPDATE chain_dispatch SET lease_until=0 WHERE id=? AND token=?",
         )
@@ -683,7 +699,7 @@ export class ChainService {
       return { state: "pending", digest: intent.digest };
     }
     if (receipt.state === "failed") {
-      this.store.db
+      await this.store.db
         .prepare(
           "UPDATE chain_intents SET state='failed',error='Sui execution aborted' WHERE id=? AND state IN ('pending','submitting')",
         )
@@ -700,14 +716,18 @@ export class ChainService {
         e.module === "practice" &&
         packageIds.has(e.eventType.split("::")[0]),
     );
-    const isType = (event: { eventType: string }, name: string) =>
-      event.eventType.endsWith(`::practice::${name}`);
+    const isType = (
+      event: {
+        eventType: string;
+      },
+      name: string,
+    ) => event.eventType.endsWith(`::practice::${name}`);
     const payload = JSON.parse(intent.payload);
     const created = events.find((e) => isType(e, "Created"));
     const objectId =
       intent.action === "create" && created
         ? CreatedBcs.parse(created.bcs).account
-        : this.account(intent.family)?.object_id;
+        : (await this.account(intent.family))?.object_id;
     if (!objectId)
       throw new DomainError(
         "The confirmed transaction did not create the expected practice account.",
@@ -719,29 +739,31 @@ export class ChainService {
       );
     const onchain = AccountBcs.parse(object.content);
     if (
-      onchain.guardian !== this.wallet(intent.family, "parent") ||
-      onchain.learner !== this.wallet(intent.family, "learner") ||
+      onchain.guardian !== (await this.wallet(intent.family, "parent")) ||
+      onchain.learner !== (await this.wallet(intent.family, "learner")) ||
       hex(Uint8Array.from(onchain.attestor)) !==
         hex(this.attestor!.getPublicKey().toRawBytes())
     )
       throw new DomainError(
         "The onchain authorities do not match this family.",
       );
-    this.store.atomic(() => {
-      const row = this.store.db
+    await this.store.atomic(async () => {
+      const state = await this.store.get(intent.family);
+      const row = (await this.store.db
         .prepare("SELECT state FROM chain_intents WHERE id=?")
-        .get(intent.id) as { state: string };
+        .get(intent.id)) as {
+        state: string;
+      };
       if (row.state === "confirmed") return;
       if (!["pending", "submitting"].includes(row.state))
         throw new DomainError(
           "The transaction is not awaiting reconciliation.",
         );
-      const state = this.store.get(intent.family);
       if (intent.action === "create") {
-        this.store.db
+        await this.store.db
           .prepare("INSERT INTO chain_accounts VALUES(?,?,?)")
           .run(intent.family, objectId, intent.digest);
-        this.store.db
+        await this.store.db
           .prepare("INSERT INTO portfolio_archives VALUES(?,?,?,?)")
           .run(
             randomUUID(),
@@ -782,7 +804,7 @@ export class ChainService {
           throw new DomainError(
             "The execution receipt does not match the reviewed order.",
           );
-        const previous = this.store.getQuote(intent.family, q.id);
+        const previous = await this.store.getQuote(intent.family, q.id);
         if (!previous.decision) {
           const now = new Date(
             Number(transaction.timestampMs ?? Date.now()),
@@ -805,7 +827,7 @@ export class ChainService {
               active: true,
               origin: "local",
             });
-          this.store.consumeQuote(q.id, q.id);
+          await this.store.consumeQuote(q.id, q.id);
           const approval = state.approvals.find((a) => a.quote.id === q.id);
           if (approval) approval.state = "consumed";
         }
@@ -839,7 +861,7 @@ export class ChainService {
             event.kind !== (entry.kind === "split" ? 0 : 1) ||
             event.effective_day !==
               String(
-                Math.floor(Date.parse(entry.date + "T00:00:00Z") / 86400_000),
+                Math.floor(Date.parse(entry.date + "T00:00:00Z") / 86400000),
               ) ||
             event.units_before !== entry.unitsBefore ||
             event.units_after !== entry.unitsAfter ||
@@ -922,11 +944,11 @@ export class ChainService {
       };
       state.sequence = Number(onchain.sequence);
       state.daySpent = onchain.day_spent;
-      state.spendDay = new Date(Number(onchain.spend_day) * 86400_000)
+      state.spendDay = new Date(Number(onchain.spend_day) * 86400000)
         .toISOString()
         .slice(0, 10);
-      this.store.set(state);
-      this.store.db
+      await this.store.set(state);
+      await this.store.db
         .prepare(
           "UPDATE chain_intents SET state='confirmed',error=NULL WHERE id=?",
         )
@@ -934,13 +956,13 @@ export class ChainService {
     });
     return { state: "confirmed", digest: intent.digest };
   }
-  async reconcilePending() {
+  async reconcilePending(batchSize = 5) {
     if (!this.config) return;
-    const rows = this.store.db
+    const rows = (await this.store.db
       .prepare(
-        "SELECT * FROM chain_intents WHERE state IN ('pending','submitting') ORDER BY expires_at LIMIT 5",
+        "SELECT * FROM chain_intents WHERE state IN ('pending','submitting') ORDER BY expires_at LIMIT ?",
       )
-      .all() as Intent[];
+      .all(Math.max(1, Math.min(5, batchSize)))) as Intent[];
     for (const intent of rows) {
       try {
         const result = await this.reconcile(intent);
@@ -954,12 +976,14 @@ export class ChainService {
         );
       }
     }
-    const families = this.store.db
-      .prepare("SELECT family FROM chain_accounts")
-      .all() as { family: string }[];
+    const families = (await this.store.db
+      .prepare("SELECT family FROM chain_accounts LIMIT ?")
+      .all(Math.max(1, Math.min(5, batchSize)))) as {
+      family: string;
+    }[];
     for (const { family } of families) {
       if (
-        this.store.db
+        await this.store.db
           .prepare(
             "SELECT 1 FROM chain_intents WHERE state IN ('building','prepared','submitting','pending')",
           )
@@ -974,11 +998,11 @@ export class ChainService {
     }
   }
   async maintain(family: string) {
-    if (!this.config || !this.account(family)) return;
-    const state = this.store.get(family),
-      plan = this.market.plan(state);
+    if (!this.config || !(await this.account(family))) return;
+    const state = await this.store.get(family),
+      plan = await this.market.plan(state);
     if (!plan.entries.length) return;
-    if (this.pending(family).length) return;
+    if ((await this.pending(family)).length) return;
     const fingerprint = hash(
       JSON.stringify([
         plan.from!.id,
@@ -988,15 +1012,20 @@ export class ChainService {
         plan.entries.map((e) => e.id),
       ]),
     ).toString("hex");
-    const retry = this.store.db
+    const retry = (await this.store.db
       .prepare("SELECT * FROM corporate_retry WHERE family=?")
-      .get(family) as
-      { fingerprint: string; attempts: number; next_at: number } | undefined;
+      .get(family)) as
+      | {
+          fingerprint: string;
+          attempts: number;
+          next_at: number;
+        }
+      | undefined;
     if (retry?.fingerprint === fingerprint && retry.next_at > Date.now())
       return;
     const attempts =
       retry?.fingerprint === fingerprint ? retry.attempts + 1 : 1;
-    this.store.db
+    await this.store.db
       .prepare(
         "INSERT INTO corporate_retry VALUES(?,?,?,?) ON CONFLICT(family) DO UPDATE SET fingerprint=excluded.fingerprint,attempts=excluded.attempts,next_at=excluded.next_at",
       )
@@ -1004,7 +1033,7 @@ export class ChainService {
         family,
         fingerprint,
         attempts,
-        Date.now() + Math.min(1800_000, 10_000 * 2 ** Math.min(attempts, 8)),
+        Date.now() + Math.min(1800000, 10000 * 2 ** Math.min(attempts, 8)),
       );
     const member: Member = {
       id: "system:corporate",
@@ -1018,7 +1047,7 @@ export class ChainService {
     ).signature;
     const result = await this.submit(member, prepared.id, signature);
     if (result.state === "confirmed")
-      this.store.db
+      await this.store.db
         .prepare("DELETE FROM corporate_retry WHERE family=?")
         .run(family);
     return result;

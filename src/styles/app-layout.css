@@ -165,13 +165,6 @@
 .app-topbar-actions {
   gap: 20px;
 }
-.practice-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 10px;
-  color: var(--muted);
-}
 .sample-strip {
   padding: 9px 42px;
   font-size: 9px;
@@ -772,10 +765,6 @@
   .app-topbar-actions {
     gap: 12px;
   }
-  .practice-badge {
-    font-size: 9px;
-    gap: 7px;
-  }
   .app-main {
     padding: 0 20px 35px;
   }
@@ -790,7 +779,7 @@
     display: none;
   }
   .sample-strip > span::after {
-    content: "Sample prices · practice funds";
+    content: attr(data-mobile-label);
     font-size: 8px;
   }
   .sample-strip .sample-separator {

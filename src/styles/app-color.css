@@ -3,7 +3,7 @@
   --panel-green: var(--spot);
 }
 
-.consumer-app :is(.allocation-panel, .company-price, .evidence-status) {
+.consumer-app :is(.allocation-panel, .evidence-status) {
   --foreground: #ffffff;
   --muted: #e3f3e9;
   --line: #ffffff38;
@@ -18,7 +18,7 @@
   border-color: var(--panel-green);
 }
 
-.consumer-app :is(.allocation-panel, .company-price) {
+.consumer-app .allocation-panel {
   background-image: radial-gradient(#ffffff12 0.65px, transparent 0.65px);
   background-size: 16px 16px;
 }
@@ -60,10 +60,6 @@
 .consumer-app .lesson-row.is-current {
   background: var(--background);
   border-color: var(--line);
-}
-
-.consumer-app .company-price {
-  padding: 20px 22px;
 }
 
 .consumer-app .stock-card:hover {

@@ -9,7 +9,6 @@ import {
 } from "../shared/model.ts";
 import { instruments } from "../shared/fixtures.ts";
 import type { DemoStore } from "./store.ts";
-
 export class DomainError extends Error {
   status = 409;
 }
@@ -77,7 +76,7 @@ export function preview(
     ...{ amount: String(order.amount), units: String(order.units) },
     price: point.price,
     reason: input.reason.trim(),
-    expiresAt: Date.now() + 120_000,
+    expiresAt: Date.now() + 120000,
     revision: state.policy.revision,
     sequence: state.sequence,
     violations: [],
@@ -95,15 +94,15 @@ export function preview(
     quote.violations.push("This would go above your daily practice allowance.");
   return quote;
 }
-export function execute(
+export async function execute(
   store: DemoStore,
   family: string,
   quoteId: string,
   actorRole?: "learner" | "parent",
 ) {
-  return store.atomic(() => {
-    const { quote, decision: existing } = store.getQuote(family, quoteId);
-    const state = rolledState(store.get(family));
+  return await store.atomic(async () => {
+    const state = rolledState(await store.get(family));
+    const { quote, decision: existing } = await store.getQuote(family, quoteId);
     if (existing) return state;
     if ((actorRole ?? state.role) !== "learner")
       throw new DomainError(
@@ -124,7 +123,7 @@ export function execute(
       );
     if (
       state.portfolio &&
-      Date.now() - Date.parse(quote.marketDate + "T21:00:00Z") > 5 * 86400_000
+      Date.now() - Date.parse(quote.marketDate + "T21:00:00Z") > 5 * 86400000
     )
       throw new DomainError(
         "Prices are stale. Review a fresh daily close before continuing.",
@@ -188,8 +187,8 @@ export function execute(
       });
     if (approval) approval.state = "consumed";
     state.sequence++;
-    store.consumeQuote(quote.id, id);
-    store.set(state);
+    await store.consumeQuote(quote.id, id);
+    await store.set(state);
     return state;
   });
 }

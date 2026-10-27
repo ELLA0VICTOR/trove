@@ -14,7 +14,6 @@ import { instruments as samples } from "../shared/fixtures.ts";
 import { MarketstackGateway } from "./integrations/marketstack.ts";
 import { DomainError } from "./domain.ts";
 import { portfolioValue } from "../shared/model.ts";
-
 export interface Dataset {
   id: string;
   asOf: string;
@@ -26,10 +25,9 @@ export interface Dataset {
 }
 // Marketstack counts each symbol against the monthly allowance, including batches.
 // A four-day import cadence keeps 12 symbols below 100 symbol-requests/month.
-const TTL = 96 * 60 * 60_000;
+const TTL = 96 * 60 * 60000;
 export const marketStale = (asOf: string, now = Date.now()) =>
-  now - Date.parse(asOf + "T21:00:00Z") > 5 * 86400_000;
-
+  now - Date.parse(asOf + "T21:00:00Z") > 5 * 86400000;
 /** One shared, private, persisted import. No browser requests ever call the provider. */
 export class MarketService {
   private active?: Promise<void>;
@@ -41,33 +39,34 @@ export class MarketService {
   ) {
     this.store = store;
     this.gateway = gateway;
-    store.db
-      .exec(`CREATE TABLE IF NOT EXISTS market_snapshots(id TEXT PRIMARY KEY, as_of TEXT NOT NULL, received_at TEXT NOT NULL, payload TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS market_refresh(id INTEGER PRIMARY KEY CHECK(id=1), next_at INTEGER NOT NULL, status TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS portfolio_archives(id TEXT PRIMARY KEY,family TEXT NOT NULL,payload TEXT NOT NULL,recorded_at TEXT NOT NULL);`);
-    store.db.exec(
-      "CREATE TABLE IF NOT EXISTS portfolio_marks(family TEXT NOT NULL,portfolio TEXT NOT NULL,date TEXT NOT NULL,value TEXT NOT NULL,dataset TEXT NOT NULL,PRIMARY KEY(family,portfolio,date))",
-    );
   }
-  latest(): Dataset | undefined {
-    const row = this.store.db
+  async latest(): Promise<Dataset | undefined> {
+    const row = (await this.store.db
       .prepare(
         "SELECT payload FROM market_snapshots ORDER BY received_at DESC LIMIT 1",
       )
-      .get() as { payload: string } | undefined;
+      .get()) as
+      | {
+          payload: string;
+        }
+      | undefined;
     return row && JSON.parse(row.payload);
   }
-  dataset(id: string): Dataset {
-    const row = this.store.db
+  async dataset(id: string): Promise<Dataset> {
+    const row = (await this.store.db
       .prepare("SELECT payload FROM market_snapshots WHERE id=?")
-      .get(id) as { payload: string } | undefined;
+      .get(id)) as
+      | {
+          payload: string;
+        }
+      | undefined;
     if (!row)
       throw new DomainError(
         "This market snapshot is unavailable. Refresh your account before continuing.",
       );
     return JSON.parse(row.payload);
   }
-  status(state: DemoState) {
+  async status(state: DemoState) {
     if (!state.portfolio)
       return {
         mode: "sample" as const,
@@ -78,12 +77,12 @@ export class MarketService {
           ? "Market prices available for a new practice portfolio"
           : "Market prices not configured",
       };
-    const data = this.dataset(state.portfolio.datasetId);
-    const current = this.latest(),
+    const data = await this.dataset(state.portfolio.datasetId);
+    const current = await this.latest(),
       actionPending = Boolean(
         current &&
         current.id !== data.id &&
-        this.hasCorporateAction(state, data, current),
+        (await this.hasCorporateAction(state, data, current)),
       );
     return {
       mode: "market" as const,
@@ -100,41 +99,51 @@ export class MarketService {
           : "Daily closing prices, not real-time quotes",
     };
   }
-  instruments(state: DemoState) {
+  async instruments(state: DemoState) {
     return state.portfolio
-      ? this.dataset(state.portfolio.datasetId).instruments
+      ? (await this.dataset(state.portfolio.datasetId)).instruments
       : samples;
   }
-  history(state: DemoState) {
+  async history(state: DemoState) {
     if (!state.portfolio) return undefined;
     const date = new Date().toISOString().slice(0, 10);
-    const existing = this.store.db
+    const existing = (await this.store.db
       .prepare(
         "SELECT date,value FROM portfolio_marks WHERE family=? AND portfolio=? ORDER BY date",
       )
-      .all(state.id, state.portfolio.id) as { date: string; value: string }[];
+      .all(state.id, state.portfolio.id)) as {
+      date: string;
+      value: string;
+    }[];
     if (!existing.length) {
       // Backfill existing local ledgers before the first persisted observation.
       // Earlier marks are preserved when a later snapshot changes share units.
+      const bases = new Map<string, Instrument[]>();
+      for (const entry of state.adjustments ?? [])
+        bases.set(
+          entry.fromDataset,
+          (await this.dataset(entry.fromDataset)).instruments,
+        );
+      const prices = await this.instruments(state);
       for (const point of accountHistory(
         state,
-        this.instruments(state),
-        (id) => this.dataset(id).instruments,
+        prices,
+        (id) => bases.get(id) ?? prices,
       ) ?? []) {
         if (point.date >= date) continue;
-        this.store.db
+        await this.store.db
           .prepare("INSERT OR IGNORE INTO portfolio_marks VALUES(?,?,?,?,?)")
           .run(
             state.id,
             state.portfolio.id,
             point.date,
-            String(BigInt(Math.round(point.value * 1_000_000))),
+            String(BigInt(Math.round(point.value * 1000000))),
             state.portfolio.datasetId,
           );
       }
     }
-    const value = portfolioValue(state, this.instruments(state));
-    this.store.db
+    const value = portfolioValue(state, await this.instruments(state));
+    await this.store.db
       .prepare(
         "INSERT INTO portfolio_marks VALUES(?,?,?,?,?) ON CONFLICT(family,portfolio,date) DO UPDATE SET value=excluded.value,dataset=excluded.dataset",
       )
@@ -146,12 +155,15 @@ export class MarketService {
         state.portfolio.datasetId,
       );
     return (
-      this.store.db
+      (await this.store.db
         .prepare(
           "SELECT date,value FROM portfolio_marks WHERE family=? AND portfolio=? ORDER BY date",
         )
-        .all(state.id, state.portfolio.id) as { date: string; value: string }[]
-    ).map((p) => ({ date: p.date, value: Number(p.value) / 1_000_000 }));
+        .all(state.id, state.portfolio.id)) as {
+        date: string;
+        value: string;
+      }[]
+    ).map((p) => ({ date: p.date, value: Number(p.value) / 1000000 }));
   }
   async refresh() {
     if (!this.gateway) return;
@@ -162,13 +174,18 @@ export class MarketService {
     return this.active;
   }
   private async import() {
-    const claimed = this.store.atomic(() => {
-      const row = this.store.db
+    const claimed = await this.store.atomic(async () => {
+      await this.store.db.lock("market-import");
+      const row = (await this.store.db
         .prepare("SELECT next_at FROM market_refresh WHERE id=1")
-        .get() as { next_at: number } | undefined;
+        .get()) as
+        | {
+            next_at: number;
+          }
+        | undefined;
       if (row && row.next_at > Date.now()) return false;
       // Reserve before network I/O; restarts cannot consume the provider quota in a loop.
-      this.store.db
+      await this.store.db
         .prepare(
           "INSERT INTO market_refresh VALUES(1,?,'loading') ON CONFLICT(id) DO UPDATE SET next_at=excluded.next_at,status='loading'",
         )
@@ -178,7 +195,7 @@ export class MarketService {
     if (!claimed) return;
     try {
       const now = new Date(),
-        from = new Date(now.getTime() - 90 * 86400_000)
+        from = new Date(now.getTime() - 90 * 86400000)
           .toISOString()
           .slice(0, 10);
       const results = await this.gateway!.histories(
@@ -219,14 +236,14 @@ export class MarketService {
         actions: corporateActions(rawInstruments),
         excluded: results.reduce((sum, r) => sum + (r.excluded ?? 0), 0),
       };
-      this.store.db
+      await this.store.db
         .prepare("INSERT OR IGNORE INTO market_snapshots VALUES(?,?,?,?)")
         .run(id, asOf, receivedAt, JSON.stringify(data));
-      this.store.db
+      await this.store.db
         .prepare("UPDATE market_refresh SET status='ready' WHERE id=1")
         .run();
     } catch {
-      this.store.db
+      await this.store.db
         .prepare("UPDATE market_refresh SET status='failed' WHERE id=1")
         .run();
       console.error(
@@ -234,16 +251,21 @@ export class MarketService {
       );
     }
   }
-  enroll(family: string, allowArchive = false, clearExamples = false) {
-    const data = this.latest();
-    if (!data || marketStale(data.asOf))
+  async enroll(
+    family: string,
+    allowArchive = false,
+    clearExamples = false,
+    allowStale = false,
+  ) {
+    const data = await this.latest();
+    if (!data || (!allowStale && marketStale(data.asOf)))
       throw new DomainError("Fresh market prices are not available yet.");
-    return this.store.atomic(() => {
-      const state = this.store.get(family);
+    return await this.store.atomic(async () => {
+      const state = await this.store.get(family);
       if (state.portfolio) return state;
       if ((state.holdings.length || state.decisions.length) && !allowArchive)
         return state;
-      this.store.db
+      await this.store.db
         .prepare("INSERT INTO portfolio_archives VALUES(?,?,?,?)")
         .run(
           randomUUID(),
@@ -266,52 +288,45 @@ export class MarketService {
       state.approvals = [];
       state.daySpent = "0";
       state.sequence++;
-      this.store.set(state);
+      await this.store.set(state);
       return state;
     });
   }
-  advance(family: string) {
-    const data = this.latest(),
-      state = this.store.get(family);
+  async advance(family: string) {
+    const data = await this.latest(),
+      state = await this.store.get(family);
     if (!data || !state.portfolio || state.portfolio.datasetId === data.id)
       return state;
-    const chainTables = this.store.db
-      .prepare(
-        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='chain_intents'",
-      )
-      .get();
     if (
-      chainTables &&
-      this.store.db
+      await this.store.db
         .prepare(
           "SELECT 1 FROM chain_intents WHERE family=? AND state IN ('building','prepared','submitting','pending')",
         )
         .get(family)
     )
       return state;
-    const onchain =
-      chainTables &&
-      this.store.db
-        .prepare("SELECT 1 FROM chain_accounts WHERE family=?")
-        .get(family);
-    const plan = this.plan(state);
+    const onchain = await this.store.db
+      .prepare("SELECT 1 FROM chain_accounts WHERE family=?")
+      .get(family);
+    const plan = await this.plan(state);
     if (onchain && plan.entries.length) return state;
-    return this.store.atomic(() => {
+    return await this.store.atomic(async () => {
       for (const entry of plan.entries)
         applyAdjustment(state, entry, state.portfolio!.datasetId, data.id);
       state.portfolio!.datasetId = data.id;
       if (!onchain && !plan.entries.length) state.sequence++;
-      this.store.set(state);
+      await this.store.set(state);
       return state;
     });
   }
-  plan(state: DemoState) {
-    const target = this.latest(),
-      before = state.portfolio && this.dataset(state.portfolio.datasetId);
+  async plan(state: DemoState) {
+    const target = await this.latest(),
+      before =
+        state.portfolio && (await this.dataset(state.portfolio.datasetId));
     const projected = structuredClone(state);
     const entries = [] as import("../shared/model.ts").Adjustment[];
     if (target && before && target.id !== before.id) {
-      const actions = this.actionsBetween(before, target);
+      const actions = await this.actionsBetween(before, target);
       for (const action of actions.filter(
         (a) => a.date > before.asOf && a.date <= target.asOf,
       )) {
@@ -321,8 +336,12 @@ export class MarketService {
     }
     return { from: before, target, entries, projected };
   }
-  private hasCorporateAction(state: DemoState, old: Dataset, data: Dataset) {
-    return this.actionsBetween(old, data).some(
+  private async hasCorporateAction(
+    state: DemoState,
+    old: Dataset,
+    data: Dataset,
+  ) {
+    return (await this.actionsBetween(old, data)).some(
       (a) =>
         a.date > old.asOf &&
         a.date <= data.asOf &&
@@ -331,13 +350,15 @@ export class MarketService {
         ),
     );
   }
-  private actionsBetween(old: Dataset, target: Dataset) {
+  private async actionsBetween(old: Dataset, target: Dataset) {
     // Retain actions that have rolled out of the provider's current history window.
-    const snapshots = this.store.db
+    const snapshots = (await this.store.db
       .prepare(
         "SELECT payload FROM market_snapshots WHERE as_of>? AND as_of<=? AND received_at<=? ORDER BY received_at",
       )
-      .all(old.asOf, target.asOf, target.receivedAt) as { payload: string }[];
+      .all(old.asOf, target.asOf, target.receivedAt)) as {
+      payload: string;
+    }[];
     const events = new Map<string, CorporateAction>();
     for (const { payload } of snapshots) {
       const data = JSON.parse(payload) as Dataset;
@@ -352,18 +373,17 @@ export class MarketService {
         (a.kind === b.kind ? 0 : a.kind === "split" ? -1 : 1),
     );
   }
-  assertTradable(state: DemoState) {
-    if (this.status(state).blocked)
+  async assertTradable(state: DemoState) {
+    if ((await this.status(state)).blocked)
       throw new DomainError(
         "Your portfolio is applying automatic split and dividend entries. Please try again shortly.",
       );
-    if (state.portfolio && this.status(state).stale)
+    if (state.portfolio && (await this.status(state)).stale)
       throw new DomainError(
         "Prices are stale. Wait for a fresh daily close before making a practice order.",
       );
   }
 }
-
 export function corporateActions(instruments: Instrument[]): CorporateAction[] {
   const actions: CorporateAction[] = [];
   for (const instrument of instruments)
@@ -402,7 +422,6 @@ export function corporateActions(instruments: Instrument[]): CorporateAction[] {
       (a.kind === b.kind ? 0 : a.kind === "split" ? -1 : 1),
   );
 }
-
 /** Value the positions held at each actual observation, never today's positions in the past. */
 export function accountHistory(
   state: DemoState,
@@ -482,8 +501,8 @@ export function accountHistory(
         .find((i) => i.symbol === symbol)!
         .prices.filter((p) => p.date <= date)
         .at(-1);
-      if (price) cash += (units * BigInt(price.price)) / 100_000_000n;
+      if (price) cash += (units * BigInt(price.price)) / 100000000n;
     }
-    return { date, value: Number(cash) / 1_000_000 };
+    return { date, value: Number(cash) / 1000000 };
   });
 }

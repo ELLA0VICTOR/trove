@@ -202,7 +202,7 @@ export function Company() {
           </Eyebrow>
           <h1>{instrument.name}</h1>
         </div>
-        <Button onClick={() => setOrdering(true)}>
+        <Button secondary onClick={() => setOrdering(true)}>
           Make a practice move <ArrowUpRight size={18} />
         </Button>
       </section>

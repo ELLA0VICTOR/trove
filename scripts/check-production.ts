@@ -18,6 +18,7 @@ async function start() {
       RENDER_EXTERNAL_URL: origin,
       TROVE_DATA_DIR: directory,
       TROVE_LIVE_SERVICES: "0",
+      DATABASE_URL: "",
       PORT: String(port),
     },
     stdio: "pipe",

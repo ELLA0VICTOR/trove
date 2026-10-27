@@ -3,7 +3,6 @@ import type { GuideReply } from "../shared/model.ts";
 import type { DemoStore } from "./store.ts";
 import type { MemoryReader } from "./integrations/walrus.ts";
 import { AccessError } from "./auth.ts";
-
 export class LearningUnavailable extends Error {
   readonly status: 409 | 503;
   constructor(message: string, status: 409 | 503 = 503) {
@@ -20,29 +19,34 @@ export class LearningService implements LiveLearning {
   readonly ready = true;
   readonly coachReady = true;
   private readonly store: DemoStore;
-  private readonly memory: (scope: string) => MemoryReader;
+  private readonly memory: (
+    scope: string,
+  ) => MemoryReader | Promise<MemoryReader>;
   private readonly coach: {
     explain(
       question: string,
-      memories: { id: string; text: string; kind?: string }[],
+      memories: {
+        id: string;
+        text: string;
+        kind?: string;
+      }[],
     ): Promise<GuideReply>;
   };
   constructor(
     store: DemoStore,
-    memory: (scope: string) => MemoryReader,
+    memory: (scope: string) => MemoryReader | Promise<MemoryReader>,
     coach: LearningService["coach"],
   ) {
     this.store = store;
     this.memory = memory;
     this.coach = coach;
   }
-  private fingerprint(family: string) {
+  private async fingerprint(family: string) {
     return createHash("sha256")
       .update(
         JSON.stringify(
-          this.store
-            .get(family)
-            .memories.filter((record) => record.active)
+          (await this.store.get(family)).memories
+            .filter((record) => record.active)
             .map((record) => [
               record.id,
               record.kind,
@@ -55,11 +59,11 @@ export class LearningService implements LiveLearning {
       .digest("hex");
   }
   async explain(family: string, question: string) {
-    if (!this.store.profile(family)?.memory_enabled)
+    if (!(await this.store.profile(family))?.memory_enabled)
       throw new AccessError(
         "Your parent can enable remembering in Account settings.",
       );
-    const state = this.store.get(family);
+    const state = await this.store.get(family);
     const active = state.memories.filter(
       (record) => record.active && record.origin === "local",
     );
@@ -68,19 +72,24 @@ export class LearningService implements LiveLearning {
         "Your latest thoughts are still syncing. Check Saved thoughts, then try again.",
         409,
       );
-    const fingerprint = this.fingerprint(family);
+    const fingerprint = await this.fingerprint(family);
     const cacheKey = createHash("sha256")
       .update(JSON.stringify([question.trim(), fingerprint]))
       .digest("hex");
     const token = randomUUID(),
       now = Date.now();
-    const cached = this.store.atomic(() => {
-      const previous = this.store.db
+    const cached = await this.store.atomic(async () => {
+      await this.store.db.lock(`coach-reply:${family}`);
+      const previous = (await this.store.db
         .prepare(
           "SELECT reply,until_at FROM coaching_cache WHERE family=? AND cache_key=?",
         )
-        .get(family, cacheKey) as
-        { reply: string | null; until_at: number } | undefined;
+        .get(family, cacheKey)) as
+        | {
+            reply: string | null;
+            until_at: number;
+          }
+        | undefined;
       if (previous && previous.until_at > now) {
         if (previous.reply)
           return { ...JSON.parse(previous.reply), cached: true } as GuideReply;
@@ -89,20 +98,20 @@ export class LearningService implements LiveLearning {
           409,
         );
       }
-      this.store.db
+      await this.store.db
         .prepare(
           `INSERT INTO coaching_cache(family,cache_key,token,until_at) VALUES(?,?,?,?)
         ON CONFLICT(family,cache_key) DO UPDATE SET token=excluded.token,until_at=excluded.until_at,reply=NULL`,
         )
-        .run(family, cacheKey, token, now + 60_000);
+        .run(family, cacheKey, token, now + 60000);
       return null;
     });
     if (cached) return cached;
     let gateway: MemoryReader | undefined;
     let stage = "recall";
     try {
-      const scope = this.store.memoryScope(family);
-      gateway = this.memory(scope);
+      const scope = await this.store.memoryScope(family);
+      gateway = await this.memory(scope);
       let hits = active.length ? await gateway.recall(question) : [];
       const correction = active.find((record) => record.kind === "correction");
       if (
@@ -113,7 +122,12 @@ export class LearningService implements LiveLearning {
       const canonical = new Map(active.map((record) => [record.id, record]));
       const verified = new Map<
         string,
-        { id: string; text: string; kind: string; blobId: string }
+        {
+          id: string;
+          text: string;
+          kind: string;
+          blobId: string;
+        }
       >();
       for (const hit of hits) {
         const stored = canonical.get(hit.record.eventId);
@@ -174,8 +188,8 @@ export class LearningService implements LiveLearning {
           "The explanation did not account for your latest correction. It was not shown; please try again.",
         );
       if (
-        !this.store.profile(family)?.memory_enabled ||
-        this.fingerprint(family) !== fingerprint
+        !(await this.store.profile(family))?.memory_enabled ||
+        (await this.fingerprint(family)) !== fingerprint
       )
         throw new LearningUnavailable(
           "Your saved thoughts changed during this explanation. Ask again with the latest context.",
@@ -187,13 +201,13 @@ export class LearningService implements LiveLearning {
           .filter((record) => reply.sources.includes(record.id))
           .map(({ id, kind, blobId }) => ({ id, kind, blobId })),
       };
-      this.store.db
+      await this.store.db
         .prepare(
           "UPDATE coaching_cache SET reply=?,until_at=? WHERE family=? AND cache_key=? AND token=?",
         )
         .run(
           JSON.stringify(result),
-          Date.now() + 5 * 60_000,
+          Date.now() + 5 * 60000,
           family,
           cacheKey,
           token,
@@ -210,7 +224,7 @@ export class LearningService implements LiveLearning {
       );
     } finally {
       gateway?.destroy?.();
-      this.store.db
+      await this.store.db
         .prepare(
           "DELETE FROM coaching_cache WHERE family=? AND cache_key=? AND token=? AND reply IS NULL",
         )

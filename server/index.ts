@@ -3,8 +3,7 @@ import { createApp } from "./app.ts";
 import { createRuntime } from "./runtime.ts";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { existsSync } from "node:fs";
-
-const runtime = createRuntime();
+const runtime = await createRuntime();
 const production = process.env.NODE_ENV === "production";
 const publicOrigin = (
   process.env.PUBLIC_ORIGIN || process.env.RENDER_EXTERNAL_URL
@@ -12,22 +11,27 @@ const publicOrigin = (
 if (
   production &&
   (!publicOrigin?.startsWith("https://") ||
-    !process.env.TROVE_DATA_DIR ||
+    (!process.env.DATABASE_URL && !process.env.TROVE_DATA_DIR) ||
     !existsSync("dist/index.html"))
 ) {
-  runtime.close();
+  await runtime.close();
   throw new Error(
-    "Production needs HTTPS PUBLIC_ORIGIN, persistent TROVE_DATA_DIR, and a built frontend.",
+    "Production needs HTTPS PUBLIC_ORIGIN, a database, and a built frontend.",
   );
 }
-const app = createApp(runtime.store, {
+const app = await createApp(runtime.store, {
   learning: runtime.learning,
   market: runtime.market,
   chain: runtime.chain,
   publicOrigin,
+  afterRequest: runtime.requestDriven
+    ? () => {
+        void runtime.maintenance().catch(() => {});
+      }
+    : undefined,
 });
-app.get("/health", (c) => {
-  runtime.store.db.prepare("SELECT 1").get();
+app.get("/health", async (c) => {
+  await runtime.store.db.prepare("SELECT 1").get();
   return c.json({ status: "ok" });
 });
 app.get(
@@ -57,11 +61,11 @@ let stopping = false;
 async function shutdown() {
   if (stopping) return;
   stopping = true;
-  const deadline = setTimeout(() => process.exit(0), 25_000);
+  const deadline = setTimeout(() => process.exit(0), 25000);
   deadline.unref();
   await runtime.stop();
-  server.close(() => {
-    runtime.close();
+  server.close(async () => {
+    await runtime.close();
     clearTimeout(deadline);
     process.exit(0);
   });

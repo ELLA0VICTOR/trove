@@ -15,7 +15,7 @@
   <a href="#getting-started">Getting started</a> ·
   <a href="#how-trove-works">How it works</a> ·
   <a href="#architecture">Architecture</a> ·
-  <a href="docs/RENDER-DEPLOY.md">Deployment</a> ·
+  <a href="docs/VERCEL-DEPLOY.md">Deployment</a> ·
   <a href="#license">License</a>
 </p>
 
@@ -96,7 +96,7 @@ flowchart LR
     UI --> API["Hono API"]
     UI --> Wallet["Sui wallet signatures"]
     Wallet --> API
-    API --> Store[("SQLite state and durable jobs")]
+    API --> Store[("PostgreSQL state and durable jobs")]
     API --> Market["Marketstack daily observations"]
     API --> Tatum["Tatum native gRPC"]
     Tatum --> Sui["Sui Testnet practice contract"]
@@ -110,7 +110,7 @@ flowchart LR
 
 The server owns authentication, quote construction, provider credentials, consent checks, durable jobs, and receipt validation. Shared TypeScript modules implement deterministic accounting and learning rules. The Move contract enforces wallet authority and signed financial transitions.
 
-The production Node process serves the compiled frontend and API from one origin. SQLite stores family state, immutable market snapshots, transaction intents, portfolio observations, memory jobs, and model-usage reservations on a persistent volume.
+The hosted application serves its compiled frontend and API from one Vercel project. PostgreSQL stores family state, immutable market snapshots, transaction intents, portfolio observations, memory jobs, and model-usage reservations. Local development also supports SQLite.
 
 | Layer            | Responsibility                                                                                                 |
 | ---------------- | -------------------------------------------------------------------------------------------------------------- |
@@ -123,20 +123,20 @@ The production Node process serves the compiled frontend and API from one origin
 
 ## Technology stack
 
-| Area                | Technology                                                   |
-| ------------------- | ------------------------------------------------------------ |
-| Application         | TypeScript 6, React 19, React Router 7, Vite 8               |
-| Styling             | Tailwind CSS 4, custom CSS, SVG and Canvas, IBM Plex Mono    |
-| Charts              | TradingView Lightweight Charts 5                             |
-| Backend             | Node.js 24, Hono, Zod                                        |
-| Persistence         | Node's built-in SQLite, transactional state and durable jobs |
-| Blockchain          | Sui Move, Mysten Sui SDK, Wallet Standard                    |
-| Chain transport     | Tatum native TLS gRPC, protobuf-ts, grpc-js                  |
-| Memory              | Walrus Memory SDK and managed Mainnet relayer                |
-| AI                  | OpenAI Responses API with structured output                  |
-| Market observations | Marketstack daily closes and corporate-action fields         |
-| Validation          | Node test runner, Move tests, Playwright, TypeScript, Oxlint |
-| Delivery            | Docker, Render Web Service, persistent disk                  |
+| Area                | Technology                                                                       |
+| ------------------- | -------------------------------------------------------------------------------- |
+| Application         | TypeScript 6, React 19, React Router 7, Vite 8                                   |
+| Styling             | Tailwind CSS 4, custom CSS, SVG and Canvas, IBM Plex Mono                        |
+| Charts              | TradingView Lightweight Charts 5                                                 |
+| Backend             | Node.js 24, Hono, Zod                                                            |
+| Persistence         | PostgreSQL on Neon, transaction-scoped connections, SQLite for local development |
+| Blockchain          | Sui Move, Mysten Sui SDK, Wallet Standard                                        |
+| Chain transport     | Tatum native TLS gRPC, protobuf-ts, grpc-js                                      |
+| Memory              | Walrus Memory SDK and managed Mainnet relayer                                    |
+| AI                  | OpenAI Responses API with structured output                                      |
+| Market observations | Marketstack daily closes and corporate-action fields                             |
+| Validation          | Node test runner, Move tests, Playwright, TypeScript, Oxlint                     |
+| Delivery            | Vercel Node functions and CDN, Neon PostgreSQL                                   |
 
 ## Getting started
 
@@ -179,6 +179,7 @@ All provider credentials belong on the server. Local development loads `.env.loc
 | Variable                  | Purpose                                                                                |
 | ------------------------- | -------------------------------------------------------------------------------------- |
 | `TATUM_API_KEY`           | Tatum Sui Testnet reads, execution, and reconciliation.                                |
+| `DATABASE_URL`            | Neon pooled PostgreSQL URI for hosted storage.                                         |
 | `MARKETSTACK_API_KEY`     | Shared market-history imports.                                                         |
 | `MEMWAL_ACCOUNT_ID`       | Walrus Memory account identifier.                                                      |
 | `MEMWAL_PRIVATE_KEY`      | Memory delegate signing key.                                                           |
@@ -190,8 +191,8 @@ All provider credentials belong on the server. Local development loads `.env.loc
 | `SUI_ORIGINAL_PACKAGE_ID` | Original account type identity; resolved from the manifest for the bundled deployment. |
 | `SUI_TESTNET_SPONSOR_KEY` | Testnet transaction sponsor.                                                           |
 | `SUI_QUOTE_ATTESTOR_KEY`  | Ed25519 signer for price and corporate-action attestations.                            |
-| `TROVE_DATA_DIR`          | Persistent application directory; defaults to `.trove`.                                |
-| `PUBLIC_ORIGIN`           | Trusted public origin; Render's generated URL is detected automatically.               |
+| `TROVE_DATA_DIR`          | Local SQLite directory when DATABASE_URL is absent; defaults to `.trove`.              |
+| `PUBLIC_ORIGIN`           | Trusted public origin; Vercel deployment URLs are detected automatically.              |
 | `PORT`                    | HTTP port; defaults to `3001`.                                                         |
 | `TROVE_LIVE_SERVICES`     | Set to `0` for deterministic offline development.                                      |
 
@@ -297,13 +298,13 @@ The suites exercise fixed-point accounting, corporate events, authority, family 
 | `npm run eval:learning -- --live`                | Run metered model evaluation through the shared allowance.   |
 | `npm run check:production`                       | Exercise the built server and restart persistence.           |
 
-Set `PLAYWRIGHT_CHROMIUM_PATH` to use an existing compatible Chromium installation. Run deterministic browser checks with `TROVE_LIVE_SERVICES=0` and a separate `TROVE_DATA_DIR`.
+Set `PLAYWRIGHT_CHROMIUM_PATH` to use an existing compatible Chromium installation. Browser checks start an isolated offline store with DATABASE_URL disabled. Use TROVE_WEB_PORT and PORT to select unused local ports.
 
 ## Deployment
 
-Trove ships as a Dockerized **Render Web Service** with one instance and a persistent disk mounted at `/data`. The service serves both the frontend and API, runs durable workers, and connects outbound to Tatum, Walrus, Marketstack, and OpenAI.
+Trove deploys to **Vercel** with **Neon PostgreSQL**. The frontend and API share an origin. Persistent application state and durable jobs live in the database; request-driven maintenance coordinates memory publication, market imports, and Tatum reconciliation across function instances.
 
-Follow the [Render dashboard deployment guide](docs/RENDER-DEPLOY.md) for environment values, disk configuration, data migration, and the hosted smoke check. The checked-in [Blueprint](render.yaml) provides the equivalent service configuration.
+Follow the [Vercel and Neon deployment guide](docs/VERCEL-DEPLOY.md). After adding DATABASE_URL locally, `npm run check:database` verifies isolated concurrent PostgreSQL operations, and `npm run deploy:prepare` initializes hosted storage and generates an ignored environment file for the Vercel dashboard.
 
 ## Repository structure
 
@@ -328,8 +329,10 @@ trove/
 │   └── styles/           Theme and responsive layouts
 ├── tests/                Domain, integration, and browser suites
 ├── .env.example          Configuration template
-├── Dockerfile            Production image
-└── render.yaml           Persistent single-instance Render service
+├── api/                  Vercel function entry point
+├── vercel.json           API routing and function settings
+├── Dockerfile            Optional Node server image
+└── render.yaml           Optional Render service using PostgreSQL
 ```
 
 ## Documentation
@@ -339,7 +342,7 @@ trove/
 - [Integration configuration](docs/INTEGRATION-SETUP.md)
 - [Sui contract and reconciliation](docs/SUI-PRACTICE.md)
 - [Learning evaluation](docs/LEARNING-EVALUATION.md)
-- [Render deployment](docs/RENDER-DEPLOY.md)
+- [Vercel and Neon deployment](docs/VERCEL-DEPLOY.md)
 
 ## Data handling
 
@@ -349,7 +352,7 @@ Provider keys, databases, private captures, generated signers, and runtime artif
 
 Family learning records are published after explicit consent. Removing or correcting a thought updates the active coaching context; published Walrus data follows its storage lifecycle. Sui records contain practice-account data and salted commitments, while reasoning text remains in the learning layer.
 
-Back up the application and model-usage databases consistently, including SQLite's transaction state. Preserve signer identities and the usage ledger when moving an installation.
+Preserve the hosted database, signer identities, and usage history when moving an installation. Local SQLite backups include their transaction state. The deployment preparation helper imports cached prices and cumulative usage while retaining local family accounts in local storage.
 
 ## Contributing
 

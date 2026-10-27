@@ -12,9 +12,59 @@ import { instruments } from "../shared/fixtures.ts";
 import { execute, preview } from "../server/domain.ts";
 import { portfolioValue } from "../shared/model.ts";
 import { createApp } from "../server/app.ts";
-
 const day = (ago: number) =>
-  new Date(Date.now() - ago * 86400_000).toISOString().slice(0, 10);
+  new Date(Date.now() - ago * 86400000).toISOString().slice(0, 10);
+
+test("configured market outages never return example prices as connected data", async () => {
+  const { store, market } = setup();
+  try {
+    const response = await createApp(store, { market }).request("/api/state");
+    assert.equal(response.status, 409);
+    const result = await response.json();
+    assert.match(result.error, /Market prices are temporarily unavailable/);
+    assert.equal(result.instruments, undefined);
+  } finally {
+    await store.db.close();
+  }
+});
+
+test("stale cached prices remain visible while new practice orders are refused", async () => {
+  const { store, market } = setup();
+  try {
+    await market.refresh();
+    const dataset = (await market.latest())!;
+    dataset.asOf = day(10);
+    await store.db
+      .prepare("UPDATE market_snapshots SET as_of=?,payload=? WHERE id=?")
+      .run(dataset.asOf, JSON.stringify(dataset), dataset.id);
+    const family = randomUUID(),
+      app = createApp(store, { market });
+    const headers = {
+      Cookie: `trove_demo=${family}`,
+      "Content-Type": "application/json",
+    };
+    const response = await app.request("/api/state", { headers });
+    assert.equal(response.status, 200);
+    const state = await response.json();
+    assert.equal(state.market.mode, "market");
+    assert.equal(state.market.stale, true);
+    assert.equal(state.instruments[0].prices.at(-1).price, "103000000");
+    const order = await app.request("/api/orders/preview", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        symbol: "AAPL",
+        side: "buy",
+        amount: "25",
+        reason: "Wait for a fresh close",
+      }),
+    });
+    assert.equal(order.status, 409);
+    assert.match((await order.json()).error, /stale/);
+  } finally {
+    await store.db.close();
+  }
+});
 function setup() {
   const store = new DemoStore(":memory:");
   let calls = 0;
@@ -29,8 +79,8 @@ function setup() {
         excluded: 0,
         prices: [3, 2, 1, 0].map((n) => ({
           date: day(n),
-          price: String((100 + 3 - n) * 1_000_000),
-          adjustedPrice: String((100 + 3 - n) * 1_000_000),
+          price: String((100 + 3 - n) * 1000000),
+          adjustedPrice: String((100 + 3 - n) * 1000000),
           sourceTimestamp: day(n),
           splitFactor: 1,
           dividend: 0,
@@ -108,25 +158,27 @@ test("one persisted market import is shared across callers and archived sample t
     await market.refresh();
     assert.equal(calls(), 1);
     const family = randomUUID(),
-      original = store.get(family),
+      original = await store.get(family),
       originalDecision = original.decisions[0];
-    assert.equal(market.enroll(family).portfolio, undefined);
-    const upgraded = market.enroll(family, true);
+    assert.equal((await market.enroll(family)).portfolio, undefined);
+    const upgraded = await market.enroll(family, true);
     assert.equal(upgraded.cash, "1000000000");
     assert.equal(upgraded.holdings.length, 0);
     assert.deepEqual(upgraded.decisions[0], originalDecision);
     assert.equal(
       (
-        store.db
+        (await store.db
           .prepare("SELECT COUNT(*) AS n FROM portfolio_archives")
-          .get() as { n: number }
+          .get()) as {
+          n: number;
+        }
       ).n,
       1,
     );
-    assert.equal(market.status(upgraded).mode, "market");
-    assert.equal(market.instruments(upgraded)[0].prices.length, 4);
+    assert.equal((await market.status(upgraded)).mode, "market");
+    assert.equal((await market.instruments(upgraded))[0].prices.length, 4);
   } finally {
-    store.db.close();
+    await store.db.close();
   }
 });
 test("reviewed real-price orders bind the snapshot and account history uses actual decisions", async () => {
@@ -134,7 +186,7 @@ test("reviewed real-price orders bind the snapshot and account history uses actu
   try {
     await market.refresh();
     const family = randomUUID(),
-      state = market.enroll(family, true);
+      state = await market.enroll(family, true);
     const q = preview(
       state,
       {
@@ -143,31 +195,34 @@ test("reviewed real-price orders bind the snapshot and account history uses actu
         amount: "50",
         reason: "Practice with a dated close.",
       },
-      market.instruments(state),
+      await market.instruments(state),
     );
     assert.equal(q.price, "103000000");
     assert.equal(q.datasetId, state.portfolio!.datasetId);
-    store.putQuote(family, q);
-    const after = execute(store, family, q.id);
+    await store.putQuote(family, q);
+    const after = await execute(store, family, q.id);
     assert.equal(after.decisions[0].portfolioId, state.portfolio!.id);
-    const series = accountHistory(after, market.instruments(after))!;
+    const series = accountHistory(after, await market.instruments(after))!;
     assert.equal(series.length, 1);
     assert.equal(
       series[0].value,
-      Number(portfolioValue(after, market.instruments(after))) / 1_000_000,
+      Number(portfolioValue(after, await market.instruments(after))) / 1000000,
     );
-    const changed = store.get(family);
+    const changed = await store.get(family);
     changed.portfolio!.datasetId = "other";
-    store.set(changed);
+    await store.set(changed);
     const second = preview(
       after,
       { symbol: "KO", side: "buy", amount: "20", reason: "" },
-      market.instruments(after),
+      await market.instruments(after),
     );
-    store.putQuote(family, second);
-    assert.throws(() => execute(store, family, second.id), /changed/);
+    await store.putQuote(family, second);
+    await assert.rejects(
+      async () => await execute(store, family, second.id),
+      /changed/,
+    );
   } finally {
-    store.db.close();
+    await store.db.close();
   }
 });
 test("stale prices stop execution even when a previously reviewed quote has not expired", async () => {
@@ -175,37 +230,39 @@ test("stale prices stop execution even when a previously reviewed quote has not 
   try {
     await market.refresh();
     const family = randomUUID(),
-      state = market.enroll(family, true),
+      state = await market.enroll(family, true),
       q = preview(
         state,
         { symbol: "KO", side: "buy", amount: "20", reason: "" },
-        market.instruments(state),
+        await market.instruments(state),
       );
     q.marketDate = day(10);
-    store.putQuote(family, q);
-    assert.throws(() => execute(store, family, q.id), /stale/);
+    await store.putQuote(family, q);
+    await assert.rejects(
+      async () => await execute(store, family, q.id),
+      /stale/,
+    );
     assert.equal(marketStale(day(10)), true);
     assert.equal(marketStale(day(1)), false);
   } finally {
-    store.db.close();
+    await store.db.close();
   }
 });
-
 test("connected guest entry uses real-price snapshots without sign-in and archives the old sample basis", async () => {
   const { store, market } = setup();
   try {
     await market.refresh();
     const family = randomUUID(),
-      before = store.get(family);
+      before = await store.get(family);
     const q = preview(before, {
       symbol: "AAPL",
       side: "buy",
       amount: "25",
       reason: "My original thought stays saved.",
     });
-    store.putQuote(family, q);
-    const prior = execute(store, family, q.id);
-    const app = createApp(store, { market });
+    await store.putQuote(family, q);
+    const prior = await execute(store, family, q.id);
+    const app = await createApp(store, { market });
     const response = await app.request("/api/state", {
         headers: { Cookie: `trove_demo=${family}` },
       }),
@@ -223,9 +280,11 @@ test("connected guest entry uses real-price snapshots without sign-in and archiv
     );
     const archive = JSON.parse(
       (
-        store.db
+        (await store.db
           .prepare("SELECT payload FROM portfolio_archives WHERE family=?")
-          .get(family) as { payload: string }
+          .get(family)) as {
+          payload: string;
+        }
       ).payload,
     );
     assert.equal(archive.cash, prior.cash);
@@ -265,12 +324,12 @@ test("connected guest entry uses real-price snapshots without sign-in and archiv
     assert.equal(direct.status, 200);
     assert.equal((await direct.json()).price, "103000000");
     assert.equal(
-      store.db
+      (await store.db
         .prepare("SELECT COUNT(*) AS n FROM portfolio_archives WHERE family=?")
-        .get(family)!.n,
+        .get(family))!.n,
       1,
     );
   } finally {
-    store.db.close();
+    await store.db.close();
   }
 });

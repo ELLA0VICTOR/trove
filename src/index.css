@@ -197,11 +197,20 @@ input[type="range"] {
 }
 
 /* Account access uses the established consumer controls. */
-.account-toggle {
-  max-width: 130px;
+.app-topbar .account-toggle {
+  min-width: 116px;
+  max-width: min(220px, 40vw);
+  gap: 18px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.account-toggle > span {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+}
+.account-toggle > svg {
+  flex-shrink: 0;
 }
 .auth-tabs {
   margin: 24px 0;
@@ -241,8 +250,11 @@ input[type="range"] {
   color: var(--spot);
 }
 @media (max-width: 760px) {
-  .account-toggle {
-    max-width: 86px;
+  .app-topbar .account-toggle {
+    min-width: 104px;
+    max-width: min(160px, 44vw);
+    gap: 12px;
+    padding: 10px 14px;
     font-size: 12px;
   }
   .app-topbar-actions {

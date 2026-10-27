@@ -18,3 +18,4 @@ contracts/**/Move.lock
 *.key
 *.p12
 *.pfx
+.vercel

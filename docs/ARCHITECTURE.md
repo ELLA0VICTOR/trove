@@ -1,19 +1,19 @@
 # Architecture
 
-Trove runs a React application and a Hono API backed by SQLite, durable workers, Sui Testnet practice accounts, Walrus Mainnet memory, Marketstack observations, and an OpenAI learning guide.
+Trove runs a React application and a Hono API backed by PostgreSQL, with SQLite available locally, durable workers, Sui Testnet practice accounts, Walrus Mainnet memory, Marketstack observations, and an OpenAI learning guide.
 
 ## Runtime
 
-The production Node process serves `dist/`, same-origin `/api` routes, and `/health`. It starts memory publication, chain reconciliation, and shared market-import workers. Shutdown waits for active work before closing storage and transports.
+The optional production Node process serves `dist/`, same-origin `/api` routes, and `/health`. PostgreSQL deployments schedule bounded memory publication, chain reconciliation, and shared market-import work after requests. Local SQLite development uses an interval. Shutdown waits for active work before closing storage and transports.
 
-A single service instance uses a persistent `TROVE_DATA_DIR`. The application database and model-usage ledger survive server restarts. Development runs Vite and the API together; Vite proxies API requests.
+Vercel serves the built frontend and bounded Node API functions. A pooled DATABASE_URL connects each instance to Neon PostgreSQL. Without that setting, local development uses SQLite in TROVE_DATA_DIR. Both adapters expose asynchronous operations with transaction-scoped connections.
 
 ```mermaid
 flowchart LR
   UI[React UI] --> API[Hono API]
   UI --> WALLET[Role-specific wallet]
   WALLET --> API
-  API --> DB[(SQLite)]
+  API --> DB[(PostgreSQL)]
   API --> DATA[Marketstack]
   API --> TATUM[Tatum native gRPC]
   TATUM --> SUI[Sui Testnet]
@@ -72,7 +72,7 @@ Original decisions remain immutable. Daily portfolio marks preserve observed val
 
 Transaction bytes, digest, payload, and expected version are persisted before submission. The dispatcher uses leases, cooldowns, and bounded retries. An uncertain network outcome retains the same digest and signed bytes.
 
-Confirmed failures release the intent without a ledger debit. Confirmed successes update state, journal entries, quote consumption, and memory work transactionally. Receipt replay is idempotent. A unique index permits one active sponsored transaction at a time.
+Confirmed failures release the intent without a ledger debit. Confirmed successes update state, journal entries, quote consumption, and memory work transactionally. Receipt replay is idempotent. A unique index permits one active sponsored transaction at a time. Family locks and optimistic versions prevent stale writes; PostgreSQL advisory locks serialize budget reservations, invitation use, job claims, and shared imports.
 
 Corporate maintenance has a separate rate allowance and persisted exponential backoff. The worker reconciles pending submissions before preparing additional work. The UI polls while a confirmation or adjustment is pending.
 
@@ -86,8 +86,8 @@ Recall is scoped to the authenticated family and cross-checked against the activ
 
 Eight concepts have foundation and transfer exercises with persisted scenario versions and deterministic scoring. Learning results and financial permissions remain separate.
 
-The guide receives bounded verified evidence and deterministic facts. Structured responses must cite the selected records and pass schema and grounding checks before caching. Model calls reserve estimated cost in a persistent SQLite ledger; completed usage settles that reservation. Shared request limits and cached replies bound demand.
+The guide receives bounded verified evidence and deterministic facts. Structured responses must cite the selected records and pass schema and grounding checks before caching. Model calls reserve estimated cost in a persistent database ledger; completed usage settles that reservation. Shared request limits and cached replies bound demand.
 
 ## Delivery
 
-The Docker image builds the frontend and runs the TypeScript server on Node 24. Render supplies HTTPS, a trusted external origin, and a mounted persistent disk. See [Render deployment](RENDER-DEPLOY.md) for dashboard setup and post-deploy checks.
+The default deployment uses Vercel and Neon. Request-driven maintenance runs with waitUntil; PostgreSQL leases coordinate instances, and persisted operation state resumes on later requests. See [Vercel deployment](VERCEL-DEPLOY.md). The optional Docker server also supports PostgreSQL.

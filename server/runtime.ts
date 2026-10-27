@@ -1,8 +1,8 @@
-import { DatabaseSync } from "node:sqlite";
 import { resolve } from "node:path";
-import { mkdirSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import { Database } from "./database.ts";
 import { configuredValue } from "./config.ts";
-import { DemoStore } from "./store.ts";
+import { DemoStore, memoryNamespace } from "./store.ts";
 import { Accounts, AccessError } from "./auth.ts";
 import { WalrusMemoryGateway } from "./integrations/walrus.ts";
 import type { MemoryReader } from "./integrations/walrus.ts";
@@ -15,7 +15,9 @@ import { MarketstackGateway } from "./integrations/marketstack.ts";
 import { ChainService } from "./chain.ts";
 import { chainConfig } from "./chain-config.ts";
 
-export function createRuntime() {
+export async function createRuntime(
+  options: { database?: Database; serverless?: boolean } = {},
+) {
   const value = (name: string) => configuredValue(process.env, name);
   const enabled = process.env.TROVE_LIVE_SERVICES !== "0";
   const memoryReady = Boolean(
@@ -25,9 +27,20 @@ export function createRuntime() {
     enabled && value("OPENAI_API_KEY") && value("COACH_MODEL"),
   );
   const dataDir = resolve(value("TROVE_DATA_DIR") ?? ".trove");
-  const store = new DemoStore(resolve(dataDir, "local.sqlite"), {
-    liveMemory: memoryReady,
-  });
+  const database =
+    options.database ??
+    new Database(
+      value("DATABASE_URL")
+        ? { url: value("DATABASE_URL") }
+        : { filename: resolve(dataDir, "local.sqlite") },
+    );
+  try {
+    await database.ready;
+  } catch (error) {
+    if (!options.database) await database.close();
+    throw error;
+  }
+  const store = new DemoStore(database, { liveMemory: memoryReady });
   const market = new MarketService(
     store,
     enabled && value("MARKETSTACK_API_KEY")
@@ -40,12 +53,12 @@ export function createRuntime() {
     enabled ? chainConfig(dataDir) : undefined,
   );
   const accounts = new Accounts(store);
-  const memory = (scope: string): MemoryReader => {
-    const profiles = store.db
+  const memory = async (scope: string): Promise<MemoryReader> => {
+    const profiles = (await database
       .prepare("SELECT family,memory_enabled FROM account_profiles")
-      .all() as { family: string; memory_enabled: number }[];
+      .all()) as { family: string; memory_enabled: number }[];
     const owner = profiles.find(
-      (profile) => store.memoryScope(profile.family) === scope,
+      (profile) => memoryNamespace(profile.family, true) === scope,
     );
     if (!owner || !scope.startsWith("account_"))
       throw new AccessError(
@@ -59,9 +72,9 @@ export function createRuntime() {
     });
     return {
       submit: async (record, key) => {
-        if (!store.profile(owner.family)?.memory_enabled)
+        if (!(await store.profile(owner.family))?.memory_enabled)
           throw new AccessError("Remembering is paused for this family.");
-        accounts.limit("walrus-writes:global", 500, 86400_000);
+        await accounts.limit("walrus-writes:global", 500, 86400_000);
         return gateway.submit(record, key);
       },
       status: (id) => gateway.status(id),
@@ -69,21 +82,23 @@ export function createRuntime() {
       destroy: () => gateway.destroy(),
     };
   };
-  let usageDb: DatabaseSync | undefined;
+  let usageDb: Database | undefined;
   let service: LearningService | undefined;
   if (memoryReady && coachReady) {
-    mkdirSync(dataDir, { recursive: true });
-    usageDb = new DatabaseSync(resolve(dataDir, "coach-usage.sqlite"));
-    const budget = new CoachBudget(
-      usageDb,
-      value("COACH_BUDGET_USD") ?? "1.00",
+    usageDb =
+      database.kind === "postgres"
+        ? database
+        : new Database({ filename: resolve(dataDir, "coach-usage.sqlite") });
+    await usageDb.ready;
+    service = new LearningService(
+      store,
+      memory,
+      new CoachGateway(
+        value("OPENAI_API_KEY")!,
+        value("COACH_MODEL") ?? COACH_MODEL,
+        new CoachBudget(usageDb, value("COACH_BUDGET_USD") ?? "1.00"),
+      ),
     );
-    const coach = new CoachGateway(
-      value("OPENAI_API_KEY")!,
-      value("COACH_MODEL") ?? COACH_MODEL,
-      budget,
-    );
-    service = new LearningService(store, memory, coach);
   }
   const learning: LiveLearning = {
     ready: memoryReady,
@@ -96,33 +111,47 @@ export function createRuntime() {
       return service.explain(family, question);
     },
   };
-  let stopped = false,
-    timer: ReturnType<typeof setTimeout> | undefined;
-  let active: Promise<unknown> | undefined;
-  let marketTimer: ReturnType<typeof setInterval> | undefined;
-  let marketActive: Promise<void> | undefined;
-  let chainTimer: ReturnType<typeof setTimeout> | undefined;
-  let chainActive: Promise<void> | undefined;
-  const reconcileChain = async () => {
-    if (stopped) return;
-    chainActive = chain.reconcilePending();
-    await chainActive.catch(() => {});
-    if (!stopped) {
-      chainTimer = setTimeout(() => void reconcileChain(), 10_000);
-      chainTimer.unref();
-    }
+  let stopped = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let active: Promise<void> | undefined;
+  const requestDriven = options.serverless || database.kind === "postgres";
+  const maintenance = () => {
+    if (stopped) return Promise.resolve();
+    if (active) return active;
+    active = (async () => {
+      const token = randomUUID(),
+        now = Date.now();
+      const claimed = await database
+        .prepare(
+          `INSERT INTO maintenance_leases(key,token,until_at) VALUES('runtime',?,?)
+        ON CONFLICT(key) DO UPDATE SET token=excluded.token,until_at=excluded.until_at
+        WHERE maintenance_leases.until_at<=? RETURNING key`,
+        )
+        .get(token, now + 120_000, now);
+      if (!claimed) return;
+      try {
+        await market.refresh();
+        if (chain.config) await chain.reconcilePending(2);
+        if (memoryReady) await store.memoryOutbox.processOne(memory);
+      } catch {
+        console.error(
+          "[trove] A maintenance cycle will resume from its persisted state.",
+        );
+      } finally {
+        await database
+          .prepare(
+            "UPDATE maintenance_leases SET until_at=? WHERE key='runtime' AND token=?",
+          )
+          .run(Date.now() + 1000, token);
+      }
+    })().finally(() => {
+      active = undefined;
+    });
+    return active;
   };
   const tick = async () => {
-    if (stopped || !memoryReady) return;
-    try {
-      active = store.memoryOutbox.processOne(memory);
-      await active;
-    } catch {
-      console.error(
-        "[trove] Memory worker could not complete its database cycle; it will retry.",
-      );
-    }
-    active = undefined;
+    if (stopped) return;
+    await maintenance().catch(() => {});
     if (!stopped) {
       timer = setTimeout(() => void tick(), 1500);
       timer.unref();
@@ -133,32 +162,23 @@ export function createRuntime() {
     market,
     chain,
     learning,
+    requestDriven,
+    maintenance,
     start: () => {
-      void tick();
-      void reconcileChain();
-      const refreshMarket = () => {
-        marketActive = market.refresh();
-        void marketActive.catch(() => {});
-      };
-      refreshMarket();
-      marketTimer = setInterval(refreshMarket, 60 * 60_000);
-      marketTimer.unref();
+      if (!requestDriven) void tick();
     },
     stop: async () => {
       stopped = true;
       clearTimeout(timer);
-      clearInterval(marketTimer);
-      clearTimeout(chainTimer);
       await active?.catch(() => {});
-      await marketActive?.catch(() => {});
-      await chainActive?.catch(() => {});
     },
-    close: () => {
+    close: async () => {
       stopped = true;
       clearTimeout(timer);
-      usageDb?.close();
+      await active?.catch(() => {});
       chain.config?.gateway.destroy();
-      store.db.close();
+      if (usageDb && usageDb !== database) await usageDb.close();
+      await database.close();
     },
   };
 }

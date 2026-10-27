@@ -2,18 +2,14 @@ services:
   - type: web
     name: trove
     runtime: docker
-    plan: starter
+    plan: free
     healthCheckPath: /health
     numInstances: 1
-    disk:
-      name: trove-data
-      mountPath: /data
-      sizeGB: 1
     envVars:
       - key: NODE_ENV
         value: production
-      - key: TROVE_DATA_DIR
-        value: /data
+      - key: DATABASE_URL
+        sync: false
       - key: TATUM_API_KEY
         sync: false
       - key: MARKETSTACK_API_KEY
@@ -27,7 +23,7 @@ services:
       - key: COACH_MODEL
         value: gpt-6-luna
       - key: COACH_BUDGET_USD
-        value: "0.99"
+        value: "1.00"
       - key: SUI_PACKAGE_ID
         sync: false
       - key: SUI_ORIGINAL_PACKAGE_ID

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "vite",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "regions": ["iad1"],
+  "functions": {
+    "api/index.ts": {
+      "maxDuration": 120,
+      "includeFiles": "contracts/practice/deployment.testnet.json"
+    }
+  },
+  "rewrites": [
+    { "source": "/health", "destination": "/api/index?__trove_health=1" },
+    {
+      "source": "/api/:path*",
+      "destination": "/api/index?__trove_path=:path*"
+    },
+    { "source": "/app/:path*", "destination": "/index.html" }
+  ]
+}

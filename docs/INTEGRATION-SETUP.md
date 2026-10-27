@@ -17,7 +17,7 @@ Trove uses server-side adapters for Tatum, Walrus Memory, Marketstack, and OpenA
 
 The Sui setup helper creates local signers in ignored `.trove/sui-testnet-keys.json`. Production reads signer keys from the host environment. Preserve the deployed attestor identity when moving existing accounts.
 
-SQLite is supplied by Node 24. `TROVE_DATA_DIR` selects its persistent directory. Conventional family credentials and Wallet Standard provide account access and signing; the reserved PostgreSQL, Enoki, and Google fields can remain blank.
+`DATABASE_URL` connects to hosted PostgreSQL. Without it, Node 24 supplies local SQLite under `TROVE_DATA_DIR`. Conventional family credentials and Wallet Standard provide account access and signing; Enoki and Google fields can remain blank.
 
 ## Preflight
 
@@ -46,7 +46,7 @@ Check the market-data account's display and redistribution entitlements when sel
 
 Guardian consent gates eligible records. The worker uses stable operation keys, persisted acceptance IDs, leases, cooldowns, and confirmation polling. The guide uses confirmed active records, validates citations, and respects corrections.
 
-`COACH_BUDGET_USD=1.00` sets the local lifetime estimated allowance. The usage ledger persists under `TROVE_DATA_DIR`. Each installation has its own ledger; preserve it during migration and account for separate installations when budgeting.
+`COACH_BUDGET_USD=1.00` sets the lifetime estimated allowance for the configured database. PostgreSQL shares reservations across hosted function instances; local SQLite keeps its ledger under `TROVE_DATA_DIR`. Deployment preparation imports cumulative local usage. Preserve this history during migration and account for any separately running installations when budgeting.
 
 ```sh
 npm run eval:learning
@@ -57,6 +57,6 @@ The first command describes the suite. The second makes metered requests through
 
 ## Hosted configuration
 
-Use the [Render dashboard guide](RENDER-DEPLOY.md). Configure one Docker Web Service with a persistent disk, copy the server credentials, and use the same sponsor and attestor identities. Render's external URL supplies the trusted origin; custom domains use `PUBLIC_ORIGIN`.
+Use the [Vercel and Neon guide](VERCEL-DEPLOY.md). Set DATABASE_URL, run the database check and deployment preparation helper, then import the generated environment file through Vercel's website. Preserve the same sponsor and attestor identities. Vercel supplies the trusted deployment origin; custom domains use PUBLIC_ORIGIN.
 
 For account continuity, migrate a consistent database backup along with the usage ledger. A fresh database creates new family accounts.

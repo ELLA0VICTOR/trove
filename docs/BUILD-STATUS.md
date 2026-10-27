@@ -1,6 +1,6 @@
 # Verification record
 
-Updated October 27, 2026. This record describes implementation checks and local integration evidence. Public deployment is configured through the [Render dashboard guide](RENDER-DEPLOY.md).
+Updated October 27, 2026. This record describes implementation checks and local integration evidence. Public deployment is configured through the [Vercel and Neon guide](VERCEL-DEPLOY.md).
 
 ## Financial ledger
 
@@ -33,7 +33,7 @@ The 32-case real-model evaluation covered no-history, original-history, correcte
 
 ## Validation suites
 
-- 78 Node tests: accounting, corporate actions, historical valuation, real-price guest entry and sample archival, family authority, durable memory, learning, cost control, market data, chain recovery, upgraded type identity, and receipt validation.
+- 89 Node tests: accounting, corporate actions, historical valuation, real-price guest entry and sample archival, family authority, durable memory, learning, cost control, market data, chain recovery, upgraded type identity, receipt validation, PostgreSQL transitions, and repeatable hosted usage imports.
 - 21 Move tests: signed financial transitions, authority, limits, one-time exceptions, replay/tampering, expiry, passive corporate entries, reverse-split remainders, and duplicate-event prevention.
 - 15 Chromium journeys: navigation, responsive layout, portfolio interactions, learning, decisions, guardian controls, and returning family accounts.
 - TypeScript production compilation and Oxlint.
@@ -43,6 +43,8 @@ Runtime keys, private test identities, provider payloads, and generated artifact
 
 ## Deployment
 
-The Dockerfile and Render Blueprint run a single Web Service with a persistent disk. Render supplies the public HTTPS origin. The hosted build, public URL, and post-deploy smoke checks are completed when the service is deployed.
+The Vercel function entry point, same-origin rewrites, request-driven maintenance, Neon PostgreSQL adapter, environment export, and database preflight are implemented. Local PostgreSQL-engine checks cover stale writers, concurrent orders and invitations, cumulative budgets, immutable memories, and sessions across fresh function runtimes.
 
-Local Docker execution is unavailable on this Windows machine because WSL virtualization is disabled. The production Node process and its persistence checks run locally. Provider display entitlements and the chosen Render service/disk plan are configured in their respective dashboards.
+The actual Neon connection passed TLS, schema initialization, duplicate-order execution, stale-write refusal, shared budget reservations, and one-use invitations using two independent connection pools in an isolated temporary schema. Hosted preparation imported one market snapshot dated October 26, its refresh reservation, and 35 AI usage records. The private Vercel environment file was generated in ignored storage. These checks made no model calls or Mainnet writes. Public Vercel deployment and its HTTPS checks follow source publication.
+
+The production Node process and its persistence checks also run locally. The optional Render configuration uses its Free service with external PostgreSQL; that service has an idle wake-up delay. The default delivery path uses Vercel and Neon.

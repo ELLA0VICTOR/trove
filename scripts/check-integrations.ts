@@ -8,10 +8,9 @@ import { MarketstackGateway } from "../server/integrations/marketstack.ts";
 import { randomUUID } from "node:crypto";
 import { configuredValue } from "../server/config.ts";
 import { CoachBudget, COACH_MODEL } from "../server/jobs/coach-budget.ts";
-import { DatabaseSync } from "node:sqlite";
+import { Database } from "../server/database.ts";
 import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
-
 const env = process.env;
 const key = (name: string) => configuredValue(env, name);
 const serviceIndex = process.argv.indexOf("--service");
@@ -21,7 +20,6 @@ if (!["all", "tatum", "walrus", "market", "coach"].includes(service ?? "")) {
   process.exit(1);
 }
 const selected = (name: string) => service === "all" || service === name;
-
 async function checkpoint(variable: string, network: "testnet" | "mainnet") {
   const gateway = new TatumSuiGateway(key(variable)!, network);
   try {
@@ -30,13 +28,20 @@ async function checkpoint(variable: string, network: "testnet" | "mainnet") {
     gateway.destroy();
   }
 }
-
-const results: { service: string; status: string; detail: unknown }[] = [];
+const results: {
+  service: string;
+  status: string;
+  detail: unknown;
+}[] = [];
 async function check(service: string, operation: () => Promise<unknown>) {
   try {
     results.push({ service, status: "checked", detail: await operation() });
   } catch (error) {
-    const httpStatus = (error as { httpStatus?: unknown })?.httpStatus;
+    const httpStatus = (
+      error as {
+        httpStatus?: unknown;
+      }
+    )?.httpStatus;
     results.push({
       service,
       status: "failed",
@@ -61,7 +66,6 @@ else if (selected("tatum"))
     status: "not configured",
     detail: "Set TATUM_API_KEY on the server.",
   });
-
 if (selected("tatum") && key("TATUM_MAINNET_API_KEY"))
   await check("Tatum Mainnet read", () =>
     checkpoint("TATUM_MAINNET_API_KEY", "mainnet"),
@@ -72,7 +76,6 @@ else if (selected("tatum"))
     status: "not configured",
     detail: "Set TATUM_MAINNET_API_KEY for Mainnet evidence reads.",
   });
-
 if (selected("market") && key("MARKETSTACK_API_KEY"))
   await check("Marketstack history", async () => {
     const history = await new MarketstackGateway(
@@ -90,7 +93,6 @@ else if (selected("market"))
     status: "not configured",
     detail: "Provider key and appropriate data permissions required.",
   });
-
 if (selected("walrus") && key("MEMWAL_ACCOUNT_ID") && key("MEMWAL_PRIVATE_KEY"))
   await check("Walrus authenticated recall", async () => {
     const gateway = new WalrusMemoryGateway({
@@ -118,7 +120,6 @@ else if (selected("walrus"))
     detail:
       "Set MEMWAL_ACCOUNT_ID and MEMWAL_PRIVATE_KEY. No read was attempted.",
   });
-
 if (
   selected("walrus") &&
   process.argv.includes("--write-memory") &&
@@ -161,7 +162,6 @@ if (
     detail:
       "Requires credentials and explicit --write-memory. No diagnostic writes occur by default.",
   });
-
 let coachModelAccessible = false;
 if (selected("coach") && key("OPENAI_API_KEY") && key("COACH_MODEL"))
   await check("OpenAI model access (no generation)", async () => {
@@ -172,7 +172,6 @@ if (selected("coach") && key("OPENAI_API_KEY") && key("COACH_MODEL"))
     coachModelAccessible = true;
     return result;
   });
-
 if (
   selected("coach") &&
   coachModelAccessible &&
@@ -182,7 +181,11 @@ if (
 )
   await check("Explicit budgeted OpenAI call", async () => {
     mkdirSync(resolve(".trove"), { recursive: true });
-    const db = new DatabaseSync(resolve(".trove/coach-usage.sqlite"));
+    const db = new Database(
+      key("DATABASE_URL")
+        ? { url: key("DATABASE_URL") }
+        : { filename: resolve(".trove/coach-usage.sqlite") },
+    );
     try {
       const budget = new CoachBudget(db, key("COACH_BUDGET_USD") ?? "1.00");
       const reply = await new CoachGateway(
@@ -192,11 +195,11 @@ if (
       ).explain("Explain why five companies can still share risk.", []);
       return {
         reply,
-        budget: budget.summary(),
+        budget: await budget.summary(),
         note: "Local estimates use the documented standard uncached text rates; other apps using this key are not tracked.",
       };
     } finally {
-      db.close();
+      await db.close();
     }
   });
 else if (selected("coach"))

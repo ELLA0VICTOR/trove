@@ -1,11 +1,10 @@
-import { DatabaseSync } from "node:sqlite";
+import { Database } from "../server/database.ts";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { CoachBudget, COACH_MODEL } from "../server/jobs/coach-budget.ts";
 import { CoachGateway } from "../server/integrations/coach.ts";
 import { configuredValue } from "../server/config.ts";
 import { gradeReply, learningCases } from "../shared/evaluation.ts";
-
 if (!process.argv.includes("--live")) {
   console.log(
     "24 paired history conditions plus 8 injection cases are ready. Run npm run eval:learning -- --live to use the existing shared $1 allowance. No request was made.",
@@ -15,14 +14,18 @@ if (!process.argv.includes("--live")) {
   if (!key) throw new Error("OPENAI_API_KEY is required.");
   const directory = resolve(process.env.TROVE_DATA_DIR ?? ".trove");
   mkdirSync(directory, { recursive: true });
-  const db = new DatabaseSync(resolve(directory, "coach-usage.sqlite")),
+  const db = new Database(
+      process.env.DATABASE_URL
+        ? { url: process.env.DATABASE_URL }
+        : { filename: resolve(directory, "coach-usage.sqlite") },
+    ),
     budget = new CoachBudget(db, process.env.COACH_BUDGET_USD ?? "1.00");
   const coach = new CoachGateway(
     key,
     process.env.COACH_MODEL ?? COACH_MODEL,
     budget,
   );
-  const before = budget.total(),
+  const before = await budget.total(),
     results: Record<string, unknown>[] = [];
   mkdirSync(".artifacts/evaluation", { recursive: true });
   try {
@@ -93,7 +96,7 @@ if (!process.argv.includes("--live")) {
               model: COACH_MODEL,
               results,
               estimatedNanoUsdBefore: before,
-              estimatedNanoUsdAfter: budget.total(),
+              estimatedNanoUsdAfter: await budget.total(),
               ranAt: new Date().toISOString(),
               limitation:
                 "Mechanical source/concept/authority checks only. Not a measure of human learning or a calibrated expert judgment of explanation quality.",
@@ -104,7 +107,13 @@ if (!process.argv.includes("--live")) {
         );
       }
     }
-    const summary: Record<string, { passed: number; total: number }> = {};
+    const summary: Record<
+      string,
+      {
+        passed: number;
+        total: number;
+      }
+    > = {};
     for (const row of results)
       for (const [name, pass] of Object.entries(
         (row.grades ?? { generation: false }) as Record<string, boolean>,
@@ -118,14 +127,14 @@ if (!process.argv.includes("--live")) {
         {
           cases: results.length,
           summary,
-          estimatedRunUsd: (budget.total() - before) / 1e9,
-          lifetimeEstimatedUsd: budget.total() / 1e9,
+          estimatedRunUsd: ((await budget.total()) - before) / 1e9,
+          lifetimeEstimatedUsd: (await budget.total()) / 1e9,
         },
         null,
         2,
       ),
     );
   } finally {
-    db.close();
+    await db.close();
   }
 }

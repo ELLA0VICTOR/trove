@@ -15,7 +15,13 @@ export default defineConfig({
   webServer: {
     command: "npm run dev",
     url: baseURL + "/api/state",
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
+    env: {
+      TROVE_LIVE_SERVICES: "0",
+      DATABASE_URL: "",
+      TROVE_DATA_DIR:
+        process.env.TROVE_BROWSER_DATA_DIR ?? ".artifacts/browser-store",
+    },
     timeout: 60_000,
   },
 });

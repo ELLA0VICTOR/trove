@@ -1,48 +1,66 @@
-import { DatabaseSync } from "node:sqlite";
-import { mkdirSync } from "node:fs";
-import { dirname } from "node:path";
+import { Database, StateConflict } from "./database.ts";
 import { InputError } from "../shared/model.ts";
 import type { DemoState, Quote } from "../shared/model.ts";
 import { seedState } from "../shared/fixtures.ts";
 import { createHash } from "node:crypto";
 import { MemoryOutbox } from "./jobs/memory-outbox.ts";
-
+const version = Symbol("database-version");
+type Versioned = DemoState & { [version]?: number };
+export const memoryNamespace = (family: string, account: boolean) =>
+  `${account ? "account" : "local"}_${createHash("sha256").update(`trove-local-v1:${family}`).digest("hex")}`;
 export class DemoStore {
-  db: DatabaseSync;
+  db: Database;
   readonly memoryOutbox: MemoryOutbox;
   readonly liveMemory: boolean;
-  constructor(filename: string, options: { liveMemory?: boolean } = {}) {
+  constructor(
+    filename: string | Database,
+    options: {
+      liveMemory?: boolean;
+    } = {},
+  ) {
     this.liveMemory = options.liveMemory ?? false;
-    if (filename !== ":memory:")
-      mkdirSync(dirname(filename), { recursive: true });
-    this.db = new DatabaseSync(filename);
-    this.db.exec(
-      "PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000; CREATE TABLE IF NOT EXISTS families (id TEXT PRIMARY KEY, state TEXT NOT NULL); CREATE TABLE IF NOT EXISTS quotes (id TEXT PRIMARY KEY, family TEXT NOT NULL, payload TEXT NOT NULL, decision TEXT);",
-    );
+    this.db =
+      typeof filename === "string" ? new Database({ filename }) : filename;
     this.memoryOutbox = new MemoryOutbox(this.db);
-    this.db.exec(
-      "CREATE TABLE IF NOT EXISTS account_profiles(family TEXT PRIMARY KEY,memory_enabled INTEGER NOT NULL DEFAULT 0)",
-    );
-    this.db.exec(
-      "CREATE TABLE IF NOT EXISTS coaching_cache(family TEXT NOT NULL,cache_key TEXT NOT NULL,token TEXT NOT NULL,reply TEXT,until_at INTEGER NOT NULL,PRIMARY KEY(family,cache_key))",
-    );
   }
-  get(id: string): DemoState {
-    const row = this.db
-      .prepare("SELECT state FROM families WHERE id = ?")
-      .get(id) as { state: string } | undefined;
-    if (row) return this.hydrate(JSON.parse(row.state));
-    const state = seedState(id);
-    this.set(state);
+  async get(id: string): Promise<DemoState> {
+    if (this.db.isTransaction) await this.db.lock(`family:${id}`);
+    const row = (await this.db
+      .prepare("SELECT state,version FROM families WHERE id = ?")
+      .get(id)) as
+      | {
+          state: string;
+          version: number;
+        }
+      | undefined;
+    if (row) {
+      const state = JSON.parse(row.state) as Versioned;
+      state[version] = row.version;
+      return await this.hydrate(state);
+    }
+    const state = seedState(id) as Versioned;
+    state[version] = -1;
+    try {
+      await this.set(state);
+    } catch (error) {
+      if (error instanceof StateConflict) return this.get(id);
+      throw error;
+    }
     return state;
   }
-  profile(family: string) {
-    return this.db
+  async profile(family: string) {
+    return (await this.db
       .prepare("SELECT memory_enabled FROM account_profiles WHERE family=?")
-      .get(family) as { memory_enabled: number } | undefined;
+      .get(family)) as
+      | {
+          memory_enabled: number;
+        }
+      | undefined;
   }
-  private hydrate(state: DemoState) {
-    const jobs = this.memoryOutbox.forScope(this.memoryScope(state.id));
+  private async hydrate(state: DemoState) {
+    const jobs = await this.memoryOutbox.forScope(
+      await this.memoryScope(state.id),
+    );
     const byId = new Map(
       jobs
         .filter((job) => !job.withdrawn)
@@ -72,10 +90,19 @@ export class DemoStore {
     }
     return state;
   }
-  set(state: DemoState) {
-    const persist = () => {
-      const scope = this.memoryScope(state.id);
-      this.memoryOutbox.synchronizeHeld(
+  async set(state: DemoState) {
+    const persist = async () => {
+      await this.db.lock(`family:${state.id}`);
+      let expected = (state as Versioned)[version];
+      if (expected === undefined)
+        expected =
+          ((
+            await this.db
+              .prepare("SELECT version FROM families WHERE id=?")
+              .get(state.id)
+          )?.version as number | undefined) ?? -1;
+      const scope = await this.memoryScope(state.id);
+      await this.memoryOutbox.synchronizeHeld(
         scope,
         state.memories
           .filter((record) => record.origin === "local" && record.active)
@@ -89,33 +116,44 @@ export class DemoStore {
             ...(record.decisionId ? { decisionId: record.decisionId } : {}),
             ...(record.supersedes ? { supersedes: record.supersedes } : {}),
           })),
-        this.liveMemory && this.profile(state.id)?.memory_enabled === 1,
+        this.liveMemory && (await this.profile(state.id))?.memory_enabled === 1,
       );
-      this.db
-        .prepare(
-          "INSERT INTO families(id,state) VALUES (?,?) ON CONFLICT(id) DO UPDATE SET state=excluded.state",
-        )
-        .run(state.id, JSON.stringify(state));
-      this.db
+      const changed =
+        expected < 0
+          ? await this.db
+              .prepare(
+                "INSERT OR IGNORE INTO families(id,state,version) VALUES(?,?,0)",
+              )
+              .run(state.id, JSON.stringify(state))
+          : await this.db
+              .prepare(
+                "UPDATE families SET state=?,version=version+1 WHERE id=? AND version=?",
+              )
+              .run(JSON.stringify(state), state.id, expected);
+      if (!changed.changes) throw new StateConflict();
+      (state as Versioned)[version] = expected + 1;
+      await this.db
         .prepare("DELETE FROM coaching_cache WHERE family=?")
         .run(state.id);
     };
-    if (this.db.isTransaction) persist();
-    else this.atomic(persist);
+    if (this.db.isTransaction) await persist();
+    else await this.atomic(persist);
   }
-  memoryScope(family: string) {
+  async memoryScope(family: string) {
     // Explicitly local-only identity. These sample namespaces must never be
     // bulk-enabled for publication when genuine authentication is introduced.
-    return `${this.profile(family) ? "account" : "local"}_${createHash("sha256").update(`trove-local-v1:${family}`).digest("hex")}`;
+    return memoryNamespace(family, Boolean(await this.profile(family)));
   }
-  memoryStatus(family: string) {
-    const state = this.get(family);
-    const jobs = this.memoryOutbox.forScope(this.memoryScope(family));
+  async memoryStatus(family: string) {
+    const state = await this.get(family);
+    const jobs = await this.memoryOutbox.forScope(
+      await this.memoryScope(family),
+    );
     return {
-      mode: this.profile(family) ? "account" : "local-only",
+      mode: (await this.profile(family)) ? "account" : "local-only",
       dispatchEnabled:
-        this.liveMemory && this.profile(family)?.memory_enabled === 1,
-      submissionEligible: Boolean(this.profile(family)),
+        this.liveMemory && (await this.profile(family))?.memory_enabled === 1,
+      submissionEligible: Boolean(await this.profile(family)),
       confirmedMainnet: jobs.filter(
         (job) => job.state === "confirmed" && !job.withdrawn,
       ).length,
@@ -143,24 +181,34 @@ export class DemoStore {
       }),
     };
   }
-  reset(id: string) {
-    return this.atomic(() => {
+  async reset(id: string) {
+    return await this.atomic(async () => {
       const state = seedState(id);
-      this.db.prepare("DELETE FROM quotes WHERE family=?").run(id);
-      this.set(state);
+      await this.db.prepare("DELETE FROM quotes WHERE family=?").run(id);
+      await this.set(state);
       return state;
     });
   }
-  putQuote(family: string, quote: Quote) {
-    this.db
+  async putQuote(family: string, quote: Quote) {
+    await this.db
       .prepare("INSERT INTO quotes(id,family,payload) VALUES (?,?,?)")
       .run(quote.id, family, JSON.stringify(quote));
   }
-  getQuote(family: string, id: string): { quote: Quote; decision?: string } {
-    const row = this.db
+  async getQuote(
+    family: string,
+    id: string,
+  ): Promise<{
+    quote: Quote;
+    decision?: string;
+  }> {
+    const row = (await this.db
       .prepare("SELECT payload,decision FROM quotes WHERE id=? AND family=?")
-      .get(id, family) as
-      { payload: string; decision: string | null } | undefined;
+      .get(id, family)) as
+      | {
+          payload: string;
+          decision: string | null;
+        }
+      | undefined;
     if (!row)
       throw new InputError(
         "This order preview was not found. Please preview it again.",
@@ -170,20 +218,12 @@ export class DemoStore {
       decision: row.decision ?? undefined,
     };
   }
-  consumeQuote(id: string, decision: string) {
-    this.db
+  async consumeQuote(id: string, decision: string) {
+    await this.db
       .prepare("UPDATE quotes SET decision=? WHERE id=? AND decision IS NULL")
       .run(decision, id);
   }
-  atomic<T>(operation: () => T): T {
-    this.db.exec("BEGIN IMMEDIATE");
-    try {
-      const result = operation();
-      this.db.exec("COMMIT");
-      return result;
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
+  async atomic<T>(operation: () => T | Promise<T>): Promise<T> {
+    return await this.db.transaction(operation);
   }
 }

@@ -7,7 +7,7 @@ RUN npm run build
 
 FROM node:24.22.1-bookworm-slim
 WORKDIR /app
-ENV NODE_ENV=production PORT=3001 TROVE_DATA_DIR=/data
+ENV NODE_ENV=production PORT=3001
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/server ./server

@@ -1,8 +1,8 @@
 import { createRuntime } from "../server/runtime.ts";
-const runtime = createRuntime();
+const runtime = await createRuntime();
 try {
   await runtime.market.refresh();
-  const data = runtime.market.latest();
+  const data = await runtime.market.latest();
   console.log(
     JSON.stringify(
       data
@@ -24,5 +24,5 @@ try {
   );
   if (!data) process.exitCode = 1;
 } finally {
-  runtime.close();
+  await runtime.close();
 }

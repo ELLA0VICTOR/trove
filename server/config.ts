@@ -17,6 +17,7 @@ const settings = [
   ["AI coach", "OPENAI_API_KEY"],
   ["Coach model", "COACH_MODEL"],
   ["Coach allowance", "COACH_BUDGET_USD"],
+  ["Hosted database", "DATABASE_URL"],
 ] as const;
 
 export function setupReport(env: Environment) {
@@ -37,6 +38,12 @@ export function setupReport(env: Environment) {
     )
       status = "invalid-format";
     if (value && variable === "COACH_MODEL" && value !== COACH_MODEL)
+      status = "invalid-format";
+    if (
+      value &&
+      variable === "DATABASE_URL" &&
+      !/^postgres(?:ql)?:\/\/[^\s]+$/.test(value)
+    )
       status = "invalid-format";
     if (
       value &&

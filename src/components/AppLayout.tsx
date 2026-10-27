@@ -6,12 +6,14 @@ import {
   ChevronRight,
   Compass,
   Home,
+  LogIn,
   ListOrdered,
   Menu,
   PanelLeftClose,
   PanelLeftOpen,
   ShieldCheck,
   Sprout,
+  UserRound,
   X,
 } from "lucide-react";
 import { Brand } from "./Brand.tsx";
@@ -194,17 +196,23 @@ export function AppLayout() {
           </div>
           <div className="app-topbar-actions">
             <button
-              className="text-link account-toggle"
+              className="button compact account-toggle"
+              type="button"
+              aria-haspopup="dialog"
+              aria-expanded={accountOpen}
               onClick={() => setAccountOpen(true)}
             >
-              {state?.session?.mode === "account"
-                ? state.session.username
-                : "Sign in"}
+              <span>
+                {state?.session?.mode === "account"
+                  ? state.session.username
+                  : "Sign in"}
+              </span>
+              {state?.session?.mode === "account" ? (
+                <UserRound size={17} aria-hidden="true" />
+              ) : (
+                <LogIn size={17} aria-hidden="true" />
+              )}
             </button>
-            <span className="practice-badge">
-              <span className="live-dot" />
-              Practice mode
-            </span>
           </div>
         </header>
         <nav className="app-bottomnav" aria-label="Mobile navigation">
@@ -216,7 +224,13 @@ export function AppLayout() {
           ))}
         </nav>
         <div className="sample-strip">
-          <span>
+          <span
+            data-mobile-label={
+              state?.market?.mode === "market"
+                ? `Market close · ${state.market.asOf}`
+                : "Sample prices · practice funds"
+            }
+          >
             <span className="live-dot" />{" "}
             {state?.session?.mode === "account"
               ? "PRACTICE ACCOUNT"
