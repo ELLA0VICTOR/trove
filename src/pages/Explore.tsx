@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useOutletContext } from "react-router-dom";
 import {
   ArrowLeft,
   ArrowRight,
@@ -175,6 +175,9 @@ export function Explore() {
   );
 }
 export function Company() {
+  const { openAccount } = useOutletContext<{
+    openAccount: (mode?: "login" | "register") => void;
+  }>();
   const { symbol } = useParams(),
     { state } = useApp(),
     [ordering, setOrdering] = useState(false),
@@ -202,8 +205,18 @@ export function Company() {
           </Eyebrow>
           <h1>{instrument.name}</h1>
         </div>
-        <Button secondary onClick={() => setOrdering(true)}>
-          Make a practice move <ArrowUpRight size={18} />
+        <Button
+          secondary
+          onClick={() =>
+            state.session?.mode === "account"
+              ? setOrdering(true)
+              : openAccount()
+          }
+        >
+          {state.session?.mode === "account"
+            ? "Make a practice move"
+            : "Sign in to practice"}{" "}
+          <ArrowUpRight size={18} />
         </Button>
       </section>
       <div className="company-detail-layout">

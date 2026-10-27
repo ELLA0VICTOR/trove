@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { useOutletContext } from "react-router-dom";
+import { AccountRequired } from "../components/AccountRequired.tsx";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -156,6 +158,9 @@ type Message = {
   cached?: boolean;
 };
 export function Guide() {
+  const { openAccount } = useOutletContext<{
+    openAccount: (mode?: "login" | "register") => void;
+  }>();
   const { state } = useApp(),
     [tab, setTab] = useState<"lessons" | "guide">("lessons"),
     [question, setQuestion] = useState(""),
@@ -165,6 +170,8 @@ export function Guide() {
     [exercise, setExercise] = useState(false),
     [selectedLesson, setSelectedLesson] = useState<LessonId | null>(null);
   if (!state) return null;
+  const signedIn = state.session?.mode === "account";
+  const canAsk = signedIn && state.role === "learner";
   const completed = new Set(
     state.attempts
       .filter((attempt) => attempt.correct)
@@ -175,7 +182,7 @@ export function Guide() {
   ).length;
   const next = nextExercise(state);
   async function ask(text: string) {
-    if (!text.trim() || busy) return;
+    if (!canAsk || !text.trim() || busy) return;
     setQuestion("");
     setMessages((previous) => [...previous, { role: "you", text }]);
     setBusy(true);
@@ -206,10 +213,12 @@ export function Guide() {
     <div className="learn-page">
       <header className="simple-page-header">
         <h1>Learn investing</h1>
-        <button className="text-link" onClick={() => setMemories(true)}>
-          <NotebookPen size={16} />
-          Saved thoughts
-        </button>
+        {signedIn && (
+          <button className="text-link" onClick={() => setMemories(true)}>
+            <NotebookPen size={16} />
+            Saved thoughts
+          </button>
+        )}
       </header>
       <div
         className="learn-tabs"
@@ -321,6 +330,28 @@ export function Guide() {
             <ShieldCheck size={15} />
             Learning never changes your practice limits.
           </p>
+        </section>
+      ) : !canAsk ? (
+        <section
+          id="learn-guide"
+          role="tabpanel"
+          aria-labelledby="learn-tab-guide"
+        >
+          <AccountRequired
+            compact
+            title={
+              signedIn
+                ? "Ask from your learner account."
+                : "Sign in to Ask Trove."
+            }
+            description={
+              signedIn
+                ? "Your learner can sign in to ask questions about their practice decisions."
+                : "Get explanations that connect to your practice choices and what you have learned."
+            }
+            onSignIn={() => openAccount()}
+            onCreate={signedIn ? undefined : () => openAccount("register")}
+          />
         </section>
       ) : (
         <section

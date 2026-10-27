@@ -63,10 +63,20 @@ export function createApp(
     state = await marketState(state);
     return {
       ...state,
+      ...(!member
+        ? {
+            cash: "0",
+            holdings: [],
+            decisions: [],
+            memories: [],
+            approvals: [],
+            adjustments: [],
+          }
+        : {}),
       role: member?.role ?? state.role,
       instruments: await market.instruments(state),
       market: await market.status(state),
-      portfolioHistory: await market.history(state),
+      portfolioHistory: member ? await market.history(state) : undefined,
       chain: member ? await chain.status(member) : undefined,
       session: {
         mode: member ? ("account" as const) : ("sample" as const),
@@ -334,18 +344,10 @@ export function createApp(
     const state = await market.enroll(member.family, true);
     return c.json(await snapshot(state, c));
   });
-  app.post("/api/preview-role", async (c) => {
-    if (c.get("member"))
-      throw new AccessError(
-        "Account roles come from sign-in and cannot be switched in preview.",
-      );
-    const input = z
-      .object({ role: z.enum(["learner", "parent"]) })
-      .parse(await c.req.json());
-    const state = await stateFor(c);
-    state.role = input.role;
-    await store.set(state);
-    return c.json(await snapshot(state, c));
+  app.post("/api/preview-role", async () => {
+    throw new AccessError(
+      "Account roles come from sign-in. Sign in with the parent or learner account.",
+    );
   });
   app.post("/api/reset", async (c) => {
     if (c.get("member"))
@@ -356,6 +358,7 @@ export function createApp(
     return c.json(await snapshot(state, c));
   });
   app.post("/api/orders/preview", async (c) => {
+    requireMember(c, "learner");
     await learnerAction(c);
     const input = z
       .object({
@@ -377,6 +380,7 @@ export function createApp(
     return c.json(quote);
   });
   app.post("/api/orders/execute", async (c) => {
+    requireMember(c, "learner");
     await chain.assertLocal(c.get("family"));
     await market.assertTradable(await marketState(await stateFor(c)));
     const { quoteId } = z
@@ -390,6 +394,7 @@ export function createApp(
     );
   });
   app.post("/api/approvals", async (c) => {
+    requireMember(c, "learner");
     await learnerAction(c);
     const { quoteId } = z
       .object({ quoteId: z.uuid() })
@@ -411,6 +416,7 @@ export function createApp(
     return c.json(await snapshot(state, c));
   });
   app.post("/api/approvals/:id", async (c) => {
+    requireMember(c, "parent");
     const { approve } = z
       .object({ approve: z.boolean() })
       .parse(await c.req.json());
@@ -438,6 +444,7 @@ export function createApp(
     return c.json(await snapshot(state, c));
   });
   app.post("/api/policy", async (c) => {
+    requireMember(c, "parent");
     await chain.assertLocal(c.get("family"));
     const input = z
       .object({
@@ -469,6 +476,7 @@ export function createApp(
     return c.json(await snapshot(state, c));
   });
   app.post("/api/memories", async (c) => {
+    requireMember(c, "learner");
     await learnerAction(c);
     const input = z
       .object({
@@ -483,13 +491,13 @@ export function createApp(
       input.decisionId &&
       !state.decisions.some((d) => d.id === input.decisionId)
     )
-      throw new DomainError("That decision is not part of your sample family.");
+      throw new DomainError("That decision is not part of your family.");
     if (input.supersedes) {
       if (input.kind !== "correction")
         throw new DomainError("Only a correction can replace a saved thought.");
       const previous = state.memories.find((m) => m.id === input.supersedes);
       if (!previous)
-        throw new DomainError("That memory is not part of your sample family.");
+        throw new DomainError("That memory is not part of your family.");
       if (!previous.active)
         throw new DomainError(
           "That thought has already been corrected. Correct its current version instead.",
@@ -512,6 +520,7 @@ export function createApp(
     return c.json(await snapshot(state, c));
   });
   app.delete("/api/memories/:id", async (c) => {
+    requireMember(c, "learner");
     await learnerAction(c);
     const state = await stateFor(c);
     state.memories = state.memories.filter((m) => m.id !== c.req.param("id"));
@@ -519,10 +528,10 @@ export function createApp(
     return c.json(await snapshot(state, c));
   });
   app.post("/api/guide", async (c) => {
+    const member = requireMember(c, "learner");
     const { question } = z
       .object({ question: textSchema })
       .parse(await c.req.json());
-    const member = c.get("member");
     if (member) {
       if (member.role !== "learner")
         throw new AccessError(

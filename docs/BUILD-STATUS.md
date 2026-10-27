@@ -4,7 +4,7 @@ Updated October 27, 2026. This record describes implementation checks and local 
 
 ## Financial ledger
 
-Guest and saved family portfolios use private immutable Marketstack snapshots with a provider, closing date, retrieval timestamp, and dataset hash once a fresh import is available. Earlier example portfolios are archived before switching to a new $1,000 market-price practice ledger; personal journal entries are preserved. Offline development retains labelled authored observations. Orders bind the portfolio and snapshot, and stale closing prices pause new orders.
+Visitors can browse immutable Marketstack snapshots with a provider, closing date, retrieval timestamp, and dataset hash once a fresh import is available. Saved family portfolios start with a $1,000 market-price practice ledger. Earlier example portfolios are archived before changing the price basis. Offline development retains labelled authored observations. Orders bind the portfolio and snapshot, and stale closing prices pause new orders.
 
 Automatic corporate entries cover forward/reverse splits, dividends, proportional basis release, and cash-in-lieu below share precision. Events are deduplicated by portfolio and provider identity. Historical observations preserve their original price basis; chart trends and replay use adjusted closes.
 
@@ -33,9 +33,9 @@ The 32-case real-model evaluation covered no-history, original-history, correcte
 
 ## Validation suites
 
-- 89 Node tests: accounting, corporate actions, historical valuation, real-price guest entry and sample archival, family authority, durable memory, learning, cost control, market data, chain recovery, upgraded type identity, receipt validation, PostgreSQL transitions, and repeatable hosted usage imports.
+- 90 Node tests: accounting, corporate actions, historical valuation, real-price guest entry and sample archival, family authority, durable memory, learning, cost control, market data, chain recovery, upgraded type identity, receipt validation, PostgreSQL transitions, repeatable hosted usage imports, and guest access restrictions. Guest coach requests are rejected before generation; expired sessions cannot reach the coach. Deterministic lessons remain available without sign-in.
 - 21 Move tests: signed financial transitions, authority, limits, one-time exceptions, replay/tampering, expiry, passive corporate entries, reverse-split remainders, and duplicate-event prevention.
-- 15 Chromium journeys: navigation, responsive layout, portfolio interactions, learning, decisions, guardian controls, and returning family accounts.
+- 18 browser journeys: navigation, responsive layout, portfolio interactions, public lessons, authenticated coaching access, decisions, guardian controls, returning family accounts, and the product walkthrough.
 - TypeScript production compilation and Oxlint.
 - Production Node smoke checks: health, SPA deep links, built assets and caching, API errors, trusted origin, secure cookie attributes, cross-origin refusal, and restart persistence.
 

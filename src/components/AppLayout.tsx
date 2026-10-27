@@ -16,8 +16,8 @@ import {
   UserRound,
   X,
 } from "lucide-react";
-import { Brand, Sapling } from "./Brand.tsx";
-import { Button } from "./UI.tsx";
+import { Brand } from "./Brand.tsx";
+import { AccountRequired } from "./AccountRequired.tsx";
 import { useApp } from "../lib/app-context.tsx";
 import { AccountDialog } from "./AccountDialog.tsx";
 import { HowItWorksDialog } from "./HowItWorksDialog.tsx";
@@ -36,9 +36,30 @@ export function AppLayout() {
         return false;
       }
     });
+  const privatePage = {
+    "/app": {
+      title: "Your portfolio starts here.",
+      description:
+        "Create a family account to start practicing, or sign in to continue where you left off.",
+    },
+    "/app/decisions": {
+      title: "Your decisions, saved here.",
+      description:
+        "Sign in to revisit your practice choices and the thinking behind them.",
+    },
+    "/app/parent": {
+      title: "Guide your learner's practice.",
+      description:
+        "Create a family account to invite a learner, set limits, and review their requests.",
+    },
+    "/app/replay": {
+      title: "Take another look at your choices.",
+      description:
+        "Sign in to compare allocations and explore how a different choice could have played out.",
+    },
+  }[location.pathname.replace(/\/$/, "")];
   const portfolioLocked =
-    location.pathname.replace(/\/$/, "") === "/app" &&
-    state?.session?.mode !== "account";
+    Boolean(privatePage) && state?.session?.mode !== "account";
   function openAccount(mode: "login" | "register" = "login") {
     setAccountMode(mode);
     setAccountOpen(true);
@@ -273,39 +294,16 @@ export function AppLayout() {
               )}
             </div>
           ) : portfolioLocked ? (
-            <section
-              className="portfolio-welcome"
-              aria-labelledby="portfolio-welcome-title"
-            >
-              <div className="portfolio-welcome-content">
-                <Sapling className="portfolio-welcome-mark" />
-                <h1 id="portfolio-welcome-title">
-                  Your portfolio starts here.
-                </h1>
-                <p>
-                  Create a family account to start practicing, or sign in to
-                  continue where you left off.
-                </p>
-                <div className="portfolio-welcome-actions">
-                  <Button onClick={() => openAccount("register")}>
-                    Create a family account <ArrowRight size={17} />
-                  </Button>
-                  <Button secondary onClick={() => openAccount()}>
-                    Sign in
-                  </Button>
-                </div>
-                <button
-                  className="text-link portfolio-welcome-help"
-                  type="button"
-                  aria-haspopup="dialog"
-                  onClick={() => setExplanationOpen(true)}
-                >
-                  What this does <ArrowRight size={14} aria-hidden="true" />
-                </button>
-              </div>
-            </section>
+            <AccountRequired
+              title={privatePage!.title}
+              description={privatePage!.description}
+              onSignIn={() => openAccount()}
+              onCreate={() => openAccount("register")}
+              onLearnMore={() => setExplanationOpen(true)}
+            />
           ) : (
             <Outlet
+              context={{ openAccount }}
               key={`${state.id}:${state.session?.username ?? state.role}`}
             />
           )}

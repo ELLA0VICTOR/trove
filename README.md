@@ -158,7 +158,7 @@ npm run dev
 
 Open **http://127.0.0.1:5173**. Vite runs on port 5173 and proxies API requests to the Node server on port 3001. On Windows, use `npm.cmd` if PowerShell execution policy blocks `npm.ps1`.
 
-With a fresh Marketstack snapshot available, guests and signed-in families start with $1,000 in practice cash and real daily closing prices. Earlier sample portfolios are archived before switching price basis; personal journal entries are retained. Offline development uses a labelled example portfolio and authored history.
+Visitors can browse market prices and complete investing lessons. Family sign-in opens the portfolio, practice investing, saved decisions, and parent controls. Ask Trove requires a signed-in learner; parent-enabled remembering connects the guide to saved learning. Family portfolios start with $1,000 in practice cash and real daily closing prices from a fresh Marketstack snapshot. Earlier example portfolios are archived before switching price basis. Offline development uses authored market history.
 
 ### Connect services
 

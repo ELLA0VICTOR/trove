@@ -12,6 +12,7 @@ import { instruments } from "../shared/fixtures.ts";
 import { execute, preview } from "../server/domain.ts";
 import { portfolioValue } from "../shared/model.ts";
 import { createApp } from "../server/app.ts";
+import { seededFamily } from "./helpers/family.ts";
 const day = (ago: number) =>
   new Date(Date.now() - ago * 86400000).toISOString().slice(0, 10);
 
@@ -49,9 +50,10 @@ test("stale cached prices remain visible while new practice orders are refused",
     assert.equal(state.market.mode, "market");
     assert.equal(state.market.stale, true);
     assert.equal(state.instruments[0].prices.at(-1).price, "103000000");
+    const { learner } = await seededFamily(store);
     const order = await app.request("/api/orders/preview", {
       method: "POST",
-      headers,
+      headers: { ...headers, Cookie: `trove_session=${learner.token}` },
       body: JSON.stringify({
         symbol: "AAPL",
         side: "buy",
@@ -271,10 +273,10 @@ test("connected guest entry uses real-price snapshots without sign-in and archiv
     assert.equal(state.session.mode, "sample");
     assert.equal(state.market.mode, "market");
     assert.equal(state.instruments[0].prices.at(-1).price, "103000000");
-    assert.equal(state.cash, "1000000000");
+    assert.equal(state.cash, "0");
     assert.deepEqual(state.holdings, []);
-    assert.equal(state.decisions.length, 1);
-    assert.equal(state.decisions[0].reason, q.reason);
+    assert.equal(state.decisions.length, 0);
+    assert.equal((await store.get(family)).decisions[0].reason, q.reason);
     assert.ok(
       state.memories.every((m: { origin: string }) => m.origin !== "sample"),
     );
@@ -289,10 +291,11 @@ test("connected guest entry uses real-price snapshots without sign-in and archiv
     );
     assert.equal(archive.cash, prior.cash);
     assert.deepEqual(archive.holdings, prior.holdings);
+    const { learner } = await seededFamily(store);
     const quoted = await app.request("/api/orders/preview", {
       method: "POST",
       headers: {
-        Cookie: `trove_demo=${family}`,
+        Cookie: `trove_session=${learner.token}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -321,8 +324,7 @@ test("connected guest entry uses real-price snapshots without sign-in and archiv
         reason: "A direct first request",
       }),
     });
-    assert.equal(direct.status, 200);
-    assert.equal((await direct.json()).price, "103000000");
+    assert.equal(direct.status, 403);
     assert.equal(
       (await store.db
         .prepare("SELECT COUNT(*) AS n FROM portfolio_archives WHERE family=?")

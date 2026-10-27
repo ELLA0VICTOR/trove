@@ -11,6 +11,72 @@ async function createPortfolioAccount(page: Page) {
   expect(response.ok()).toBe(true);
 }
 
+async function createLearnerAccount(page: Page) {
+  await createPortfolioAccount(page);
+  const invitation = await page.request.post("/api/account/invite", {
+    data: {},
+  });
+  expect(invitation.ok()).toBe(true);
+  const code = (await invitation.json()).code;
+  await page.request.post("/api/auth/logout", { data: {} });
+  const joined = await page.request.post("/api/auth/join", {
+    data: {
+      code,
+      username: `learner_${crypto.randomUUID().slice(0, 8)}`,
+      password: "browser-test-password",
+    },
+  });
+  expect(joined.ok()).toBe(true);
+}
+
+test("visitors can finish lessons and browse prices but must sign in for Ask Trove and personal actions", async ({
+  page,
+}) => {
+  await page.goto("/app/guide");
+  await page.getByRole("button", { name: "Start lesson: Shared risk" }).click();
+  await page.getByRole("button", { name: "Check understanding" }).click();
+  await page
+    .getByRole("button", {
+      name: /Different names can still share the same risks/,
+    })
+    .click();
+  await page.getByRole("button", { name: "Check answer" }).click();
+  await expect(page.getByText("Correct", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Done", exact: true }).click();
+  await page.getByRole("tab", { name: "Ask Trove", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Sign in to Ask Trove." }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("textbox", { name: "Ask your learning guide" }),
+  ).toHaveCount(0);
+  expect(
+    (
+      await page.request.post("/api/guide", {
+        data: { question: "Explain risk" },
+      })
+    ).status(),
+  ).toBe(403);
+  await page.goto("/app/explore/AAPL");
+  await expect(page.locator(".company-price")).toBeVisible();
+  await page
+    .getByRole("button", { name: "Sign in to practice", exact: true })
+    .click();
+  await expect(
+    page.getByRole("dialog", { name: "SIGN IN TO TROVE" }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  for (const route of ["/app/decisions", "/app/parent", "/app/replay"]) {
+    await page.goto(route);
+    await expect(page.locator(".portfolio-welcome")).toBeVisible();
+    await expect(
+      page.locator(
+        ".compact-decision-row, .parent-limit-grid, .replay-results",
+      ),
+    ).toHaveCount(0);
+  }
+});
+
 test("product walkthrough opens in place, supports steps, and closes by button, backdrop, or Escape", async ({
   page,
 }) => {
@@ -347,6 +413,7 @@ test("intro replays after refresh and can be skipped", async ({ page }) => {
 test("a practice buy persists after reload with its original explanation", async ({
   page,
 }) => {
+  await createLearnerAccount(page);
   await page.goto("/app/explore/KO");
   await page.getByRole("button", { name: "Make a practice move" }).click();
   await page.getByLabel("Practice amount").fill("50");
@@ -458,6 +525,7 @@ test("a learning attempt changes the next task without changing spending authori
 test("parent navigation leads directly to working limits and pause controls", async ({
   page,
 }) => {
+  await createPortfolioAccount(page);
   await page.goto("/app");
   await page
     .getByRole("navigation", { name: "Your Trove" })
@@ -466,7 +534,6 @@ test("parent navigation leads directly to working limits and pause controls", as
   await expect(
     page.getByRole("heading", { name: "Parent controls" }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Enter parent preview" }).click();
   await page.getByRole("button", { name: "Edit limits" }).click();
   await page.getByLabel("Per investment ($)").fill("75");
   await page.getByLabel("Daily allowance ($)").fill("200");
@@ -481,18 +548,35 @@ test("parent navigation leads directly to working limits and pause controls", as
   expect(paused.policy.paused).toBe(true);
   expect(paused.policy.perTrade).toBe("75000000");
   await page.getByRole("button", { name: "Resume practice" }).click();
-  await page.getByRole("link", { name: "Back to Maya", exact: true }).click();
+  await page.getByRole("link", { name: "Portfolio", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "Your portfolio starts here." }),
+    page.getByRole("heading", { name: "Your portfolio", exact: true }),
   ).toBeVisible();
   const learner = await (await page.request.get("/api/state")).json();
-  expect(learner.role).toBe("learner");
+  expect(learner.role).toBe("parent");
   expect(learner.policy.paused).toBe(false);
 });
 
 test("a decision reflection stays linked to its original choice", async ({
   page,
 }) => {
+  await createLearnerAccount(page);
+  const quote = await page.request.post("/api/orders/preview", {
+    data: {
+      symbol: "AAPL",
+      side: "buy",
+      amount: "25",
+      reason: "I want to understand how companies share risks.",
+    },
+  });
+  expect(quote.ok()).toBe(true);
+  expect(
+    (
+      await page.request.post("/api/orders/execute", {
+        data: { quoteId: (await quote.json()).id },
+      })
+    ).ok(),
+  ).toBe(true);
   await page.goto("/app/decisions");
   await page.locator(".compact-decision-row").first().click();
   await page.getByRole("button", { name: "Add a reflection" }).click();
@@ -509,7 +593,7 @@ test("a decision reflection stays linked to its original choice", async ({
   );
   expect(memory.decisionId).toBe(snapshot.decisions[0].id);
   expect(snapshot.decisions[0].reason).toBe(
-    "I chose five different companies, so I think I have spread out my risk.",
+    "I want to understand how companies share risks.",
   );
 });
 
@@ -605,6 +689,17 @@ test("portfolio chart supports inspection, zoom, pan, styles, and real sample pe
 test("a corrected memory changes the local guide response", async ({
   page,
 }) => {
+  await createLearnerAccount(page);
+  expect(
+    (
+      await page.request.post("/api/memories", {
+        data: {
+          kind: "reflection",
+          text: "I am learning how companies share risks.",
+        },
+      })
+    ).ok(),
+  ).toBe(true);
   await page.goto("/app/guide");
   await page
     .getByRole("button", { name: "Saved thoughts", exact: true })
@@ -631,6 +726,7 @@ test("a corrected memory changes the local guide response", async ({
 test("replay allocation controls change only the comparison", async ({
   page,
 }) => {
+  await createPortfolioAccount(page);
   await page.goto("/app/replay");
   const before = await page
     .locator(".replay-results strong")

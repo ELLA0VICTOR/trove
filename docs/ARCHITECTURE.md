@@ -48,6 +48,8 @@ A guardian creates a family and invites a learner using an expiring, single-use 
 
 Server-resolved membership supplies the role and family scope. Wallet-link challenges bind the member, address, origin, network, purpose, and expiry. The guardian and learner use distinct addresses. The shared account fixes those addresses and the operator's attestor public key.
 
+Visitors can browse the market catalog and complete deterministic lessons. The API requires authenticated learner membership for Ask Trove, order previews, execution, approval requests, and saved thoughts, and parent membership for policy changes and approvals. Guest snapshots omit portfolio balances, holdings, decisions, and memories. Parent consent gates the live remembered guide; request limits and cumulative budget reservations apply after identity checks.
+
 Guardian signatures authorize policy changes and exact exceptions. Learner signatures authorize orders. Signed price and corporate-action terms allow a narrowly scoped financial transition. Wallet ownership establishes control of the linked address; family roles are self-service.
 
 ## Financial state

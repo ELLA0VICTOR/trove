@@ -9,6 +9,14 @@ import {
 import type { ReactNode } from "react";
 import type { AppSnapshot } from "../../shared/model.ts";
 
+class ApiError extends Error {
+  readonly status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
 // oxlint-disable-next-line react/only-export-components -- Shared API helper is independent of provider state.
 export async function api<T>(
   path: string,
@@ -24,7 +32,10 @@ export async function api<T>(
     .json()
     .catch(() => ({ error: "The local API could not be reached." }));
   if (!response.ok)
-    throw new Error(data.error ?? "This action could not be completed.");
+    throw new ApiError(
+      data.error ?? "This action could not be completed.",
+      response.status,
+    );
   return data;
 }
 interface AppContextValue {
@@ -76,6 +87,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setState(next);
         setError("");
       } catch (e) {
+        if (generation.current !== version) return;
+        if (e instanceof ApiError && e.status === 401) {
+          generation.current++;
+          setState(null);
+        }
         setError((e as Error).message);
       } finally {
         refreshPending.current = null;
@@ -96,6 +112,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setState(next);
       return next;
     } catch (e) {
+      if (e instanceof ApiError && e.status === 401) {
+        generation.current++;
+        setState(null);
+        setError(e.message);
+      }
       notify((e as Error).message);
       throw e;
     } finally {
