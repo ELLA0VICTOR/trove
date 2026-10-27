@@ -4,9 +4,15 @@ import { api, useApp } from "../lib/app-context.tsx";
 import { Button, Modal } from "./UI.tsx";
 import { ChainAccount } from "./ChainAccount.tsx";
 
-export function AccountDialog({ onClose }: { onClose: () => void }) {
+export function AccountDialog({
+  onClose,
+  initialMode = "login",
+}: {
+  onClose: () => void;
+  initialMode?: "login" | "register" | "join";
+}) {
   const { state, update, busy, notify } = useApp();
-  const [mode, setMode] = useState<"login" | "register" | "join">("login");
+  const [mode, setMode] = useState(initialMode);
   const [username, setUsername] = useState(""),
     [password, setPassword] = useState(""),
     [code, setCode] = useState("");

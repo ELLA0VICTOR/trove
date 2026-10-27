@@ -1,4 +1,73 @@
 import { test, expect } from "@playwright/test";
+import type { Page } from "@playwright/test";
+
+async function createPortfolioAccount(page: Page) {
+  const response = await page.request.post("/api/auth/register", {
+    data: {
+      username: `portfolio_${crypto.randomUUID().slice(0, 8)}`,
+      password: "browser-test-password",
+    },
+  });
+  expect(response.ok()).toBe(true);
+}
+
+test("portfolio stays hidden until sign-in and returns to the welcome screen after logout", async ({
+  page,
+}) => {
+  await page.goto("/app");
+  const main = page.getByRole("main");
+  await expect(
+    main.getByRole("heading", { name: "Your portfolio starts here." }),
+  ).toBeVisible();
+  await expect(
+    page.locator(
+      ".account-metrics, .portfolio-performance, .portfolio-holdings",
+    ),
+  ).toHaveCount(0);
+  await expect(page.locator(".sample-strip")).toHaveCount(0);
+  await main
+    .getByRole("button", { name: "Create a family account", exact: true })
+    .click();
+  let dialog = page.getByRole("dialog");
+  await expect(
+    dialog.getByRole("button", { name: "Create family account", exact: true }),
+  ).toBeVisible();
+  const username = `welcome_${crypto.randomUUID().slice(0, 8)}`;
+  await dialog.getByLabel("Username", { exact: true }).fill(username);
+  await dialog
+    .getByLabel("Password", { exact: true })
+    .fill("browser-test-password");
+  await dialog
+    .getByRole("button", { name: "Create family account", exact: true })
+    .click();
+  await expect(
+    main.getByRole("heading", { name: "Your portfolio", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".account-metrics")).toBeVisible();
+  await page.reload();
+  await expect(
+    main.getByRole("heading", { name: "Your portfolio", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: username, exact: true }).click();
+  dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: "Sign out", exact: true }).click();
+  await page.keyboard.press("Escape");
+  await expect(
+    main.getByRole("heading", { name: "Your portfolio starts here." }),
+  ).toBeVisible();
+  await expect(
+    page.locator(
+      ".account-metrics, .portfolio-performance, .portfolio-holdings",
+    ),
+  ).toHaveCount(0);
+  await main.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(
+    page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Sign in", exact: true })
+      .last(),
+  ).toBeVisible();
+});
 
 test("family sign-in and learner invitations preserve separate roles and returning history", async ({
   page,
@@ -10,7 +79,10 @@ test("family sign-in and learner invitations preserve separate roles and returni
     learner = `learner_${suffix}`,
     password = "browser-test-password";
   await page.goto("/app");
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Sign in", exact: true })
+    .first()
+    .click();
   let dialog = page.getByRole("dialog");
   await dialog
     .getByRole("button", { name: "Create family", exact: true })
@@ -41,7 +113,10 @@ test("family sign-in and learner invitations preserve separate roles and returni
   try {
     const child = await context.newPage();
     await child.goto("/app");
-    await child.getByRole("button", { name: "Sign in", exact: true }).click();
+    await child
+      .getByRole("button", { name: "Sign in", exact: true })
+      .first()
+      .click();
     const join = child.getByRole("dialog");
     await join
       .getByRole("button", { name: "Join a family", exact: true })
@@ -161,7 +236,7 @@ test("company discovery supports industries, official logos, and direct mobile n
   await expect(page.locator(".app-body")).not.toHaveAttribute("inert");
 });
 
-test("a first visit creates one consistent sample session", async ({
+test("a first visit creates one consistent guest session behind the sign-in screen", async ({
   page,
   context,
 }) => {
@@ -173,7 +248,7 @@ test("a first visit creates one consistent sample session", async ({
   });
   await page.goto("/app");
   await expect(
-    page.getByRole("heading", { name: "Your portfolio" }),
+    page.getByRole("heading", { name: "Your portfolio starts here." }),
   ).toBeVisible();
   const snapshot = await (await page.request.get("/api/state")).json();
   expect(familyIds.length).toBeGreaterThan(0);
@@ -197,7 +272,7 @@ test("intro replays after refresh and can be skipped", async ({ page }) => {
   await expect(page.locator("#root")).not.toHaveAttribute("inert");
   await page.getByRole("link", { name: "Try now", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "Your portfolio" }),
+    page.getByRole("heading", { name: "Your portfolio starts here." }),
   ).toBeVisible();
 });
 test("a practice buy persists after reload with its original explanation", async ({
@@ -229,29 +304,60 @@ test("a practice buy persists after reload with its original explanation", async
 });
 test("the exact parent-approved action can return to the learner and execute once", async ({
   page,
+  browser,
+  baseURL,
 }) => {
-  await page.goto("/app/explore/KO");
-  await page.getByRole("button", { name: "Make a practice move" }).click();
-  await page.getByLabel("Practice amount").fill("150");
-  await page.getByRole("button", { name: "Review my practice move" }).click();
-  await expect(
-    page.getByText("This is above your per-investment limit."),
-  ).toBeVisible();
-  await page.getByRole("button", { name: "Ask for guidance" }).click();
-  await page.getByRole("link", { name: "Open parent preview" }).click();
-  await page.getByRole("button", { name: "Enter parent preview" }).click();
-  await page.getByRole("button", { name: "Approve this choice" }).click();
-  await page.getByRole("link", { name: /Back to Maya/ }).click();
-  await page
-    .getByRole("button", { name: "Review this approved choice" })
-    .click();
-  await page.getByRole("button", { name: "Confirm practice move" }).click();
-  await expect(
-    page.getByRole("heading", { name: "One small move. Something to learn." }),
-  ).toBeVisible();
-  const snapshot = await (await page.request.get("/api/state")).json();
-  expect(snapshot.approvals[0].state).toBe("consumed");
-  expect(snapshot.policy.perTrade).toBe("100000000");
+  const parentContext = await browser.newContext({ baseURL });
+  try {
+    const suffix = crypto.randomUUID().slice(0, 8);
+    const registered = await parentContext.request.post("/api/auth/register", {
+      data: {
+        username: `approval_parent_${suffix}`,
+        password: "browser-test-password",
+      },
+    });
+    expect(registered.ok()).toBe(true);
+    const invitation = await parentContext.request.post("/api/account/invite", {
+      data: {},
+    });
+    expect(invitation.ok()).toBe(true);
+    const joined = await page.request.post("/api/auth/join", {
+      data: {
+        code: (await invitation.json()).code,
+        username: `approval_child_${suffix}`,
+        password: "browser-test-password",
+      },
+    });
+    expect(joined.ok()).toBe(true);
+    await page.goto("/app/explore/KO");
+    await page.getByRole("button", { name: "Make a practice move" }).click();
+    await page.getByLabel("Practice amount").fill("150");
+    await page.getByRole("button", { name: "Review my practice move" }).click();
+    await expect(
+      page.getByText("This is above your per-investment limit."),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Ask for guidance" }).click();
+    const parentPage = await parentContext.newPage();
+    await parentPage.goto("/app/parent");
+    await parentPage
+      .getByRole("button", { name: "Approve this choice" })
+      .click();
+    await page.goto("/app");
+    await page
+      .getByRole("button", { name: "Review this approved choice" })
+      .click();
+    await page.getByRole("button", { name: "Confirm practice move" }).click();
+    await expect(
+      page.getByRole("heading", {
+        name: "One small move. Something to learn.",
+      }),
+    ).toBeVisible();
+    const snapshot = await (await page.request.get("/api/state")).json();
+    expect(snapshot.approvals[0].state).toBe("consumed");
+    expect(snapshot.policy.perTrade).toBe("100000000");
+  } finally {
+    await parentContext.close();
+  }
 });
 test("a learning attempt changes the next task without changing spending authority", async ({
   page,
@@ -308,7 +414,7 @@ test("parent navigation leads directly to working limits and pause controls", as
   await page.getByRole("button", { name: "Resume practice" }).click();
   await page.getByRole("link", { name: "Back to Maya", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "Your portfolio" }),
+    page.getByRole("heading", { name: "Your portfolio starts here." }),
   ).toBeVisible();
   const learner = await (await page.request.get("/api/state")).json();
   expect(learner.role).toBe("learner");
@@ -341,6 +447,7 @@ test("a decision reflection stays linked to its original choice", async ({
 test("desktop sidebar can hide and restore without losing the account or chart", async ({
   page,
 }) => {
+  await createPortfolioAccount(page);
   await page.goto("/app");
   await expect(
     page.getByRole("heading", { name: "Your portfolio" }),
@@ -380,6 +487,7 @@ test("desktop sidebar can hide and restore without losing the account or chart",
 test("portfolio chart supports inspection, zoom, pan, styles, and real sample periods", async ({
   page,
 }) => {
+  await createPortfolioAccount(page);
   await page.goto("/app");
   await expect(
     page.locator(".portfolio-chart-canvas canvas").first(),
@@ -422,7 +530,7 @@ test("portfolio chart supports inspection, zoom, pan, styles, and real sample pe
   await expect(window).toContainText("Sep 25, 2026");
   const snapshot = await (await page.request.get("/api/state")).json();
   expect(snapshot.sequence).toBe(0);
-  expect(snapshot.decisions).toHaveLength(5);
+  expect(snapshot.decisions).toHaveLength(0);
 });
 
 test("a corrected memory changes the local guide response", async ({

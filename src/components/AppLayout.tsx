@@ -16,7 +16,8 @@ import {
   UserRound,
   X,
 } from "lucide-react";
-import { Brand } from "./Brand.tsx";
+import { Brand, Sapling } from "./Brand.tsx";
+import { Button } from "./UI.tsx";
 import { useApp } from "../lib/app-context.tsx";
 import { AccountDialog } from "./AccountDialog.tsx";
 
@@ -25,6 +26,7 @@ export function AppLayout() {
     location = useLocation(),
     [menuOpen, setMenuOpen] = useState(false),
     [accountOpen, setAccountOpen] = useState(false),
+    [accountMode, setAccountMode] = useState<"login" | "register">("login"),
     [sidebarHidden, setSidebarHidden] = useState(() => {
       try {
         return localStorage.getItem("trove-sidebar-hidden") === "1";
@@ -32,6 +34,13 @@ export function AppLayout() {
         return false;
       }
     });
+  const portfolioLocked =
+    location.pathname.replace(/\/$/, "") === "/app" &&
+    state?.session?.mode !== "account";
+  function openAccount(mode: "login" | "register" = "login") {
+    setAccountMode(mode);
+    setAccountOpen(true);
+  }
   const navigation = [
     { to: "/app", label: "Home", icon: Home, end: true },
     { to: "/app/guide", label: "Learn", icon: BookOpen },
@@ -200,7 +209,7 @@ export function AppLayout() {
               type="button"
               aria-haspopup="dialog"
               aria-expanded={accountOpen}
-              onClick={() => setAccountOpen(true)}
+              onClick={() => openAccount()}
             >
               <span>
                 {state?.session?.mode === "account"
@@ -223,29 +232,31 @@ export function AppLayout() {
             </NavLink>
           ))}
         </nav>
-        <div className="sample-strip">
-          <span
-            data-mobile-label={
-              state?.market?.mode === "market"
-                ? `Market close · ${state.market.asOf}`
-                : "Sample prices · practice funds"
-            }
-          >
-            <span className="live-dot" />{" "}
-            {state?.session?.mode === "account"
-              ? "PRACTICE ACCOUNT"
-              : state?.market?.mode === "market"
-                ? "GUEST PRACTICE"
-                : "SAMPLE EXPERIENCE"}{" "}
-            <span className="sample-separator">/</span> Practice funds ·{" "}
-            {state?.market?.mode === "market"
-              ? `${state.market.provider} · ${state.market.asOf}${state.market.blocked ? " · UPDATING" : state.market.stale ? " · STALE" : ""}`
-              : "authored sample prices"}
-          </span>
-          <Link to="/app/evidence">
-            About this build <ArrowRight size={13} />
-          </Link>
-        </div>
+        {!portfolioLocked && (
+          <div className="sample-strip">
+            <span
+              data-mobile-label={
+                state?.market?.mode === "market"
+                  ? `Market close · ${state.market.asOf}`
+                  : "Sample prices · practice funds"
+              }
+            >
+              <span className="live-dot" />{" "}
+              {state?.session?.mode === "account"
+                ? "PRACTICE ACCOUNT"
+                : state?.market?.mode === "market"
+                  ? "GUEST PRACTICE"
+                  : "SAMPLE EXPERIENCE"}{" "}
+              <span className="sample-separator">/</span> Practice funds ·{" "}
+              {state?.market?.mode === "market"
+                ? `${state.market.provider} · ${state.market.asOf}${state.market.blocked ? " · UPDATING" : state.market.stale ? " · STALE" : ""}`
+                : "authored sample prices"}
+            </span>
+            <Link to="/app/evidence">
+              About this build <ArrowRight size={13} />
+            </Link>
+          </div>
+        )}
         <main id="app-main" className="app-main">
           {!state ? (
             <div className="loading-state">
@@ -257,6 +268,30 @@ export function AppLayout() {
                 </button>
               )}
             </div>
+          ) : portfolioLocked ? (
+            <section
+              className="portfolio-welcome"
+              aria-labelledby="portfolio-welcome-title"
+            >
+              <div className="portfolio-welcome-content">
+                <Sapling className="portfolio-welcome-mark" />
+                <h1 id="portfolio-welcome-title">
+                  Your portfolio starts here.
+                </h1>
+                <p>
+                  Create a family account to start practicing, or sign in to
+                  continue where you left off.
+                </p>
+                <div className="portfolio-welcome-actions">
+                  <Button onClick={() => openAccount("register")}>
+                    Create a family account <ArrowRight size={17} />
+                  </Button>
+                  <Button secondary onClick={() => openAccount()}>
+                    Sign in
+                  </Button>
+                </div>
+              </div>
+            </section>
           ) : (
             <Outlet
               key={`${state.id}:${state.session?.username ?? state.role}`}
@@ -269,7 +304,12 @@ export function AppLayout() {
           {toast}
         </div>
       )}
-      {accountOpen && <AccountDialog onClose={() => setAccountOpen(false)} />}
+      {accountOpen && (
+        <AccountDialog
+          initialMode={accountMode}
+          onClose={() => setAccountOpen(false)}
+        />
+      )}
     </div>
   );
 }

@@ -17,6 +17,7 @@ export default defineConfig({
     url: baseURL + "/api/state",
     reuseExistingServer: false,
     env: {
+      PUBLIC_ORIGIN: baseURL,
       TROVE_LIVE_SERVICES: "0",
       DATABASE_URL: "",
       TROVE_DATA_DIR:
