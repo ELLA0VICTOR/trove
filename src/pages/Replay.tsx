@@ -29,15 +29,28 @@ export function Replay() {
     [playing, setPlaying] = useState(false),
     timer = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
   useEffect(() => () => clearInterval(timer.current), []);
+  const last = state ? state.instruments[0].prices.length - 1 : 59;
+  const selectedEnd = Math.min(end, last);
+  const replayInstruments = useMemo(
+    () =>
+      state?.instruments.map((instrument) => ({
+        ...instrument,
+        prices: instrument.prices.map((p) => ({
+          ...p,
+          price: p.adjustedPrice ?? p.price,
+        })),
+      })),
+    [state],
+  );
   const paths = useMemo(
     () =>
       state
         ? {
-            original: replay(state.instruments, original, 0, end),
-            alternative: replay(state.instruments, mix, 0, end),
+            original: replay(replayInstruments!, original, 0, selectedEnd),
+            alternative: replay(replayInstruments!, mix, 0, selectedEnd),
           }
         : null,
-    [state, mix, end],
+    [state, mix, selectedEnd, replayInstruments],
   );
   if (!state || !paths) return null;
   const allocated = Object.values(mix).reduce((sum, weight) => sum + weight, 0),
@@ -51,7 +64,7 @@ export function Replay() {
     timer.current = setInterval(() => {
       index++;
       setEnd(index);
-      if (index >= 59) {
+      if (index >= last) {
         clearInterval(timer.current);
         setPlaying(false);
       }
@@ -106,36 +119,40 @@ export function Replay() {
           <Chart
             points={paths.original}
             comparison={paths.alternative}
-            label="Comparison of two practice allocations over the same sample period"
+            label="Comparison of two practice allocations over the same market period"
           />
           <div className="replay-timeline">
             <button
               className="icon-button"
-              aria-label="Play through sample history"
+              aria-label="Play through price history"
               disabled={playing}
               onClick={advance}
             >
               <Play size={16} />
             </button>
             <label className="sr-only" htmlFor="replay-date">
-              Move through the sample period
+              Move through the selected period
             </label>
             <input
               id="replay-date"
               type="range"
               min="1"
-              max="59"
-              value={end}
+              max={last}
+              value={selectedEnd}
               disabled={playing}
               onChange={(event) => setEnd(Number(event.target.value))}
             />
-            <span>{state.instruments[0].prices[end].date}</span>
+            <span>{state.instruments[0].prices[selectedEnd].date}</span>
           </div>
           <div className="replay-assumptions">
             <span className="mini-label">THE SAME STARTING POINT</span>
             <p>
-              $1,000 each · same sample dates · buy and hold · no fees, taxes,
-              interest, or dividends. Remaining money stays as cash.
+              $1,000 each · same dates · buy and hold · no fees, taxes or
+              interest.
+              {state.market?.mode === "market"
+                ? " Adjusted closes include provider split and dividend adjustments; these are comparison units, not share quantities."
+                : " No dividends."}{" "}
+              Remaining money stays as cash.
             </p>
           </div>
         </div>
@@ -207,8 +224,11 @@ export function Replay() {
         </Button>
       </section>
       <p className="data-note">
-        Authored sample prices. Moving this timeline changes the comparison, not
-        your actual practice balance or saved decisions.
+        {state.market?.mode === "market"
+          ? "Marketstack historical daily closes."
+          : "Authored sample prices."}{" "}
+        Moving this timeline changes the comparison, not your actual practice
+        balance or saved decisions.
       </p>
       {exercise && <ExerciseDialog onClose={() => setExercise(false)} />}
     </>

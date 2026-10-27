@@ -10,6 +10,10 @@ import { CoachGateway } from "./integrations/coach.ts";
 import { CoachBudget, COACH_MODEL } from "./jobs/coach-budget.ts";
 import { LearningService, LearningUnavailable } from "./learning-service.ts";
 import type { LiveLearning } from "./learning-service.ts";
+import { MarketService } from "./market.ts";
+import { MarketstackGateway } from "./integrations/marketstack.ts";
+import { ChainService } from "./chain.ts";
+import { chainConfig } from "./chain-config.ts";
 
 export function createRuntime() {
   const value = (name: string) => configuredValue(process.env, name);
@@ -20,9 +24,21 @@ export function createRuntime() {
   const coachReady = Boolean(
     enabled && value("OPENAI_API_KEY") && value("COACH_MODEL"),
   );
-  const store = new DemoStore(resolve(".trove/local.sqlite"), {
+  const dataDir = resolve(value("TROVE_DATA_DIR") ?? ".trove");
+  const store = new DemoStore(resolve(dataDir, "local.sqlite"), {
     liveMemory: memoryReady,
   });
+  const market = new MarketService(
+    store,
+    enabled && value("MARKETSTACK_API_KEY")
+      ? new MarketstackGateway(value("MARKETSTACK_API_KEY")!)
+      : undefined,
+  );
+  const chain = new ChainService(
+    store,
+    market,
+    enabled ? chainConfig(dataDir) : undefined,
+  );
   const accounts = new Accounts(store);
   const memory = (scope: string): MemoryReader => {
     const profiles = store.db
@@ -56,8 +72,8 @@ export function createRuntime() {
   let usageDb: DatabaseSync | undefined;
   let service: LearningService | undefined;
   if (memoryReady && coachReady) {
-    mkdirSync(resolve(".trove"), { recursive: true });
-    usageDb = new DatabaseSync(resolve(".trove/coach-usage.sqlite"));
+    mkdirSync(dataDir, { recursive: true });
+    usageDb = new DatabaseSync(resolve(dataDir, "coach-usage.sqlite"));
     const budget = new CoachBudget(
       usageDb,
       value("COACH_BUDGET_USD") ?? "1.00",
@@ -83,6 +99,19 @@ export function createRuntime() {
   let stopped = false,
     timer: ReturnType<typeof setTimeout> | undefined;
   let active: Promise<unknown> | undefined;
+  let marketTimer: ReturnType<typeof setInterval> | undefined;
+  let marketActive: Promise<void> | undefined;
+  let chainTimer: ReturnType<typeof setTimeout> | undefined;
+  let chainActive: Promise<void> | undefined;
+  const reconcileChain = async () => {
+    if (stopped) return;
+    chainActive = chain.reconcilePending();
+    await chainActive.catch(() => {});
+    if (!stopped) {
+      chainTimer = setTimeout(() => void reconcileChain(), 10_000);
+      chainTimer.unref();
+    }
+  };
   const tick = async () => {
     if (stopped || !memoryReady) return;
     try {
@@ -101,17 +130,34 @@ export function createRuntime() {
   };
   return {
     store,
+    market,
+    chain,
     learning,
-    start: () => void tick(),
+    start: () => {
+      void tick();
+      void reconcileChain();
+      const refreshMarket = () => {
+        marketActive = market.refresh();
+        void marketActive.catch(() => {});
+      };
+      refreshMarket();
+      marketTimer = setInterval(refreshMarket, 60 * 60_000);
+      marketTimer.unref();
+    },
     stop: async () => {
       stopped = true;
       clearTimeout(timer);
+      clearInterval(marketTimer);
+      clearTimeout(chainTimer);
       await active?.catch(() => {});
+      await marketActive?.catch(() => {});
+      await chainActive?.catch(() => {});
     },
     close: () => {
       stopped = true;
       clearTimeout(timer);
       usageDb?.close();
+      chain.config?.gateway.destroy();
       store.db.close();
     },
   };

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Copy, LogOut, ShieldCheck } from "lucide-react";
 import { api, useApp } from "../lib/app-context.tsx";
 import { Button, Modal } from "./UI.tsx";
+import { ChainAccount } from "./ChainAccount.tsx";
 
 export function AccountDialog({ onClose }: { onClose: () => void }) {
   const { state, update, busy, notify } = useApp();
@@ -156,6 +157,25 @@ export function AccountDialog({ onClose }: { onClose: () => void }) {
                 : "Your parent can enable remembering from their account."}
             </p>
           )}
+          {state.role === "parent" && state.market?.mode !== "market" && (
+            <div className="account-section">
+              <h3>Market-price practice</h3>
+              <p>
+                Start with $1,000 in fresh practice cash and real daily closes.
+                Your earlier sample activity stays in your journal and an
+                archived portfolio.
+              </p>
+              <Button
+                disabled={busy}
+                onClick={() =>
+                  void update("/account/market", {}).catch(() => {})
+                }
+              >
+                Use market prices
+              </Button>
+            </div>
+          )}
+          <ChainAccount />
           <div className="modal-actions">
             <button
               className="text-link"

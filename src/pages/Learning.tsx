@@ -32,6 +32,42 @@ const lessons = [
     description: "Connect your decisions to when you need the money.",
     icon: Clock3,
   },
+  {
+    id: "liquidity",
+    title: "Money you need soon",
+    description: "Keep near-term needs available.",
+    icon: Clock3,
+  },
+  {
+    id: "fees",
+    title: "Costs and returns",
+    description: "Understand what you keep after costs.",
+    icon: Layers3,
+  },
+  {
+    id: "evidence",
+    title: "Check the evidence",
+    description: "Sources, incentives, and uncertainty.",
+    icon: ShieldCheck,
+  },
+  {
+    id: "loss",
+    title: "Loss and recovery",
+    description: "Percentages change with the starting point.",
+    icon: Layers3,
+  },
+  {
+    id: "ownership",
+    title: "What you own",
+    description: "Separate practice units from real assets.",
+    icon: ShieldCheck,
+  },
+  {
+    id: "outcomes",
+    title: "Reason before result",
+    description: "Judge your process as well as the outcome.",
+    icon: NotebookPen,
+  },
 ] as const;
 type LessonId = (typeof lessons)[number]["id"];
 
@@ -54,6 +90,7 @@ export function ExerciseDialog({ onClose }: { onClose: () => void }) {
         await api("/exercise", "POST", {
           answer: choice,
           concept: exercise.concept,
+          variant: exercise.variant,
         }),
       );
       await refresh();
@@ -275,6 +312,11 @@ export function Guide() {
               );
             })}
           </div>
+          {completedCount === lessons.length && (
+            <button className="text-link" onClick={() => setExercise(true)}>
+              Try a new scenario <ArrowRight size={16} />
+            </button>
+          )}
           <p className="learning-limit-note">
             <ShieldCheck size={15} />
             Learning never changes your practice limits.
@@ -292,7 +334,7 @@ export function Guide() {
             <span>
               {state.session?.mode === "account" && state.session.memoryEnabled
                 ? "Remembered guide"
-                : "Sample guide"}
+                : "Local guide"}
             </span>
           </div>
           {messages.length === 0 ? (
@@ -366,7 +408,9 @@ export function Guide() {
             </button>
           </form>
           <p className="guide-mode-note">
-            Local sample guide. Live AI is not connected.
+            {state.session?.memoryEnabled && state.session.servicesReady
+              ? "Uses your saved learning context. Explains ideas; never changes your limits or places orders."
+              : "Local guide. Enable remembering from the parent account for memory-backed AI explanations."}
           </p>
         </section>
       )}
@@ -420,7 +464,7 @@ export function MemoryDialog({
     if (!state?.session?.memoryEnabled) return;
     const timer = setInterval(() => void refresh(), 4000);
     return () => clearInterval(timer);
-  }, [state?.session?.memoryEnabled, state?.id]);
+  }, [state?.session?.memoryEnabled, state?.id, refresh]);
   if (!state) return null;
   async function save(event: React.FormEvent) {
     event.preventDefault();

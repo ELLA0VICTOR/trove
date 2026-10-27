@@ -3,6 +3,7 @@ import { test, expect } from "@playwright/test";
 test("family sign-in and learner invitations preserve separate roles and returning history", async ({
   page,
   browser,
+  baseURL,
 }) => {
   const suffix = Date.now().toString(36);
   const parent = `parent_${suffix}`,
@@ -36,10 +37,10 @@ test("family sign-in and learner invitations preserve separate roles and returni
     dialog.getByRole("button", { name: "Enable remembering" }),
   ).toBeDisabled();
   await page.keyboard.press("Escape");
-  const context = await browser.newContext();
+  const context = await browser.newContext({ baseURL });
   try {
     const child = await context.newPage();
-    await child.goto("http://127.0.0.1:5173/app");
+    await child.goto("/app");
     await child.getByRole("button", { name: "Sign in", exact: true }).click();
     const join = child.getByRole("dialog");
     await join
@@ -56,12 +57,12 @@ test("family sign-in and learner invitations preserve separate roles and returni
     ).toBeVisible();
     expect(
       (
-        await child.request.post("http://127.0.0.1:5173/api/preview-role", {
+        await child.request.post("/api/preview-role", {
           data: { role: "parent" },
         })
       ).status(),
     ).toBe(403);
-    await child.request.post("http://127.0.0.1:5173/api/memories", {
+    await child.request.post("/api/memories", {
       data: {
         kind: "reflection",
         text: "I want to understand how industries differ.",
@@ -82,9 +83,7 @@ test("family sign-in and learner invitations preserve separate roles and returni
     await expect(
       child.getByRole("button", { name: learner, exact: true }),
     ).toBeVisible();
-    const snapshot = await (
-      await child.request.get("http://127.0.0.1:5173/api/state")
-    ).json();
+    const snapshot = await (await child.request.get("/api/state")).json();
     expect(snapshot.role).toBe("learner");
     expect(snapshot.memories[0].text).toBe(
       "I want to understand how industries differ.",
@@ -364,7 +363,7 @@ test("desktop sidebar can hide and restore without losing the account or chart",
   ).toBeVisible();
   await page
     .getByRole("img", {
-      name: /Practice portfolio value over the selected sample period/,
+      name: /Practice portfolio value over the selected period/,
     })
     .focus();
   await page.keyboard.press("ArrowLeft");
@@ -389,7 +388,7 @@ test("portfolio chart supports inspection, zoom, pan, styles, and real sample pe
     initial = await window.textContent();
   await page
     .getByRole("img", {
-      name: /Practice portfolio value over the selected sample period/,
+      name: /Practice portfolio value over the selected period/,
     })
     .focus();
   await page.keyboard.press("ArrowLeft");

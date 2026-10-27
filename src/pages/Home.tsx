@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, ArrowUpRight, Plus } from "lucide-react";
 import { useApp } from "../lib/app-context.tsx";
@@ -25,14 +25,20 @@ const PortfolioChart = lazy(() =>
 
 export function Home() {
   const { state } = useApp(),
-    [period, setPeriod] = useState(60),
-    [approvedQuote, setApprovedQuote] = useState<Quote | null>(null);
+    [period, setPeriod] = useState(Infinity),
+    [approvedQuote, setApprovedQuote] = useState<Quote | null>(null),
+    [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
   const series = useMemo(
     () =>
       state
-        ? portfolioSeries(state.holdings, state.cash, state.instruments).slice(
-            -period,
-          )
+        ? (
+            state.portfolioHistory ??
+            portfolioSeries(state.holdings, state.cash, state.instruments)
+          ).slice(-period)
         : [],
     [state, period],
   );
@@ -61,8 +67,7 @@ export function Home() {
       {state.approvals
         .filter(
           (approval) =>
-            approval.state === "approved" &&
-            approval.quote.expiresAt > Date.now(),
+            approval.state === "approved" && approval.quote.expiresAt > now,
         )
         .map((approval) => (
           <div className="approved-notice" key={approval.id}>
@@ -116,7 +121,7 @@ export function Home() {
               [5, "1W"],
               [20, "1M"],
               [40, "2M"],
-              [60, "All"],
+              [Infinity, "All"],
             ].map(([amount, label]) => (
               <button
                 key={label}
@@ -139,9 +144,11 @@ export function Home() {
           <PortfolioChart points={series} />
         </Suspense>
         <p className="performance-note">
-          {hasLocalDecisions
-            ? "Current holdings valued across sample history; this is not your transaction history."
-            : "Sample price history · Jul 06 – Sep 25, 2026"}
+          {state.market?.mode === "market"
+            ? `Your account history · ${state.market.provider} · close ${state.market.asOf}`
+            : hasLocalDecisions
+              ? "Current holdings valued across sample history; this is not your transaction history."
+              : "Sample price history · Jul 06 – Sep 25, 2026"}
         </p>
       </section>
       <section className="portfolio-holdings" aria-labelledby="holdings-title">
@@ -157,7 +164,9 @@ export function Home() {
         <div className="holdings-table">
           <div className="holdings-table-head">
             <span>COMPANY</span>
-            <span className="holding-trend">SAMPLE TREND</span>
+            <span className="holding-trend">
+              {state.market?.mode === "market" ? "PRICE TREND" : "SAMPLE TREND"}
+            </span>
             <span>SHARES</span>
             <span>MARKET VALUE</span>
             <span>RETURN</span>

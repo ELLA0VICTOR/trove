@@ -1,12 +1,13 @@
 import { z } from "zod";
 import type { GuideReply } from "../../shared/model.ts";
 import { COACH_MODEL, CoachBudget } from "../jobs/coach-budget.ts";
+import { conceptIds } from "../../shared/learning.ts";
 
 const answer = z
   .object({
     text: z.string().min(1).max(2000),
     sources: z.array(z.string()).max(6),
-    concept: z.enum(["concentration", "horizon"]),
+    concept: z.enum(conceptIds),
   })
   .strict();
 const evidence = z
@@ -116,7 +117,7 @@ export class CoachGateway {
             properties: {
               text: { type: "string" },
               sources: { type: "array", items: { type: "string" } },
-              concept: { type: "string", enum: ["concentration", "horizon"] },
+              concept: { type: "string", enum: conceptIds },
             },
             required: ["text", "sources", "concept"],
             additionalProperties: false,

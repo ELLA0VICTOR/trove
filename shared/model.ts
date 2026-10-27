@@ -4,12 +4,39 @@ export interface Instrument {
   description: string;
   sector: string;
   color: string;
-  prices: { date: string; price: string }[];
+  prices: {
+    date: string;
+    price: string;
+    adjustedPrice?: string;
+    splitFactor?: number | null;
+    dividend?: number | null;
+  }[];
 }
 export interface Holding {
   symbol: string;
   units: string;
   cost: string;
+}
+export interface CorporateAction {
+  id: string;
+  symbol: string;
+  kind: "split" | "dividend";
+  date: string;
+  numerator: string;
+  denominator: string;
+  dividend: string;
+  price: string;
+}
+export interface Adjustment extends CorporateAction {
+  portfolioId: string;
+  fromDataset: string;
+  toDataset: string;
+  unitsBefore: string;
+  unitsAfter: string;
+  cashDelta: string;
+  costReleased: string;
+  recordedAt: string;
+  transactionDigest?: string;
 }
 export interface Decision {
   id: string;
@@ -23,6 +50,9 @@ export interface Decision {
   marketDate: string;
   origin: "sample" | "local";
   memoryStatus: "local" | "queued" | "confirmed";
+  portfolioId?: string;
+  datasetId?: string;
+  transactionDigest?: string;
 }
 export interface Memory {
   id: string;
@@ -57,6 +87,8 @@ export interface Quote {
   sequence: number;
   violations: string[];
   marketDate: string;
+  datasetId?: string;
+  portfolioId?: string;
 }
 export interface Approval {
   id: string;
@@ -70,6 +102,8 @@ export interface Attempt {
   answer: number;
   correct: boolean;
   recordedAt: string;
+  variant?: string;
+  phase?: "foundation" | "transfer";
 }
 export interface DemoState {
   id: string;
@@ -85,9 +119,28 @@ export interface DemoState {
   attempts: Attempt[];
   daySpent: string;
   spendDay: string;
+  adjustments?: Adjustment[];
+  portfolio?: {
+    id: string;
+    startedAt: string;
+    initialCash: string;
+    datasetId: string;
+  };
 }
 export interface AppSnapshot extends DemoState {
+  chain?: import("./chain.ts").ChainStatus;
   instruments: Instrument[];
+  market?: {
+    mode: "sample" | "market";
+    provider: string;
+    asOf: string;
+    receivedAt?: string;
+    datasetId?: string;
+    stale: boolean;
+    blocked?: boolean;
+    status: string;
+  };
+  portfolioHistory?: { date: string; value: number }[];
   session?: {
     mode: "sample" | "account";
     username?: string;

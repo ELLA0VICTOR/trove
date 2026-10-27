@@ -50,7 +50,14 @@ export function AppLayout() {
           )?.label ?? "Home");
   useEffect(() => {
     void refresh();
-  }, []);
+  }, [refresh]);
+  useEffect(() => {
+    if (!state?.market?.blocked && !state?.chain?.pending?.length) return;
+    const timer = setInterval(() => {
+      if (!document.hidden) void refresh();
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [state?.market?.blocked, state?.chain?.pending?.length, refresh]);
   useEffect(() => {
     const resumed = () => {
       if (!document.hidden) void refresh();
@@ -61,7 +68,7 @@ export function AppLayout() {
       window.removeEventListener("focus", resumed);
       document.removeEventListener("visibilitychange", resumed);
     };
-  }, []);
+  }, [refresh]);
   useEffect(() => {
     try {
       localStorage.setItem("trove-sidebar-hidden", sidebarHidden ? "1" : "0");
@@ -71,6 +78,7 @@ export function AppLayout() {
   }, [sidebarHidden]);
   useEffect(() => {
     window.scrollTo(0, 0);
+    // oxlint-disable-next-line react/set-state-in-effect -- A route transition dismisses the external navigation overlay.
     setMenuOpen(false);
   }, [location.pathname]);
   useEffect(() => {
@@ -212,9 +220,13 @@ export function AppLayout() {
             <span className="live-dot" />{" "}
             {state?.session?.mode === "account"
               ? "PRACTICE ACCOUNT"
-              : "SAMPLE EXPERIENCE"}{" "}
-            <span className="sample-separator">/</span> Practice funds ·
-            authored sample prices
+              : state?.market?.mode === "market"
+                ? "GUEST PRACTICE"
+                : "SAMPLE EXPERIENCE"}{" "}
+            <span className="sample-separator">/</span> Practice funds ·{" "}
+            {state?.market?.mode === "market"
+              ? `${state.market.provider} · ${state.market.asOf}${state.market.blocked ? " · UPDATING" : state.market.stale ? " · STALE" : ""}`
+              : "authored sample prices"}
           </span>
           <Link to="/app/evidence">
             About this build <ArrowRight size={13} />

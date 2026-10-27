@@ -1,54 +1,48 @@
-# Trove build status
+# Verification record
 
-Updated October 26, 2026. This is the current implementation record; architecture/research documents also describe future production work.
+Updated October 27, 2026. This record describes implementation checks and local integration evidence. Public deployment is configured through the [Render dashboard guide](RENDER-DEPLOY.md).
 
-## Working application
+## Financial ledger
 
-The approved landing design and white/forest-green consumer layout remain. Home, Learn, Explore, Decisions, Replay, Parent, and About this build work with practice funds and authored sample prices. Company logos and interactive portfolio charts remain intact.
+Guest and saved family portfolios use private immutable Marketstack snapshots with a provider, closing date, retrieval timestamp, and dataset hash once a fresh import is available. Earlier example portfolios are archived before switching to a new $1,000 market-price practice ledger; personal journal entries are preserved. Offline development retains labelled authored observations. Orders bind the portfolio and snapshot, and stale closing prices pause new orders.
 
-The guest sample stays separate from saved accounts. Its preview role switch applies only to guest data and cannot enter an authenticated family's records. Existing guest history is never uploaded.
+Automatic corporate entries cover forward/reverse splits, dividends, proportional basis release, and cash-in-lieu below share precision. Events are deduplicated by portfolio and provider identity. Historical observations preserve their original price basis; chart trends and replay use adjusted closes.
 
-Saved families now have separate parent and learner usernames/passwords, salted scrypt password hashes, random HttpOnly SameSite sessions stored as hashes, seven-day session expiry, login/registration limits, logout invalidation, and hashed single-use 24-hour learner invitations. Roles come from membership, not a dropdown. The first version supports one parent and one learner per family. New families start with $1,000 practice cash and no preloaded positions.
+## Sui and Tatum
 
-Parent limits, pause/resume, stale-policy checks, exact one-time approvals, integer accounting, two-minute reviewed quotes, and duplicate execution protection remain enforced by the local API. These are not yet Sui contract permissions. Parents cannot execute learner choices; learners cannot edit parent controls or enable memory sharing.
+The current compatible package upgrade is recorded in [the deployment manifest](../contracts/practice/deployment.testnet.json). Existing accounts retain their original type identity. Separate guardian/learner wallets control their respective actions, with sponsored Testnet gas and attested market terms.
 
-## Connected memory and coaching
+The live order flow created a practice account, updated policy, approved an exact exception, executed a learner order, and reconciled Tatum receipts and BCS object contents. Additional browser execution exercised wallet-standard signing.
 
-A parent explicitly enables remembering in Account settings. This covers that family's existing and new practice reasons, reflections, corrections and lesson results. The managed relayer processes plaintext before encrypted storage; namespaces and API authorization provide application isolation, not separate family-owned encryption keys. The operator holds the configured delegate.
+An isolated synthetic corporate scenario executed against the upgraded package through Tatum. A 0.25-share position became 0.5 shares, a $1-per-share fixture credited $0.50 simulated cash, and cost basis, guardian policy, and daily spending stayed unchanged. Repeated reconciliation posted once. Receipt: `9YFKkonMm4PLMW5Px11YVx8bYwwGsULnH9xMnL3Sc6fE`.
 
-Domain changes and memory jobs are persisted atomically. The worker uses stable operation keys, persisted accepted job IDs, leases with fencing, backoff, and confirmed blob IDs. Accepted jobs are not counted as confirmed. Guest jobs remain held. Removing/correcting a thought excludes it from future coaching; never-dispatched payloads are removed, while attempted/confirmed jobs retain withdrawal metadata. This is not remote erasure. Pausing prevents new submission requests and live coaching; already in-flight jobs can finish and are reconciled.
+Local sanitized evidence:
 
-The live OpenAI guide retrieves from the authorized Walrus namespace, matches results against active canonical records and confirmed blob receipts, excludes superseded/removed/wrong-scope/changed records, and prioritizes the current correction. Pending thoughts block stale coaching. Citation and correction checks run before a reply is shown. Provider failure returns an explicit error rather than fabricated recall or a silent local substitute.
+- `.artifacts/contracts/confirmed-chain-loop.json`
+- `.artifacts/contracts/corporate-live-proof.json`
 
-A durable five-minute reply cache avoids another model call for an unchanged question/context. Concurrent duplicates are coalesced by a persisted claim; changed thoughts invalidate results. Family/global request limits, bounded excerpts, 384 output tokens, no paid tools, no automatic model retries/fallbacks, and a persistent user-approved $1 allowance bound usage. This allowance estimates this adapter's usage, not all spending on the OpenAI key.
+The corporate scenario used synthetic market events; the Testnet execution and Tatum confirmation were actual network operations.
 
-The API reads ignored .env.local through the development command. Adding keys alone does not upload guest records; authenticated membership and parent consent are required. TROVE_LIVE_SERVICES=0 disables live services for an offline run.
+## Memory and learning
 
-## Actual external validation
+Ten active synthetic learning records were confirmed on Walrus Mainnet, followed by correction-aware coaching and fresh-session retrieval. The separate corporate fixture keeps memory consent off.
 
-- Tatum Testnet and Mainnet checkpoint reads passed provider preflight.
-- Marketstack returned 43 AAPL daily observations in a bounded history check. These observations are not yet the app's dataset.
-- A non-personal demonstration ran through the actual account/domain API: four practice choices, two concept checks with initial mistakes and successful follow-ups, reflections, and a correction.
-- **Ten distinct active learning records reached Walrus Mainnet done status with blob IDs.** These are explicitly synthetic demo practice activity over authored market observations, not real investment actions or measured human learning.
-- OpenAI retrieved and cited the actual stored correction, then did so again after logout and a fresh authenticated session. Repeating the unchanged question used the cache.
-- Total OpenAI ledger estimate at that checkpoint: **$0.0002884 across three generation requests**, including the earlier standalone preflight. No automatic retry made another model call.
-- The first integrated guide attempt returned 503 before a generation request; a subsequent deliberate read/guide attempt succeeded without recreating any memory writes. This is observed behavior, not a claim of uninterrupted provider reliability.
+The guide verifies active scoped records and confirmed blob evidence. Publication, corrections, pending jobs, restart recovery, and usage reservations have deterministic test coverage.
 
-Sanitized local proof is in .artifacts/integrations/confirmed-memory-loop-2026-10-26.json. Private generated demo credentials are in .trove/demo-access.json; both directories are ignored by Git. About this build reports the current family's actual confirmed count rather than a global hardcoded number.
+The 32-case real-model evaluation covered no-history, original-history, corrected-history, and injected-history inputs across eight concepts. Its mechanical grounding/citation checks passed. Estimated local model usage after that evaluation was $0.0023142 within the configured $1 allowance. See [learning evaluation](LEARNING-EVALUATION.md) for method and interpretation.
 
-## Verification
+## Validation suites
 
-- 55 accounting, API, account, memory journal/worker, scoped learning and cost-control tests. Tests cover cross-family cookie/ID attempts, parent/learner authority, invitations, login/logout/expiry, consent, atomic rollback, immutable payloads, retries, stale leases, correction priority, missing memory, concurrent explanations, cache invalidation and budget persistence.
-- 15 Chromium journeys, including family creation, an independent learner session, invitation redemption, role refusal, returning history, plus the existing portfolio/learning/approval/replay/mobile journeys.
-- TypeScript and production build checks. These checks do not constitute a security audit or prove educational effectiveness.
+- 78 Node tests: accounting, corporate actions, historical valuation, real-price guest entry and sample archival, family authority, durable memory, learning, cost control, market data, chain recovery, upgraded type identity, and receipt validation.
+- 21 Move tests: signed financial transitions, authority, limits, one-time exceptions, replay/tampering, expiry, passive corporate entries, reverse-split remainders, and duplicate-event prevention.
+- 15 Chromium journeys: navigation, responsive layout, portfolio interactions, learning, decisions, guardian controls, and returning family accounts.
+- TypeScript production compilation and Oxlint.
+- Production Node smoke checks: health, SPA deep links, built assets and caching, API errors, trusted origin, secure cookie attributes, cross-origin refusal, and restart persistence.
 
-## Remaining implementation
+Runtime keys, private test identities, provider payloads, and generated artifacts remain in ignored storage.
 
-1. Import/cache entitled real market observations into the app, with consistent corporate-action handling, date alignment and explicit daily-price freshness. The current portfolio plot still values the current mix across a sample period, not a reconstructed transaction ledger.
-2. Implement/test/deploy the Sui Testnet practice contract, genuine wallet-signing authority, exact approval and price-attestor boundaries, and Tatum reconciliation. Checkpoint preflight alone is not the final Tatum product integration.
-3. Complete remote memory renewal/removal/expiry lifecycle, operational diagnostics and recovery, and broader multi-family isolation/failure evaluation. Account sharing currently has one parent and one learner.
-4. Expand and evaluate the learning loop beyond the two implemented concepts. Run held-out history/no-history/correction and injection cases within the $1 allowance; report outcomes and failures honestly.
-5. Prepare production storage, HTTPS/origin configuration, account recovery/password reset and deployment hardening. Username/password local sign-in works without Enoki/Google configuration; preferred wallet/Google login remains optional future work.
-6. Finish the hosted demo, public sanitized repository, published blog and short video. No publishing, submission or winner claim has been made.
+## Deployment
 
-**Current demonstrated Mainnet learning records: 10. Sui practice transactions: 0. Real stock purchases: none.**
+The Dockerfile and Render Blueprint run a single Web Service with a persistent disk. Render supplies the public HTTPS origin. The hosted build, public URL, and post-deploy smoke checks are completed when the service is deployed.
+
+Local Docker execution is unavailable on this Windows machine because WSL virtualization is disabled. The production Node process and its persistence checks run locally. Provider display entitlements and the chosen Render service/disk plan are configured in their respective dashboards.

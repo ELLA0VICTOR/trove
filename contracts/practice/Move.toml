@@ -1,0 +1,10 @@
+[package]
+name = "trove_practice"
+edition = "2024.beta"
+license = "MIT"
+
+[dependencies]
+Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "testnet-v1.82.2" }
+
+[addresses]
+trove = "0x0"

@@ -15,6 +15,9 @@ export function Decisions() {
     [reflectionId, setReflectionId] = useState<string | undefined>(),
     [filter, setFilter] = useState("All");
   if (!state) return null;
+  const adjustments = (state.adjustments ?? []).filter(
+    (entry) => entry.portfolioId === state.portfolio?.id,
+  );
   const decisions = state.decisions.filter(
     (decision) =>
       filter === "All" ||
@@ -108,6 +111,53 @@ export function Decisions() {
           No {filter === "All" ? "decisions" : filter.toLowerCase()} yet.
         </p>
       )}
+      {filter === "All" && adjustments.length > 0 && (
+        <section
+          className="portfolio-holdings"
+          aria-label="Splits and dividends"
+        >
+          <div className="holdings-heading">
+            <h2>Splits & dividends</h2>
+          </div>
+          {adjustments.map((entry) => (
+            <article
+              className="compact-decision-row"
+              key={`${entry.portfolioId}:${entry.id}`}
+            >
+              <CompanyLogo symbol={entry.symbol} />
+              <div className="compact-decision-copy">
+                <h3>
+                  {entry.symbol} ·{" "}
+                  {entry.kind === "split"
+                    ? `${entry.numerator}-for-${entry.denominator} split`
+                    : "Cash dividend"}
+                </h3>
+                <span>{entry.date}</span>
+                <p>
+                  {entry.kind === "split"
+                    ? `${shares(entry.unitsBefore)} → ${shares(entry.unitsAfter)} shares`
+                    : `${money(entry.dividend, 4)} per share`}
+                </p>
+              </div>
+              <strong>
+                {BigInt(entry.cashDelta) > 0n
+                  ? `+${money(entry.cashDelta)}`
+                  : "Applied"}
+              </strong>
+              {entry.transactionDigest && (
+                <a
+                  aria-label="View adjustment receipt"
+                  href={`https://suiscan.xyz/testnet/tx/${entry.transactionDigest}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <ChevronRight size={17} />
+                </a>
+              )}
+            </article>
+          ))}
+        </section>
+      )}
       {selected && (
         <Modal title="DECISION DETAILS" onClose={() => setSelected(null)}>
           <div className="decision-modal-company">
@@ -131,7 +181,9 @@ export function Decisions() {
             <strong>{shares(selected.units)}</strong>
           </div>
           <div className="detail-fact">
-            <span>Sample market date</span>
+            <span>
+              {selected.datasetId ? "Market close date" : "Sample market date"}
+            </span>
             <strong>{selected.marketDate}</strong>
           </div>
           <div className="detail-fact">
@@ -141,6 +193,17 @@ export function Decisions() {
             </strong>
           </div>
           <h3 className="reason-heading">Original reason</h3>
+          {selected.transactionDigest && (
+            <p>
+              <a
+                href={`https://suiscan.xyz/testnet/tx/${selected.transactionDigest}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                View confirmed Sui Testnet receipt ↗
+              </a>
+            </p>
+          )}
           <blockquote className="decision-quote">
             {selected.reason || "No reason recorded."}
           </blockquote>

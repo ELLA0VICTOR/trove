@@ -5,7 +5,6 @@ import { bodyLimit } from "hono/body-limit";
 import { secureHeaders } from "hono/secure-headers";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import { instruments } from "../shared/fixtures.ts";
 import { InputError, parseDollars } from "../shared/model.ts";
 import { localGuide, nextExercise } from "../shared/learning.ts";
 import { DomainError, execute, preview } from "./domain.ts";
@@ -15,37 +14,61 @@ import type { Member } from "./auth.ts";
 import { LearningUnavailable } from "./learning-service.ts";
 import type { LiveLearning } from "./learning-service.ts";
 import type { DemoState } from "../shared/model.ts";
+import { MarketService, marketStale } from "./market.ts";
+import { ChainService } from "./chain.ts";
 
 const textSchema = z.string().trim().min(1).max(1500);
 type Environment = { Variables: { family: string; member: Member | null } };
 export function createApp(
   store: DemoStore,
-  options: { learning?: LiveLearning } = {},
+  options: {
+    learning?: LiveLearning;
+    market?: MarketService;
+    chain?: ChainService;
+    publicOrigin?: string;
+  } = {},
 ) {
   const accounts = new Accounts(store);
+  const market = options.market ?? new MarketService(store);
+  const chain = options.chain ?? new ChainService(store, market);
   const app = new Hono<Environment>();
   const stateFor = (c: Context<Environment>) => {
     const state = store.get(c.get("family"));
     return { ...state, role: c.get("member")?.role ?? state.role };
   };
+  const marketState = (state: DemoState) => {
+    const currentMarket = market.latest();
+    if (!state.portfolio && currentMarket && !marketStale(currentMarket.asOf)) {
+      // Archive the old price basis before opening a fresh market-backed ledger.
+      // Guest visitors receive the same real observations as signed-in families.
+      market.enroll(state.id, true, true);
+    }
+    return market.advance(state.id);
+  };
   const snapshot = (
     state: DemoState,
     c: Context<Environment>,
     member = c.get("member"),
-  ) => ({
-    ...state,
-    role: member?.role ?? state.role,
-    instruments,
-    session: {
-      mode: member ? ("account" as const) : ("sample" as const),
+  ) => {
+    state = marketState(state);
+    return {
+      ...state,
       role: member?.role ?? state.role,
-      username: member?.username,
-      memoryEnabled: store.profile(state.id)?.memory_enabled === 1,
-      servicesReady: Boolean(
-        options.learning?.ready && options.learning?.coachReady,
-      ),
-    },
-  });
+      instruments: market.instruments(state),
+      market: market.status(state),
+      portfolioHistory: market.history(state),
+      chain: member ? chain.status(member) : undefined,
+      session: {
+        mode: member ? ("account" as const) : ("sample" as const),
+        role: member?.role ?? state.role,
+        username: member?.username,
+        memoryEnabled: store.profile(state.id)?.memory_enabled === 1,
+        servicesReady: Boolean(
+          options.learning?.ready && options.learning?.coachReady,
+        ),
+      },
+    };
+  };
   const requireMember = (c: Context<Environment>, role?: Member["role"]) => {
     const member = c.get("member");
     if (!member || (role && member.role !== role))
@@ -74,7 +97,9 @@ export function createApp(
       sameSite: "Strict",
       path: "/",
       maxAge: 7 * 86400,
-      secure: c.req.url.startsWith("https:"),
+      secure:
+        Boolean(options.publicOrigin?.startsWith("https:")) ||
+        c.req.url.startsWith("https:"),
     });
     return c.json(snapshot(store.get(result.member.family), c, result.member));
   };
@@ -92,6 +117,7 @@ export function createApp(
       !["GET", "HEAD"].includes(c.req.method) &&
       origin &&
       ![
+        ...(options.publicOrigin ? [options.publicOrigin] : []),
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "http://localhost:3001",
@@ -128,6 +154,7 @@ export function createApp(
         sameSite: "Strict",
         path: "/",
         maxAge: 60 * 60 * 24 * 30,
+        secure: Boolean(options.publicOrigin?.startsWith("https:")),
       });
     }
     c.set("family", family);
@@ -175,6 +202,7 @@ export function createApp(
       sameSite: "Strict",
       path: "/",
       maxAge: 30 * 86400,
+      secure: Boolean(options.publicOrigin?.startsWith("https:")),
     });
     return c.json(snapshot(store.get(family), c, null));
   });
@@ -199,6 +227,61 @@ export function createApp(
     return c.json(snapshot(store.get(member.family), c));
   });
   app.get("/api/state", (c) => c.json(snapshot(stateFor(c), c)));
+  app.get("/api/chain/status", (c) => c.json(chain.status(requireMember(c))));
+  app.get("/api/chain/transactions/:id", (c) => {
+    const member = requireMember(c),
+      id = z.uuid().parse(c.req.param("id"));
+    const row = store.db
+      .prepare("SELECT state,digest FROM chain_intents WHERE id=? AND family=?")
+      .get(id, member.family) as { state: string; digest: string } | undefined;
+    if (!row)
+      throw new DomainError("This transaction is not part of your family.");
+    return c.json(row);
+  });
+  app.post("/api/chain/challenge", async (c) => {
+    const input = z.object({ address: z.string() }).parse(await c.req.json());
+    return c.json(chain.challenge(requireMember(c), input.address));
+  });
+  app.post("/api/chain/link", async (c) => {
+    const input = z
+      .object({ id: z.uuid(), signature: z.string().max(3000) })
+      .parse(await c.req.json());
+    return c.json(
+      await chain.link(requireMember(c), input.id, input.signature),
+    );
+  });
+  app.post("/api/chain/prepare", async (c) =>
+    c.json(await chain.prepare(requireMember(c), await c.req.json())),
+  );
+  app.post("/api/chain/submit", async (c) => {
+    const input = z
+      .object({ id: z.uuid(), signature: z.string().max(3000) })
+      .parse(await c.req.json());
+    const result = await chain.submit(
+      requireMember(c),
+      input.id,
+      input.signature,
+    );
+    return c.json({ ...result, snapshot: snapshot(stateFor(c), c) });
+  });
+  app.post("/api/chain/cancel", async (c) => {
+    const input = z.object({ id: z.uuid() }).parse(await c.req.json());
+    chain.cancel(requireMember(c), input.id);
+    return c.json(snapshot(stateFor(c), c));
+  });
+  app.post("/api/chain/reconcile", async (c) => {
+    const member = requireMember(c);
+    accounts.limit(`chain-recheck:${member.family}`, 6, 60_000);
+    accounts.limit("chain-recheck:global", 30, 60_000);
+    await chain.reconcilePending();
+    return c.json(snapshot(stateFor(c), c));
+  });
+  app.post("/api/account/market", (c) => {
+    const member = requireMember(c, "parent");
+    chain.assertLocal(member.family);
+    const state = market.enroll(member.family, true);
+    return c.json(snapshot(state, c));
+  });
   app.post("/api/preview-role", async (c) => {
     if (c.get("member"))
       throw new AccessError(
@@ -230,11 +313,18 @@ export function createApp(
         reason: z.string().max(1500).default(""),
       })
       .parse(await c.req.json());
-    const quote = preview(stateFor(c), input);
+    marketState(stateFor(c));
+    if (chain.account(c.get("family"))) await chain.maintain(c.get("family"));
+    const state = stateFor(c);
+    market.assertTradable(state);
+    const quote = preview(state, input, market.instruments(state));
+    if (chain.account(state.id)) quote.expiresAt = await chain.quoteExpiry();
     store.putQuote(c.get("family"), quote);
     return c.json(quote);
   });
   app.post("/api/orders/execute", async (c) => {
+    chain.assertLocal(c.get("family"));
+    market.assertTradable(marketState(stateFor(c)));
     const { quoteId } = z
       .object({ quoteId: z.uuid() })
       .parse(await c.req.json());
@@ -277,6 +367,7 @@ export function createApp(
         403,
       );
     const approval = state.approvals.find((a) => a.id === c.req.param("id"));
+    if (approve) chain.assertLocal(state.id);
     if (!approval || approval.state !== "requested")
       throw new DomainError("This request is no longer awaiting approval.");
     if (
@@ -293,6 +384,7 @@ export function createApp(
     return c.json(snapshot(state, c));
   });
   app.post("/api/policy", async (c) => {
+    chain.assertLocal(c.get("family"));
     const input = z
       .object({
         perTrade: z.string().max(12),
@@ -392,20 +484,34 @@ export function createApp(
         return c.json(await options.learning.explain(member.family, question));
       }
     }
-    return c.json(localGuide(stateFor(c), instruments, question));
+    return c.json(
+      localGuide(stateFor(c), market.instruments(stateFor(c)), question),
+    );
   });
   app.get("/api/exercise", (c) => {
-    const { correct: _, ...exercise } = nextExercise(stateFor(c));
+    const {
+      correct: _,
+      explanation: __,
+      ...exercise
+    } = nextExercise(stateFor(c));
     return c.json(exercise);
   });
   app.post("/api/exercise", async (c) => {
     learnerAction(c);
-    const { answer, concept } = z
-      .object({ answer: z.number().int().min(0).max(2), concept: z.string() })
+    const { answer, concept, variant } = z
+      .object({
+        answer: z.number().int().min(0).max(2),
+        concept: z.string(),
+        variant: z.string().optional(),
+      })
       .parse(await c.req.json());
     const state = stateFor(c),
       exercise = nextExercise(state);
-    if (concept !== exercise.concept)
+    if (
+      concept !== exercise.concept ||
+      (variant && variant !== exercise.variant) ||
+      (!variant && exercise.phase === "transfer")
+    )
       throw new DomainError(
         "Your next lesson changed. Please reopen the question.",
       );
@@ -417,11 +523,13 @@ export function createApp(
       answer,
       correct,
       recordedAt,
+      variant: exercise.variant,
+      phase: exercise.phase,
     });
     state.memories.unshift({
       id: randomUUID(),
       kind: "learning",
-      text: `Answered “${exercise.options[answer]}” in a ${exercise.concept} exercise. ${correct ? "Matched the concept rubric." : "This concept needs another look."}`,
+      text: `Answered “${exercise.options[answer]}” in ${exercise.variant}. ${correct ? "Matched the concept rubric." : "This concept needs another look."}`,
       recordedAt,
       active: true,
       origin: "local",
@@ -435,9 +543,22 @@ export function createApp(
   });
   app.get("/api/integrations", (c) =>
     c.json({
-      mode: "local-demo",
-      marketData: "authored-sample",
-      chain: { connected: false, network: "testnet", provider: "Tatum" },
+      mode: c.get("member") ? "family-practice" : "local-demo",
+      marketData: market.status(stateFor(c)),
+      chain: {
+        connected: Boolean(chain.config),
+        network: "testnet",
+        provider: "Tatum",
+        account: chain.account(c.get("family"))?.object_id,
+        pending: chain.pending(c.get("family")).length,
+        confirmed: (
+          store.db
+            .prepare(
+              "SELECT COUNT(*) AS n FROM chain_intents WHERE family=? AND state='confirmed'",
+            )
+            .get(c.get("family")) as { n: number }
+        ).n,
+      },
       memory: {
         connected: Boolean(options.learning?.ready),
         network: "mainnet",
@@ -453,7 +574,7 @@ export function createApp(
             : "deterministic-local",
         connected: Boolean(options.learning?.coachReady),
       },
-      storage: "local-sqlite",
+      storage: options.publicOrigin ? "persistent-sqlite" : "local-sqlite",
       authentication: c.get("member")
         ? "password-session"
         : "sample-role-preview",

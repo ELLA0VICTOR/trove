@@ -1,6 +1,6 @@
 import type { Instrument } from "../../shared/model.ts";
 
-/** A compact view of the instrument's actual sample series, without a second data source. */
+/** Corporate-action-adjusted performance from the same cached price series. */
 export function Sparkline({
   instrument,
   className = "",
@@ -8,7 +8,9 @@ export function Sparkline({
   instrument: Instrument;
   className?: string;
 }) {
-  const values = instrument.prices.map((point) => Number(point.price));
+  const values = instrument.prices.map((point) =>
+    Number(point.adjustedPrice ?? point.price),
+  );
   if (values.length < 2) return null;
   const min = Math.min(...values),
     spread = Math.max(...values) - min || 1;
@@ -24,7 +26,7 @@ export function Sparkline({
       className={`sparkline ${rising ? "rising" : "falling"} ${className}`}
       viewBox="0 0 128 48"
       role="img"
-      aria-label={`${instrument.name} sample period trend: ${rising ? "up" : "down"}`}
+      aria-label={`${instrument.name} period trend: ${rising ? "up" : "down"}`}
     >
       <path
         d={path}

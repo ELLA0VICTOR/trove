@@ -15,13 +15,14 @@ import { money, USD_SCALE } from "../../shared/model.ts";
 import { Button, Modal } from "../components/UI.tsx";
 import { CompanyLogo } from "../components/CompanyLogo.tsx";
 import { AccountDialog } from "../components/AccountDialog.tsx";
+import { chainAction } from "../lib/wallet.ts";
 
 export function Parent() {
-  const { state, update, busy, notify } = useApp(),
+  const { state, update, busy, notify, refresh } = useApp(),
     navigate = useNavigate(),
     [editing, setEditing] = useState(false),
     [accountOpen, setAccountOpen] = useState(false),
-    [now, setNow] = useState(Date.now());
+    [now, setNow] = useState(Date.now);
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 10_000);
     return () => clearInterval(timer);
@@ -44,13 +45,17 @@ export function Parent() {
   }
   async function togglePause() {
     try {
-      await update("/policy", {
+      const policy = {
         perTrade: String(Number(state!.policy.perTrade) / Number(USD_SCALE)),
         daily: String(Number(state!.policy.daily) / Number(USD_SCALE)),
         paused: !state!.policy.paused,
-      });
-    } catch {
-      /* Provider displays failure. */
+      };
+      if (state!.chain?.account) {
+        await chainAction({ action: "policy", ...policy }, state!.chain.wallet);
+        await refresh();
+      } else await update("/policy", policy);
+    } catch (e) {
+      notify((e as Error).message);
     }
   }
   return (
@@ -94,7 +99,7 @@ export function Parent() {
           <p>
             {state.session?.mode === "account"
               ? "Sign out and sign in with the parent account to manage limits."
-              : "Guest sample. Sign in to create a saved family account."}
+              : "Guest preview. Sign in to create a saved family account."}
           </p>
         </section>
       ) : (
@@ -220,13 +225,23 @@ export function Parent() {
                         <Button
                           disabled={busy || expired || stale}
                           onClick={() =>
-                            void update("/approvals/" + request.id, {
-                              approve: true,
-                            })
+                            void (
+                              state.chain?.account
+                                ? chainAction(
+                                    {
+                                      action: "approve",
+                                      approvalId: request.id,
+                                    },
+                                    state.chain.wallet,
+                                  ).then(() => refresh())
+                                : update("/approvals/" + request.id, {
+                                    approve: true,
+                                  })
+                            )
                               .then(() =>
                                 notify("Approved for this action only."),
                               )
-                              .catch(() => {})
+                              .catch((e) => notify((e as Error).message))
                           }
                         >
                           <Check size={15} />
@@ -249,7 +264,10 @@ export function Parent() {
             })}
           </section>
           <p className="parent-controls-note">
-            Local parent preview. Daily allowance resets at 00:00 UTC.
+            {state.chain?.account
+              ? "Controls enforced on Sui Testnet."
+              : "Practice controls."}{" "}
+            Daily allowance resets at 00:00 UTC.
           </p>
         </>
       )}
@@ -260,7 +278,7 @@ export function Parent() {
 }
 
 function LimitsDialog({ onClose }: { onClose: () => void }) {
-  const { state, update, busy, notify } = useApp(),
+  const { state, update, busy, notify, refresh } = useApp(),
     [perTrade, setPerTrade] = useState(
       String(Number(state!.policy.perTrade) / Number(USD_SCALE)),
     ),
@@ -272,11 +290,15 @@ function LimitsDialog({ onClose }: { onClose: () => void }) {
     event.preventDefault();
     setError("");
     try {
-      await update("/policy", {
+      const policy = {
         perTrade,
         daily,
         paused: state!.policy.paused,
-      });
+      };
+      if (state!.chain?.account) {
+        await chainAction({ action: "policy", ...policy }, state!.chain.wallet);
+        await refresh();
+      } else await update("/policy", policy);
       notify("Limits saved.");
       onClose();
     } catch (error) {

@@ -48,3 +48,8 @@ coverage/
 *.key
 *.p12
 *.pfx
+
+# Move compiler output and local CLI state
+contracts/**/build/
+contracts/**/.sui/
+.railway/

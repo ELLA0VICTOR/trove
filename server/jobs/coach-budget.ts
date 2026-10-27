@@ -83,7 +83,7 @@ export class CoachBudget {
       )
       .run(id);
   }
-  private total() {
+  total() {
     return (
       this.db
         .prepare(

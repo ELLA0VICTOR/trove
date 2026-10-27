@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { DemoState, Quote } from "../shared/model.ts";
+import type { DemoState, Quote, Instrument } from "../shared/model.ts";
 import {
   buy,
   sell,
@@ -54,9 +54,10 @@ export function preview(
     amount: string;
     reason: string;
   },
+  prices: Instrument[] = instruments,
 ): Quote {
   rolledState(state);
-  const instrument = instruments.find((i) => i.symbol === input.symbol);
+  const instrument = prices.find((i) => i.symbol === input.symbol);
   if (!instrument)
     throw new DomainError("This company is not available in this sample.");
   const point = latest(instrument);
@@ -81,6 +82,8 @@ export function preview(
     sequence: state.sequence,
     violations: [],
     marketDate: point.date,
+    datasetId: state.portfolio?.datasetId,
+    portfolioId: state.portfolio?.id,
   };
   nonBypassable(state, quote);
   if (quote.side === "buy" && requested > BigInt(state.policy.perTrade))
@@ -112,10 +115,19 @@ export function execute(
       );
     if (
       quote.revision !== state.policy.revision ||
-      quote.sequence !== state.sequence
+      quote.sequence !== state.sequence ||
+      quote.datasetId !== state.portfolio?.datasetId ||
+      quote.portfolioId !== state.portfolio?.id
     )
       throw new DomainError(
         "Your account changed since this preview. Please review the order again.",
+      );
+    if (
+      state.portfolio &&
+      Date.now() - Date.parse(quote.marketDate + "T21:00:00Z") > 5 * 86400_000
+    )
+      throw new DomainError(
+        "Prices are stale. Review a fresh daily close before continuing.",
       );
     nonBypassable(state, quote);
     const approval = state.approvals.find(
@@ -161,6 +173,8 @@ export function execute(
       marketDate: quote.marketDate,
       origin: "local",
       memoryStatus: "local",
+      portfolioId: quote.portfolioId,
+      datasetId: quote.datasetId,
     });
     if (quote.reason)
       state.memories.unshift({

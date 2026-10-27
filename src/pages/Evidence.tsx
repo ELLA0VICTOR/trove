@@ -7,17 +7,22 @@ export function Evidence() {
   const { state, update, notify } = useApp(),
     [status, setStatus] = useState<Record<string, unknown> | null>(null),
     [reset, setReset] = useState(false);
+  const confirmedMemories = state?.memories.filter(
+    (memory) => memory.blobId,
+  ).length;
   useEffect(() => {
     void api<Record<string, unknown>>("/integrations")
       .then(setStatus)
       .catch(() => setStatus(null));
-  }, [state?.id, state?.memories.filter((memory) => memory.blobId).length]);
+  }, [state?.id, confirmedMemories]);
   if (!state) return null;
   const memory = status?.memory as
     { connected?: boolean; confirmed?: number } | undefined;
   const coach = status?.coach as
     { connected?: boolean; mode?: string } | undefined;
   const account = state.session?.mode === "account";
+  const chain = status?.chain as
+    { connected?: boolean; confirmed?: number } | undefined;
   const receipts = (
     (
       status?.localMemory as
@@ -45,18 +50,14 @@ export function Evidence() {
           <br />
           <span className="accent">Honest foundations.</span>
         </h1>
-        <p>
-          What this local version does today, and what still needs to connect.
-        </p>
+        <p>What this version does today, with evidence from your account.</p>
       </section>
       <div className="evidence-status">
         <span className="live-dot" />
-        <strong>
-          {status ? "Local API connected" : "Checking local API…"}
-        </strong>
+        <strong>{status ? "API connected" : "Checking API…"}</strong>
         <span>
-          {account ? "Family account" : "Sample family"} · persistent local
-          SQLite
+          {account ? "Family account" : "Guest practice"} · saved practice
+          history
         </span>
       </div>
       <div className="evidence-grid">
@@ -74,14 +75,16 @@ export function Evidence() {
             "Working locally",
             coach?.mode === "live"
               ? "The OpenAI guide uses confirmed, recalled Walrus memories, validates its sources, respects corrections, and caches unchanged explanations within the shared $1 allowance."
-              : "A deterministic sample guide uses saved thoughts, respects corrections, and changes the next exercise after a successful concept check. Sign in and enable remembering for the live guide.",
+              : "The local guide uses saved thoughts and respects corrections. Sign in and enable remembering for explanations grounded in confirmed Walrus memories.",
             true,
           ],
           [
             "03",
             "DECISION REPLAY",
             "Working locally",
-            "Two allocations are calculated over the same authored sample period, with matching starting funds and explicit assumptions.",
+            state.market?.mode === "market"
+              ? "Two allocations use aligned Marketstack dates and adjusted closes, with matching starting funds and explicit assumptions."
+              : "Two allocations use the same authored sample period, matching starting funds, and explicit assumptions.",
             true,
           ],
           [
@@ -90,21 +93,25 @@ export function Evidence() {
             memory?.connected ? "Configured" : "Not connected",
             account
               ? "With parent consent, learning records enter a durable write queue. Only completed jobs with blob receipts count as confirmed. Corrected or removed thoughts are excluded from coaching."
-              : "Available to signed-in family accounts with parent consent. Guest sample history stays local and is never uploaded.",
+              : "Available to signed-in family accounts with parent consent. Guest learning history stays local.",
             Boolean(memory?.connected),
           ],
           [
             "05",
             "TATUM & SUI",
-            "Not connected",
-            "Tatum checkpoint reads passed provider preflight. Signed transactions and the practice contract are not connected; current practice limits run in the API.",
-            false,
+            chain?.connected ? "Testnet configured" : "Not connected",
+            state.chain?.account
+              ? "Wallet-signed parent controls and learner orders execute in the Sui practice contract. Tatum receipts and account objects reconcile balances before the app records the action. No real shares or funds."
+              : "The Testnet practice contract supports separate parent and learner wallets, signed price attestations, and sponsored gas. Link wallets in Account settings to start a Sui practice portfolio. Ordinary practice remains in the API.",
+            Boolean(chain?.connected),
           ],
           [
             "06",
             "MARKET DATA & SIGN-IN",
             "Family sign-in ready",
-            "Parent and learner accounts use separate credentials, expiring sessions, and single-use invitations. Prices in the app remain authored samples; a real AAPL history read passed preflight.",
+            state.market?.mode === "market"
+              ? `${state.market.provider}, dated ${state.market.asOf}. Only validated USD observations are used. Separate family sign-ins, expiring sessions, and single-use invitations protect account roles.`
+              : "Offline examples use authored observations. A connected server opens market-price portfolios automatically once a fresh Marketstack snapshot is available.",
             true,
           ],
         ].map(([number, title, label, description, connected]) => (
@@ -131,7 +138,7 @@ export function Evidence() {
         </div>
         <div>
           <span>LIVE CHAIN TRANSACTIONS</span>
-          <strong>0</strong>
+          <strong>{chain?.confirmed ?? 0}</strong>
         </div>
       </div>
       <section className="evidence-note">
@@ -160,12 +167,12 @@ export function Evidence() {
         <h2>
           {account
             ? "Your family’s practice account."
-            : "Your local sample is yours to explore."}
+            : "Your guest practice account."}
         </h2>
         <p>
           {account
-            ? "Your family’s practice choices are saved on this server and restored when you sign in again. Walrus storage is enabled only with parent consent. This version does not move money or buy real stocks. Hosted deployment, recovery, and onchain permissions still need implementation."
-            : "Guest choices persist for this browser’s sample cookie. Resetting restores the example. Create a family account to return with a sign-in on another session. This version does not move money or buy stocks."}
+            ? "Your family’s practice choices are saved on this server and restored when you sign in again. Parent consent enables Walrus memory. Connected Sui accounts enforce guardian rules through signed Testnet transactions. Balances and orders are simulated."
+            : "Guest practice is saved for this browser. Create a family account to sign in from another session, invite a learner, and enable remembered learning. Practice balances and orders are simulated."}
         </p>
         <div className="evidence-actions">
           <Link to="/app" className="text-link">
@@ -173,22 +180,22 @@ export function Evidence() {
           </Link>
           {!account && (
             <button className="text-link" onClick={() => setReset(true)}>
-              Reset my local sample <RotateCcw size={15} />
+              Reset guest practice <RotateCcw size={15} />
             </button>
           )}
         </div>
       </section>
       {reset && (
-        <Modal title="A FRESH SAMPLE START" onClose={() => setReset(false)}>
+        <Modal title="RESET GUEST PRACTICE" onClose={() => setReset(false)}>
           <h2>
-            Start this sample
+            Start your practice
             <br />
             from the seed.
           </h2>
           <p>
-            This removes the new practice orders, reflections, and settings in
-            your local sample family. The original illustrative journey will
-            return.
+            This clears your guest orders, reflections, and settings. Connected
+            servers start with $1,000 in practice cash and market prices;
+            offline servers restore the example.
           </p>
           <div className="modal-actions">
             <button className="text-link" onClick={() => setReset(false)}>
@@ -199,12 +206,12 @@ export function Evidence() {
                 void update("/reset", {})
                   .then(() => {
                     setReset(false);
-                    notify("Your local sample has a fresh start.");
+                    notify("Your guest practice has a fresh start.");
                   })
                   .catch(() => {})
               }
             >
-              Reset sample <RotateCcw size={16} />
+              Reset practice <RotateCcw size={16} />
             </Button>
           </div>
         </Modal>

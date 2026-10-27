@@ -1,69 +1,62 @@
-# Trove integration setup
+# Integration setup
 
-Prepared October 26, 2026. Checklist for implementation, not a request to paste secrets into chat or authorization to buy a subscription.
+Trove uses server-side adapters for Tatum, Walrus Memory, Marketstack, and OpenAI. Start with [account setup](ACCOUNT-SETUP.md) for provider dashboard links, then fill in the ignored `.env.local` using `.env.example`.
 
-## Current state
+## Service configuration
 
-For the user's step-by-step account creation and credential mapping, start with [ACCOUNT-SETUP.md](ACCOUNT-SETUP.md). An ignored `.env.local` with placeholders is now created. `npm run setup:check` checks it offline without printing values; `check:integrations -- --service tatum|walrus|market|coach` limits provider preflight to one service. Placeholder values are never sent as credentials. Mainnet and Testnet Tatum keys are configured separately.
+| Service           | Required configuration                              | Runtime use                                                                                 |
+| ----------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Tatum             | `TATUM_API_KEY`                                     | Sui Testnet native TLS gRPC, execution, receipts, and BCS account reads.                    |
+| Marketstack       | `MARKETSTACK_API_KEY`                               | Shared immutable USD daily-close snapshots, adjusted prices, splits, and dividends.         |
+| Walrus Memory     | `MEMWAL_ACCOUNT_ID`, `MEMWAL_PRIVATE_KEY`           | Consented Mainnet learning records, confirmation polling, and scoped recall.                |
+| OpenAI            | `OPENAI_API_KEY`, `COACH_MODEL`, `COACH_BUDGET_USD` | Structured, cited learning explanations with persistent cost accounting.                    |
+| Sui signers       | `SUI_TESTNET_SPONSOR_KEY`, `SUI_QUOTE_ATTESTOR_KEY` | Sponsored gas and bounded quote/corporate-event attestations.                               |
+| Contract identity | `SUI_PACKAGE_ID`, `SUI_ORIGINAL_PACKAGE_ID`         | Current callable package and original account type; the bundled manifest supplies defaults. |
 
-The guest React/Vite/Tailwind sample works without provider accounts. Separate parent/learner accounts, consent-gated Walrus Mainnet writes, scoped recall, and a budgeted OpenAI guide now work with the configured credentials. Ten non-personal demo-learning records and fresh-session correction-aware coaching have been verified. App prices remain authored samples; Sui practice contracts and production deployment remain work. See [BUILD-STATUS.md](BUILD-STATUS.md).
+`MEMWAL_SERVER_URL` defaults to `https://relayer.memory.walrus.xyz`. The memory credential is a delegate key. Administrative memory-owner credentials remain outside the application runtime.
 
-The user confirmed accounts were not ready and requested the private file and manual setup instructions. Keep keys out of chat. Do not copy `.env.example` over `.env.local` after entering credentials. This does not enable the live product automatically.
+The Sui setup helper creates local signers in ignored `.trove/sui-testnet-keys.json`. Production reads signer keys from the host environment. Preserve the deployed attestor identity when moving existing accounts.
 
-Run `npm run check:integrations` for the manual preflight. With no credentials it reports missing setup. With configured Tatum and Marketstack keys it attempts read-only checks. Add `-- --write-memory` only to explicitly request a Mainnet diagnostic write, or `-- --model-call` for a metered coach check. The diagnostic is not useful learner history and must not be counted toward the ten-memory requirement. Acceptance alone is not confirmed storage. The local app never invokes these adapters automatically.
+SQLite is supplied by Node 24. `TROVE_DATA_DIR` selects its persistent directory. Conventional family credentials and Wallet Standard provide account access and signing; the reserved PostgreSQL, Enoki, and Google fields can remain blank.
 
-## Required configuration
+## Preflight
 
-| Configuration                  | Purpose                                                                                             | Exposure                                               |
-| ------------------------------ | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| `TATUM_API_KEY`                | Sui Testnet practice reads and Mainnet memory-object evidence. Verify permitted networks/methods.   | Server only                                            |
-| `MEMWAL_ACCOUNT_ID`            | Mainnet `MemWalAccount` object ID for the configured account.                                       | Identifier; keep configuration server-side             |
-| `MEMWAL_PRIVATE_KEY`           | Registered memory delegate credential, not the owner wallet key.                                    | Server secret                                          |
-| `MEMWAL_SERVER_URL`            | `https://relayer.memory.walrus.xyz` for final Mainnet memory use.                                   | Public endpoint                                        |
-| `OPENAI_API_KEY`               | Grounded coach generation using the user's existing OpenAI credits.                                 | Server secret                                          |
-| `COACH_MODEL`                  | `gpt-6-luna`, verified pricing and structured-output capability; no automatic expensive fallback.   | Server configuration                                   |
-| `COACH_BUDGET_USD`             | User-approved $1.00 lifetime allowance tracked in ignored SQLite; not an account-level billing cap. | Server configuration                                   |
-| `MARKETSTACK_API_KEY`          | Initial real daily market-data adapter.                                                             | Server secret; redact query-string credentials in logs |
-| `DATABASE_URL`                 | Durable PostgreSQL state and outbox.                                                                | Server secret                                          |
-| Session secrets/allowed origin | Session signing/encryption and request-origin validation.                                           | Secrets server-side; allowed origin public             |
-| `VITE_ENOKI_PUBLIC_KEY`        | Preferred provider-wallet login.                                                                    | Deliberately public provider key                       |
-| `VITE_GOOGLE_CLIENT_ID`        | Configured OAuth client/origins for the chosen provider.                                            | Public identifier                                      |
-| `ENOKI_SECRET_KEY`             | Restricted sponsorship if the account plan permits it.                                              | Server secret                                          |
-| Practice package/account IDs   | Verified Testnet Move deployment and per-learner account mapping.                                   | Public identifiers, typed by network                   |
-| Quote-attestor credential      | Issue constrained practice-price tickets. Cannot serve as parent authority.                         | Restricted server secret                               |
+```sh
+npm run setup:check
+npm run check:integrations -- --service tatum
+npm run check:integrations -- --service walrus
+npm run check:integrations -- --service market
+npm run check:integrations -- --service coach
+npm run sui:setup
+```
 
-`MEMWAL_AGENT_ID` on the submission form is the delegate's **public key**. It is not `MEMWAL_PRIVATE_KEY`, the memory account object ID, or a practice-account ID. The Walrus account owner credential is kept outside the application server for administrative account/delegate lifecycle operations.
+The setup check is offline and prints configuration status. Selected integration checks make scoped provider requests. The coach check reads model metadata; `--model-call` explicitly enables generation. A memory diagnostic write requires `--write-memory`.
 
-In a Vite project, variables prefixed `VITE_` are bundled into client code. Never prefix server secrets that way. Ignore actual environment files and supply a blank-value example when implementation starts.
+Read provider diagnostics locally. Server credentials stay outside browser bundles and `VITE_` variables.
 
-## Cost and entitlement checks
+## Market import
 
-| Service                       | Verified expectation                                                                          | Check before live use                                                                                                 |
-| ----------------------------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| Walrus managed memory relayer | Advertises sponsored WAL and SUI for relayed writes, subject to service limits.               | Delegate/account works, allowed payloads/rate, confirmations, retention, account-creation requirements.               |
-| Sui practice execution        | Target Testnet and test gas.                                                                  | Toolchain, faucet availability, sponsor behavior, deployed package/objects. Test coins are not real practice money.   |
-| Tatum                         | An API key and appropriate provider access are needed.                                        | Actual account plan, RPC/method/network availability, credit/rate limits. Do not assume all services are free.        |
-| Marketstack                   | Published Free is limited/non-commercial; Basic advertises $9.99/month and commercial use.    | Exact plan, symbols, history, caching/public display/export rights, and overage cap. No purchase authorized.          |
-| Enoki                         | Free Sandbox is advertised; public/live usage and sponsorship depend on account entitlements. | Available networks, origins, allowed targets, credits, and whether any paid plan is required. No purchase authorized. |
-| Coach provider                | Model calls are metered.                                                                      | Available model, account budget, per-user limits, and evaluation ceiling before running paid calls.                   |
-| PostgreSQL/hosting            | Can start locally; public hosting may have free or paid limits.                               | Durable storage, worker lifecycle, connection limits, sleep/expiry behavior, and an approved hosting choice.          |
+One private import serves every family. The four-day reservation persists across restarts and keeps twelve symbols near 96 symbol-requests per 31 days. Each symbol counts against the provider allowance. The worker validates USD currency and observation consistency, aligns chart dates, and retains unaligned corporate-event dates.
 
-Do not interpret a general instruction to build as unlimited authority to purchase plans, top up real tokens, enable uncapped overages, or publish the app. Prepare the concrete integration and show the actual cost/remaining requirement when such a decision is needed. No account or plan changes were made during research.
+The dataset hash freezes each portfolio's price basis. Splits, reverse splits, fractional remainders, and dividends post automatically before an affected portfolio adopts the next snapshot. Daily close freshness is checked before orders. Guests and signed-in families receive market prices once a fresh snapshot is available; earlier sample portfolios are archived before changing basis.
 
-## First credentialed preflight
+Check the market-data account's display and redistribution entitlements when selecting a public hosting plan.
 
-1. Use a patched supported Node runtime and a pinned Sui Testnet CLI. Start local PostgreSQL or connect an explicitly configured development database.
-2. Resolve/install compatible packages and lock versions. Run type checks on the actual client constructors and response types.
-3. Call Tatum for a real checkpoint and known object; verify Testnet/Mainnet selection and native transport. Record method, network, timestamp, and sanitized response/digest.
-4. With the configured Mainnet memory account/delegate, write a useful non-sensitive test record, persist its accepted job ID, wait for completion, and recall it from a fresh client. Capture its blob ID and Mainnet object evidence. A health check is not this test.
-5. Confirm whether the deployed relayer supports the SDK's inventory methods. Exercise pagination/count semantics before relying on a memory counter.
-6. Validate one permitted market symbol, a daily history page, latest observation, split/dividend fields, and timestamps. Establish the selected plan's public-demo permissions before public use.
-7. Exercise Google/Enoki login and server signature verification on the target network. Exercise a restricted sponsored transaction or record the exact entitlement/budget needed. A conventional wallet can support explicit development testing while this is configured.
-8. Make one bounded model call with real retrieved context and a validated response. Confirm failure handling and cost reporting before larger evaluations.
-9. Deploy and test the narrow practice contract on Testnet once the implementation is ready. Confirm permitted action, refused action, stale revision, changed payload, and duplicate submission through actual receipts.
+## Memory and learning
 
-This preflight is part of the authorized build once the user says to start; it has not been run yet. Missing credentials do not prevent local UI/domain development, but they prevent claiming the corresponding live feature is complete.
+Guardian consent gates eligible records. The worker uses stable operation keys, persisted acceptance IDs, leases, cooldowns, and confirmation polling. The guide uses confirmed active records, validates citations, and respects corrections.
 
-## Public demo and submission gate
+`COACH_BUDGET_USD=1.00` sets the local lifetime estimated allowance. The usage ledger persists under `TROVE_DATA_DIR`. Each installation has its own ledger; preserve it during migration and account for separate installations when budgeting.
 
-Before publishing, verify working authenticated consumer journeys, confirmed Mainnet memory count/evidence, actual Tatum use, data display rights, privacy settings, secret scanning, and accurate network/demo labels. Have the repository, blog draft, and two-to-three-minute video ready for review. Follow the user's existing publishing/spending instructions rather than inventing a new approval flow.
+```sh
+npm run eval:learning
+npm run eval:learning -- --live
+```
+
+The first command describes the suite. The second makes metered requests through the shared allowance. See [learning evaluation](LEARNING-EVALUATION.md).
+
+## Hosted configuration
+
+Use the [Render dashboard guide](RENDER-DEPLOY.md). Configure one Docker Web Service with a persistent disk, copy the server credentials, and use the same sponsor and attestor identities. Render's external URL supplies the trusted origin; custom domains use `PUBLIC_ORIGIN`.
+
+For account continuity, migrate a consistent database backup along with the usage ledger. A fresh database creates new family accounts.

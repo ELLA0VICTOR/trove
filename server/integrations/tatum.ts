@@ -1,6 +1,7 @@
 import { SuiGrpcClient } from "@mysten/sui/grpc";
 import { GrpcTransport } from "@protobuf-ts/grpc-transport";
 import { ChannelCredentials } from "@grpc/grpc-js";
+import { rpcThrottle } from "./rpc-throttle.ts";
 
 export class TatumSuiGateway {
   readonly client: SuiGrpcClient;
@@ -15,6 +16,7 @@ export class TatumSuiGateway {
       channelCredentials: ChannelCredentials.createSsl(),
       meta: { "x-api-key": apiKey },
       timeout: 15_000,
+      interceptors: [rpcThrottle(apiKey)],
     });
     this.client = new SuiGrpcClient({
       network,

@@ -96,7 +96,7 @@ The allowance covers Trove calls through this adapter, not other applications us
 
 Leave `DATABASE_URL`, `ENOKI_SECRET_KEY`, `VITE_ENOKI_PUBLIC_KEY`, and `VITE_GOOGLE_CLIENT_ID` blank. Local SQLite already works. Local parent/learner username-password sign-in now works without these entries. They are reserved for future wallet/Google login and production storage; those unused entries are not prerequisites for the first Tatum/Walrus checks.
 
-No stock trading account, real investment deposit, wallet seed phrase, or owner-wallet private key is needed in this environment file.
+No stock trading account, investment deposit, learner private key, guardian private key or Mainnet wallet seed belongs in this environment file. Optional Sui practice uses separate Testnet-only sponsor and quote-attestor service keys. Locally these are generated into ignored `.trove/sui-testnet-keys.json`; the browser wallets retain user signing authority. See [Sui practice setup](SUI-PRACTICE.md) and [Render environment values](RENDER-DEPLOY.md).
 
 ## Using the connected app
 

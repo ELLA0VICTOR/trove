@@ -1,7 +1,15 @@
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import type { ReactNode } from "react";
 import type { AppSnapshot } from "../../shared/model.ts";
 
+// oxlint-disable-next-line react/only-export-components -- Shared API helper is independent of provider state.
 export async function api<T>(
   path: string,
   method = "GET",
@@ -56,7 +64,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     document.documentElement.dataset.motion = paused ? "paused" : "playing";
   }, [paused]);
   useEffect(() => () => clearTimeout(timer.current), []);
-  function refresh() {
+  const refresh = useCallback(() => {
     // Strict Mode can mount twice before the first session cookie arrives.
     // Share the request so both mounts resolve to the same sample family.
     if (refreshPending.current) return refreshPending.current;
@@ -74,7 +82,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     })();
     return refreshPending.current;
-  }
+  }, []);
   function notify(message: string) {
     clearTimeout(timer.current);
     setToast(message);
@@ -112,6 +120,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     </Context.Provider>
   );
 }
+// oxlint-disable-next-line react/only-export-components -- Context hook shares this provider's identity.
 export function useApp() {
   const context = useContext(Context);
   if (!context) throw new Error("Trove needs its application provider.");

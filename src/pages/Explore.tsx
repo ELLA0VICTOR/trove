@@ -16,6 +16,7 @@ import { Button, Eyebrow, Modal } from "../components/UI.tsx";
 import { Chart } from "../components/Chart.tsx";
 import { CompanyLogo } from "../components/CompanyLogo.tsx";
 import { Sparkline } from "../components/Sparkline.tsx";
+import { chainAction } from "../lib/wallet.ts";
 
 export function Explore() {
   const { state } = useApp(),
@@ -89,7 +90,11 @@ export function Explore() {
             ))}
           </div>
           <span className="catalog-period">
-            Sample period <span>Jul 06 – Sep 25</span>
+            {state.market?.mode === "market" ? "Daily closes" : "Sample period"}{" "}
+            <span>
+              {state.instruments[0].prices[0].date} –{" "}
+              {state.instruments[0].prices.at(-1)!.date}
+            </span>
           </span>
         </div>
       </div>
@@ -99,9 +104,14 @@ export function Explore() {
       </div>
       <div className="catalog-grid">
         {filtered.map((instrument) => {
-          const first = BigInt(instrument.prices[0].price),
+          const first = BigInt(
+              instrument.prices[0].adjustedPrice ?? instrument.prices[0].price,
+            ),
             current = BigInt(latest(instrument).price),
-            change = (Number(current - first) / Number(first)) * 100;
+            adjusted = BigInt(
+              latest(instrument).adjustedPrice ?? latest(instrument).price,
+            ),
+            change = (Number(adjusted - first) / Number(first)) * 100;
           return (
             <Link
               className="stock-card"
@@ -129,7 +139,11 @@ export function Explore() {
               </div>
               <div className="stock-card-trend">
                 <Sparkline instrument={instrument} />
-                <span>Sample period</span>
+                <span>
+                  {state.market?.mode === "market"
+                    ? "Adjusted change"
+                    : "Sample period"}
+                </span>
               </div>
               <ArrowUpRight className="stock-card-arrow" size={16} />
             </Link>
@@ -153,8 +167,9 @@ export function Explore() {
         </div>
       )}
       <p className="catalog-note">
-        Practice prices and chart movements are authored sample data, not live
-        quotes.
+        {state.market?.mode === "market"
+          ? `${state.market.status}. Source: Marketstack; USD closing prices. Trends and period returns use adjusted closes.`
+          : "Practice prices and chart movements are authored sample data, not live quotes."}
       </p>
     </section>
   );
@@ -163,7 +178,7 @@ export function Company() {
   const { symbol } = useParams(),
     { state } = useApp(),
     [ordering, setOrdering] = useState(false),
-    [period, setPeriod] = useState(60);
+    [period, setPeriod] = useState(Infinity);
   const instrument = state?.instruments.find((i) => i.symbol === symbol);
   if (!state || !instrument)
     return (
@@ -195,13 +210,16 @@ export function Company() {
         <section>
           <div className="company-price">
             {money(current.price)}
-            <span>Sample price · {current.date}</span>
+            <span>
+              {state.market?.mode === "market" ? "Daily close" : "Sample price"}{" "}
+              · {current.date}
+            </span>
           </div>
           <div className="period-tabs">
             {[
               [20, "1M"],
               [40, "2M"],
-              [60, "ALL"],
+              [Infinity, "ALL"],
             ].map(([amount, label]) => (
               <button
                 key={label}
@@ -215,13 +233,15 @@ export function Company() {
           <Chart
             points={instrument.prices.slice(-period).map((p) => ({
               date: p.date,
-              value: Number(p.price) / Number(USD_SCALE),
+              value: Number(p.adjustedPrice ?? p.price) / Number(USD_SCALE),
             }))}
-            label={`${instrument.name} sample prices`}
+            label={`${instrument.name} ${state.market?.mode === "market" ? "adjusted closing" : "sample"} prices`}
           />
           <p className="fine-print">
-            Illustrative sample price history. This local build is not connected
-            to a market-data provider.
+            {state.market?.mode === "market"
+              ? state.market.status +
+                ". Source: Marketstack. Chart uses adjusted closes; practice orders use the displayed daily close."
+              : "Illustrative sample price history. Sign in to use market prices in a separate practice portfolio."}
           </p>
         </section>
         <aside className="company-about">
@@ -278,7 +298,7 @@ export function OrderDialog({
   onClose: () => void;
   initialQuote?: Quote;
 }) {
-  const { state, update, notify } = useApp(),
+  const { state, update, notify, refresh } = useApp(),
     [side, setSide] = useState<"buy" | "sell">(initialQuote?.side ?? "buy"),
     [amount, setAmount] = useState(
       initialQuote
@@ -321,7 +341,13 @@ export function OrderDialog({
     setWorking(true);
     setError("");
     try {
-      await update("/orders/execute", { quoteId: quote!.id });
+      if (state!.chain?.account) {
+        await chainAction(
+          { action: "order", quoteId: quote!.id },
+          state!.chain.wallet,
+        );
+        await refresh();
+      } else await update("/orders/execute", { quoteId: quote!.id });
       setComplete(true);
     } catch (e) {
       setError((e as Error).message);
@@ -367,7 +393,9 @@ export function OrderDialog({
               : "You can add a reflection when you’re ready."}
           </p>
           <p className="fine-print">
-            Saved locally. No real shares or blockchain transaction.
+            {state.chain?.account
+              ? "Confirmed on Sui Testnet through Tatum. Practice units only; no real stock purchase."
+              : "Saved to your practice account. No real shares or stock transaction."}
           </p>
           <Button onClick={onClose}>
             Keep growing <ArrowRight size={17} />
@@ -382,8 +410,12 @@ export function OrderDialog({
             talk it through.
           </h2>
           <p>
-            The sample parent can review this exact order. The preview expires
-            after two minutes; an expired request needs a fresh review.
+            Your{" "}
+            {state.session?.mode === "account"
+              ? "parent or guardian"
+              : "sample parent"}{" "}
+            can review this exact order. A preview lasts up to two minutes; an
+            expired request needs a fresh review.
           </p>
           <Button to="/app/parent" onClick={onClose}>
             Open parent preview
@@ -408,7 +440,9 @@ export function OrderDialog({
             </strong>
           </div>
           <div className="detail-fact">
-            <span>Sample price</span>
+            <span>
+              {state.market?.mode === "market" ? "Daily close" : "Sample price"}
+            </span>
             <strong>
               {money(quote.price)} · {quote.marketDate}
             </strong>
@@ -444,7 +478,13 @@ export function OrderDialog({
             </Button>
           </div>
           <p className="fine-print">
-            Practice funds only. Preview valid for two minutes.
+            Practice funds only. Preview expires at{" "}
+            {new Date(quote.expiresAt).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+            })}
+            .
           </p>
         </div>
       ) : (

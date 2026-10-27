@@ -1,0 +1,14 @@
+{
+  "network": "testnet",
+  "provider": "Tatum",
+  "packageId": "0x03925c8dc575c552bb63f302f9a1dedb9dc6dac652c1ba0b38d4ea71060b3d0e",
+  "digest": "3s3KzBBTXMAubJoE5y69KNRG5isAi1nZDgH2WNpB9Tdr",
+  "publishedAt": "2026-10-27T07:57:07.859Z",
+  "moduleHash": "0ff4821999726402a8852a6467a4fceb3388b3f3293628861bcc711ef0e7104a",
+  "toolchain": "testnet-v1.82.2",
+  "upgradePolicy": "Upgrade capability retained by Testnet deployer; prototype is not immutable.",
+  "originalPackageId": "0x53b0807b39006cb4e6088a759b86b51ca0a7cda676b3d64848eb4ec0cf604406",
+  "previousPackageId": "0x53b0807b39006cb4e6088a759b86b51ca0a7cda676b3d64848eb4ec0cf604406",
+  "upgradeCap": "0x8f8675478b263c9d470b015b9b5ef2d6ff001536294e3bbbca61fdf77f75df1c",
+  "version": 2
+}

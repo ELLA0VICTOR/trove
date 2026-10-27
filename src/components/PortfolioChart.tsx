@@ -128,7 +128,7 @@ export function PortfolioChart({ points }: { points: ChartPoint[] }) {
       priceFormat: { type: "price", precision: 2, minMove: 0.01 },
     });
     const baseline = series.createPriceLine({
-      price: points[0].value,
+      price: 1000,
       color: "#9eb3a7",
       lineWidth: 1,
       lineStyle: LineStyle.Dashed,
@@ -230,7 +230,12 @@ export function PortfolioChart({ points }: { points: ChartPoint[] }) {
   }
 
   if (!sufficient)
-    return <p>There is not enough sample history for this period.</p>;
+    return (
+      <p>
+        Your portfolio history starts today. More observations will appear as
+        you practise.
+      </p>
+    );
   const reading = selected ?? points.at(-1)!,
     first = points[0];
   const change = reading.value - first.value,
@@ -292,7 +297,7 @@ export function PortfolioChart({ points }: { points: ChartPoint[] }) {
         className="portfolio-chart-canvas"
         role="img"
         tabIndex={0}
-        aria-label="Practice portfolio value over the selected sample period. Drag to pan, scroll to zoom, or use left and right arrows to inspect observations."
+        aria-label="Practice portfolio value over the selected period. Drag to pan, scroll to zoom, or use left and right arrows to inspect observations."
         onKeyDown={inspect}
         onPointerLeave={() => {
           keyboardIndex.current = null;

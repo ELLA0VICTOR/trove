@@ -3,12 +3,14 @@ const bar = z.object({
   symbol: z.string(),
   date: z.string(),
   close: z.number().positive(),
+  adj_close: z.number().positive().nullish(),
   high: z.number().positive(),
   low: z.number().positive(),
   open: z.number().positive(),
   price_currency: z.string().nullish(),
-  split_factor: z.number().nullish(),
-  dividend: z.number().nullish(),
+  exchange: z.string().nullish(),
+  split_factor: z.number().positive().nullish(),
+  dividend: z.number().nonnegative().nullish(),
 });
 const pageSchema = z.object({
   pagination: z.object({
@@ -27,8 +29,14 @@ export class MarketstackGateway {
   }
   private key: string;
   async history(symbol: string, from: string, to: string) {
+    return (await this.histories([symbol], from, to))[0];
+  }
+  async histories(symbols: string[], from: string, to: string) {
     if (
-      !/^[A-Z.]{1,8}$/.test(symbol) ||
+      symbols.length < 1 ||
+      symbols.length > 12 ||
+      new Set(symbols).size !== symbols.length ||
+      symbols.some((symbol) => !/^[A-Z.]{1,8}$/.test(symbol)) ||
       !/^\d{4}-\d{2}-\d{2}$/.test(from) ||
       !/^\d{4}-\d{2}-\d{2}$/.test(to) ||
       from >= to
@@ -40,7 +48,7 @@ export class MarketstackGateway {
       const url = new URL("https://api.marketstack.com/v2/eod");
       for (const [key, value] of Object.entries({
         access_key: this.key,
-        symbols: symbol,
+        symbols: symbols.join(","),
         date_from: from,
         date_to: to,
         sort: "ASC",
@@ -67,37 +75,60 @@ export class MarketstackGateway {
       if (offset === 9000)
         throw new Error("This history exceeds the bounded import size.");
     }
-    const dates = new Set<string>();
-    const prices = bars
-      .map((point) => {
-        const date = point.date.slice(0, 10);
-        if (
-          point.symbol !== symbol ||
-          dates.has(date) ||
-          (point.price_currency && point.price_currency !== "USD") ||
-          point.high < point.low ||
-          point.close > point.high ||
-          point.close < point.low
-        )
-          throw new Error("Market data failed consistency checks.");
-        dates.add(date);
-        return {
-          date,
-          price: String(BigInt(Math.round(point.close * 1_000_000))),
-          sourceTimestamp: point.date,
-          splitFactor: point.split_factor ?? null,
-          dividend: point.dividend ?? null,
-        };
-      })
-      .sort((a, b) => a.date.localeCompare(b.date));
-    if (prices.length < 2)
-      throw new Error("There is insufficient history for a comparison.");
-    return {
-      symbol,
-      provider: "Marketstack",
-      basis: "raw-close",
-      receivedAt,
-      prices,
-    };
+    return symbols.map((symbol) => {
+      const dates = new Set<string>();
+      const symbolBars = bars.filter((point) => point.symbol === symbol);
+      // A ticker alone is not a currency identity. Do not relabel foreign or unknown
+      // currency observations as USD, even when their prices look plausible.
+      const supported = symbolBars.filter(
+        (point) =>
+          point.price_currency === "USD" &&
+          ["XNAS", "XNYS", "ARCX"].includes(point.exchange ?? ""),
+      );
+      const prices = supported
+        .map((point) => {
+          const date = point.date.slice(0, 10);
+          const dateMs = Date.parse(date + "T00:00:00Z");
+          const priceMicro = Math.round(point.close * 1_000_000);
+          if (
+            !/^\d{4}-\d{2}-\d{2}$/.test(date) ||
+            !Number.isFinite(dateMs) ||
+            new Date(dateMs).toISOString().slice(0, 10) !== date ||
+            date < from ||
+            date > to ||
+            !Number.isSafeInteger(priceMicro) ||
+            priceMicro <= 0 ||
+            point.symbol !== symbol ||
+            dates.has(date) ||
+            (point.price_currency && point.price_currency !== "USD") ||
+            point.high < point.low ||
+            point.close > point.high ||
+            point.close < point.low
+          )
+            throw new Error("Market data failed consistency checks.");
+          dates.add(date);
+          return {
+            date,
+            price: String(BigInt(priceMicro)),
+            adjustedPrice: point.adj_close
+              ? String(BigInt(Math.round(point.adj_close * 1_000_000)))
+              : undefined,
+            sourceTimestamp: point.date,
+            splitFactor: point.split_factor ?? null,
+            dividend: point.dividend ?? null,
+          };
+        })
+        .sort((a, b) => a.date.localeCompare(b.date));
+      if (prices.length < 2)
+        throw new Error("There is insufficient history for a comparison.");
+      return {
+        symbol,
+        provider: "Marketstack",
+        basis: "raw-close",
+        receivedAt,
+        excluded: symbolBars.length - supported.length,
+        prices,
+      };
+    });
   }
 }
