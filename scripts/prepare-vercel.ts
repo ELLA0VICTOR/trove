@@ -4,8 +4,16 @@ import { execFileSync } from "node:child_process";
 import { Database } from "../server/database.ts";
 import { configuredValue } from "../server/config.ts";
 import { seedHostedData } from "../server/bootstrap-data.ts";
+import {
+  configuredNetwork,
+  practiceDeployment,
+} from "../server/chain-config.ts";
 
 const value = (key: string) => configuredValue(process.env, key);
+const network = configuredNetwork({
+  ...process.env,
+  ...(process.argv.includes("--mainnet") ? { SUI_NETWORK: "mainnet" } : {}),
+});
 const url = value("DATABASE_URL");
 if (!url)
   throw new Error(
@@ -17,16 +25,22 @@ execFileSync("git", ["check-ignore", "--quiet", output], {
   windowsHide: true,
 });
 const directory = resolve(value("TROVE_DATA_DIR") ?? ".trove"),
-  keysPath = resolve(directory, "sui-testnet-keys.json");
+  keysPath = resolve(directory, `sui-${network}-keys.json`);
 const keys = existsSync(keysPath)
   ? JSON.parse(readFileSync(keysPath, "utf8"))
   : {};
-const manifest = JSON.parse(
-  readFileSync("contracts/practice/deployment.testnet.json", "utf8"),
+const deployment = practiceDeployment(
+  value(network === "mainnet" ? "SUI_MAINNET_PACKAGE_ID" : "SUI_PACKAGE_ID"),
+  value(
+    network === "mainnet"
+      ? "SUI_MAINNET_ORIGINAL_PACKAGE_ID"
+      : "SUI_ORIGINAL_PACKAGE_ID",
+  ),
+  network,
 );
 const env: Record<string, string | undefined> = {
   DATABASE_URL: url,
-  TATUM_API_KEY: value("TATUM_API_KEY"),
+  SUI_NETWORK: network,
   MEMWAL_ACCOUNT_ID: value("MEMWAL_ACCOUNT_ID"),
   MEMWAL_PRIVATE_KEY: value("MEMWAL_PRIVATE_KEY"),
   MEMWAL_SERVER_URL:
@@ -34,13 +48,25 @@ const env: Record<string, string | undefined> = {
   OPENAI_API_KEY: value("OPENAI_API_KEY"),
   COACH_MODEL: value("COACH_MODEL") ?? "gpt-6-luna",
   COACH_BUDGET_USD: value("COACH_BUDGET_USD") ?? "1.00",
-  SUI_PACKAGE_ID: value("SUI_PACKAGE_ID") ?? manifest.packageId,
-  SUI_ORIGINAL_PACKAGE_ID:
-    value("SUI_ORIGINAL_PACKAGE_ID") ??
-    manifest.originalPackageId ??
-    manifest.packageId,
-  SUI_TESTNET_SPONSOR_KEY: value("SUI_TESTNET_SPONSOR_KEY") ?? keys.sponsorKey,
-  SUI_QUOTE_ATTESTOR_KEY: value("SUI_QUOTE_ATTESTOR_KEY") ?? keys.attestorKey,
+  ...(network === "mainnet"
+    ? {
+        TATUM_MAINNET_API_KEY: value("TATUM_MAINNET_API_KEY"),
+        SUI_MAINNET_PACKAGE_ID: deployment.packageId,
+        SUI_MAINNET_ORIGINAL_PACKAGE_ID: deployment.originalPackageId,
+        SUI_MAINNET_SPONSOR_KEY:
+          value("SUI_MAINNET_SPONSOR_KEY") ?? keys.sponsorKey,
+        SUI_MAINNET_QUOTE_ATTESTOR_KEY:
+          value("SUI_MAINNET_QUOTE_ATTESTOR_KEY") ?? keys.attestorKey,
+      }
+    : {
+        TATUM_API_KEY: value("TATUM_API_KEY"),
+        SUI_PACKAGE_ID: deployment.packageId,
+        SUI_ORIGINAL_PACKAGE_ID: deployment.originalPackageId,
+        SUI_TESTNET_SPONSOR_KEY:
+          value("SUI_TESTNET_SPONSOR_KEY") ?? keys.sponsorKey,
+        SUI_QUOTE_ATTESTOR_KEY:
+          value("SUI_QUOTE_ATTESTOR_KEY") ?? keys.attestorKey,
+      }),
 };
 const missing = Object.entries(env)
   .filter(([, entry]) => !entry)
@@ -61,10 +87,16 @@ if (missing.length)
   throw new Error(
     `Complete these local settings first: ${missing.join(", ")}. Secret values were not printed.`,
   );
-const db = new Database({ url });
+const db = new Database({ url, chainNetwork: network });
 try {
   await db.ready;
-  const imported = await seedHostedData(db, directory);
+  const imported =
+    network === "mainnet"
+      ? {
+          skipped:
+            "Existing accounts and Mainnet memories preserved; Testnet chain records remain isolated.",
+        }
+      : await seedHostedData(db, directory);
   mkdirSync(".artifacts", { recursive: true });
   writeFileSync(
     output,

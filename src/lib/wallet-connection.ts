@@ -9,6 +9,7 @@ import type {
   StandardEventsFeature,
 } from "@mysten/wallet-standard";
 import { normalizeSuiAddress } from "@mysten/sui/utils";
+import type { SuiNetwork } from "../../shared/network.ts";
 
 export type SigningWallet = WalletWithFeatures<
   StandardConnectFeature & StandardEventsFeature & Partial<SuiWalletFeatures>
@@ -19,10 +20,14 @@ export type AccountSelector = (
 export function sameWalletAddress(a: string, b: string) {
   return normalizeSuiAddress(a) === normalizeSuiAddress(b);
 }
-function eligible(accounts: readonly WalletAccount[], expected?: string) {
+function eligible(
+  accounts: readonly WalletAccount[],
+  chain: `sui:${SuiNetwork}`,
+  expected?: string,
+) {
   return accounts.filter(
     (a) =>
-      a.chains.includes("sui:testnet") &&
+      a.chains.includes(chain) &&
       (!expected || sameWalletAddress(a.address, expected)),
   );
 }
@@ -32,6 +37,10 @@ export class WalletConnection {
   wallet?: SigningWallet;
   account?: WalletAccount;
   private unsubscribe?: () => void;
+  readonly chain: `sui:${SuiNetwork}`;
+  constructor(network: SuiNetwork = "testnet") {
+    this.chain = `sui:${network}`;
+  }
 
   private select(wallet: SigningWallet, account: WalletAccount) {
     this.unsubscribe?.();
@@ -39,8 +48,9 @@ export class WalletConnection {
     this.account = account;
     const events = wallet.features["standard:events"];
     this.unsubscribe = events?.on("change", ({ accounts, chains }) => {
-      if (chains && !chains.includes("sui:testnet")) this.account = undefined;
-      if (accounts) this.account = eligible(accounts, account.address)[0];
+      if (chains && !chains.includes(this.chain)) this.account = undefined;
+      if (accounts)
+        this.account = eligible(accounts, this.chain, account.address)[0];
     });
     return account;
   }
@@ -53,7 +63,7 @@ export class WalletConnection {
   }
 
   authorized(wallet: Wallet, expected: string) {
-    return eligible(wallet.accounts, expected)[0];
+    return eligible(wallet.accounts, this.chain, expected)[0];
   }
 
   async connect(
@@ -87,7 +97,7 @@ export class WalletConnection {
     });
     if (
       expected &&
-      !eligible(accounts, expected).length &&
+      !eligible(accounts, this.chain, expected).length &&
       !options.fresh &&
       "standard:disconnect" in wallet.features
     ) {
@@ -96,7 +106,7 @@ export class WalletConnection {
         silent: false,
       }));
     }
-    const candidates = eligible(accounts, expected);
+    const candidates = eligible(accounts, this.chain, expected);
     let account = candidates[0];
     if (!expected && candidates.length > 1) {
       if (!options.selectAccount)
@@ -110,7 +120,7 @@ export class WalletConnection {
       throw new Error(
         expected
           ? `Authorize ${expected.slice(0, 8)}…${expected.slice(-6)} in ${wallet.name}, then reconnect.`
-          : "Select a Sui Testnet wallet account.",
+          : `Select a Sui ${this.chain === "sui:mainnet" ? "Mainnet" : "Testnet"} wallet account.`,
       );
     }
     return this.select(wallet, account);

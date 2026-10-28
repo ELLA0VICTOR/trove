@@ -652,35 +652,46 @@ test("Home exposes required wallet setup and activation asks the parent wallet t
   expect(wallet.signatures()).toBe(1);
 });
 
-test("parent activates before any learner wallet is linked", async ({
-  page,
-}) => {
-  await createPortfolioAccount(page);
-  const wallet = await installBrowserWallet(page, false, false);
-  await page.goto("/app");
-  await page
-    .getByRole("button", { name: "Link Test Sui Wallet", exact: true })
-    .click();
-  await expect(
-    page.getByRole("button", {
-      name: "Activate practice portfolio",
-      exact: true,
-    }),
-  ).toBeEnabled();
-  await page
-    .getByRole("button", { name: "Activate practice portfolio", exact: true })
-    .click();
-  await expect(
-    page.getByRole("heading", { name: "Your portfolio is active" }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("list", { name: "Setup progress" }).locator(".complete"),
-  ).toHaveCount(2);
-  await expect(
-    page.getByRole("link", { name: "View practice contract account" }),
-  ).toBeVisible();
-  expect(wallet.signatures()).toBe(1);
-});
+for (const network of ["testnet", "mainnet"] as const)
+  test(`${network}: parent activates before any learner wallet is linked`, async ({
+    page,
+  }) => {
+    await createPortfolioAccount(page);
+    const wallet = await installBrowserWallet(
+      page,
+      false,
+      false,
+      false,
+      "own",
+      network,
+    );
+    await page.goto("/app");
+    await page
+      .getByRole("button", { name: "Link Test Sui Wallet", exact: true })
+      .click();
+    await expect(
+      page.getByRole("button", {
+        name: "Activate practice portfolio",
+        exact: true,
+      }),
+    ).toBeEnabled();
+    await page
+      .getByRole("button", { name: "Activate practice portfolio", exact: true })
+      .click();
+    await expect(
+      page.getByRole("heading", { name: "Your portfolio is active" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("list", { name: "Setup progress" }).locator(".complete"),
+    ).toHaveCount(2);
+    await expect(
+      page.getByRole("link", { name: "View practice contract account" }),
+    ).toHaveAttribute(
+      "href",
+      `https://suiscan.xyz/${network}/object/0x${"9".repeat(64)}`,
+    );
+    expect(wallet.signatures()).toBe(1);
+  });
 
 test("learner finishes connecting to an already active portfolio without parent approval", async ({
   page,

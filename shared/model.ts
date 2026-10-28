@@ -29,6 +29,7 @@ export interface CorporateAction {
   price: string;
 }
 export interface Adjustment extends CorporateAction {
+  network?: import("./network.ts").SuiNetwork;
   portfolioId: string;
   fromDataset: string;
   toDataset: string;
@@ -40,6 +41,7 @@ export interface Adjustment extends CorporateAction {
   transactionDigest?: string;
 }
 export interface Decision {
+  network?: import("./network.ts").SuiNetwork;
   id: string;
   symbol: string;
   side: "buy" | "sell";
@@ -131,6 +133,7 @@ export interface DemoState {
     transactionDigest?: string;
   }[];
   portfolio?: {
+    network?: import("./network.ts").SuiNetwork;
     id: string;
     startedAt: string;
     initialCash: string;

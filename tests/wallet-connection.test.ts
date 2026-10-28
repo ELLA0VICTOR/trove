@@ -79,6 +79,22 @@ function fixture() {
   };
 }
 
+test("Mainnet authorization accepts Mainnet accounts and refuses Testnet-only accounts", async () => {
+  const f = fixture(),
+    connection = new WalletConnection("mainnet");
+  f.emit([account(parent, "sui:mainnet")]);
+  assert.equal((await connection.connect(f.wallet, parent)).address, parent);
+  assert.equal(connection.chain, "sui:mainnet");
+  f.emit([account(parent, "sui:testnet")]);
+  assert.equal(connection.authorized(f.wallet, parent), undefined);
+  f.grant([account(parent, "sui:testnet")]);
+  await assert.rejects(
+    () => connection.connect(f.wallet, parent, { fresh: true }),
+    /Authorize/,
+  );
+  connection.clear();
+});
+
 test("both authorized addresses stay usable regardless of their order or the last selected role", async () => {
   const f = fixture(),
     connection = new WalletConnection();

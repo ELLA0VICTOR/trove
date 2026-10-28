@@ -295,7 +295,7 @@ export function Parent() {
           </section>
           <p className="parent-controls-note">
             {state.chain?.account
-              ? "Controls enforced on Sui Testnet."
+              ? `Controls enforced on Sui ${state.chain.network === "mainnet" ? "Mainnet" : "Testnet"}.`
               : "Starting limits apply once family wallet setup is complete."}{" "}
             Daily allowance resets at 00:00 UTC.
           </p>

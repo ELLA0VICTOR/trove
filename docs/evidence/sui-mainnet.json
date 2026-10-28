@@ -1,0 +1,149 @@
+{
+  "checkedAt": "2026-10-28T10:53:07.223Z",
+  "network": "mainnet",
+  "provider": "Tatum",
+  "provenance": "Actual Mainnet transactions from an isolated synthetic family. Real Alpaca IEX market prices. No user accounts or Walrus records changed.",
+  "packageId": "0x08531dda24e3a97a234b8bb18a770cd0cfba76fbd79a4c1eaba54ef0f2e18ab0",
+  "account": "0xfe448df18748ff980982d445de8bac5a6de527898cd1401074e7f20ea41b60b5",
+  "market": {
+    "provider": "Alpaca IEX",
+    "asOf": "2026-10-27"
+  },
+  "actions": [
+    {
+      "action": "parent-first-activation",
+      "id": "15efe991-11f7-492b-b172-01af599c2a3f",
+      "digest": "H6ojSBLunuqnAaNKyCRvvGSpUASD77LXnH7sJV3YtsaD",
+      "gas": {
+        "computationCost": "100000",
+        "storageCost": "2888000",
+        "storageRebate": "0",
+        "nonRefundableStorageFee": "0"
+      }
+    },
+    {
+      "action": "refill-before-learner",
+      "id": "525dc235-807f-4e63-9873-da38373d926a",
+      "digest": "8jZxwQPCaSVMdDfr2PWbKPK8inpzqTr5VKKAYxeWJJWw",
+      "gas": {
+        "computationCost": "100000",
+        "storageCost": "4772800",
+        "storageRebate": "2887711",
+        "nonRefundableStorageFee": "289"
+      }
+    },
+    {
+      "action": "parent-policy",
+      "id": "0ec715ad-75d1-46b7-b5c9-c5b5c9f4530e",
+      "digest": "6wYiorXCauERJtpSdpXjfdaaf7UAhVcpZqti24FzKqJk",
+      "gas": {
+        "computationCost": "100000",
+        "storageCost": "2888000",
+        "storageRebate": "2887711",
+        "nonRefundableStorageFee": "289"
+      }
+    },
+    {
+      "action": "learner-registration",
+      "id": "6cb4092c-82a3-40c7-a199-9e5ddf0e3e33",
+      "digest": "FuF6uxTC84dtJRS8Rp1Qtrk5M74Si5aS41eEQWJcezvi",
+      "gas": {
+        "computationCost": "100000",
+        "storageCost": "2888000",
+        "storageRebate": "2887711",
+        "nonRefundableStorageFee": "289"
+      }
+    },
+    {
+      "action": "within-limit-buy",
+      "id": "b6c74de8-f106-4afe-8fe8-73a99b831483",
+      "digest": "6pyfWXUHrJZmLrxfhaaG7KZ9x1QaPWNtzsskzb8xdMjR",
+      "gas": {
+        "computationCost": "100000",
+        "storageCost": "3047600",
+        "storageRebate": "2887711",
+        "nonRefundableStorageFee": "289"
+      }
+    },
+    {
+      "action": "parent-approval",
+      "id": "48fc9af6-5db9-4745-8947-85b2a1c9742b",
+      "digest": "8sDWUQuniPVfSMeB5GtkqfuAcsApxPN7HTjRSynv4F7e",
+      "gas": {
+        "computationCost": "100000",
+        "storageCost": "3290800",
+        "storageRebate": "3047295",
+        "nonRefundableStorageFee": "305"
+      }
+    },
+    {
+      "action": "approved-buy",
+      "id": "d48ac9a1-6238-4954-aac1-b7dc2093f21c",
+      "digest": "9S3hhAPzDRZPJgtPnfG1yW1JVM9q2yg78kUiu2hQ9FYB",
+      "gas": {
+        "computationCost": "100000",
+        "storageCost": "3207200",
+        "storageRebate": "3290471",
+        "nonRefundableStorageFee": "329"
+      }
+    },
+    {
+      "action": "learner-sale",
+      "id": "489c37cb-b558-494e-b375-0f1e94a6fd6e",
+      "digest": "qp9hhG8sFGAiYZhQpdwf4kih9aiFdHt6HejrUuoRNBX",
+      "gas": {
+        "computationCost": "100000",
+        "storageCost": "3207200",
+        "storageRebate": "3206879",
+        "nonRefundableStorageFee": "321"
+      }
+    }
+  ],
+  "duplicateProtection": true,
+  "cash": "970000004",
+  "holdings": [
+    {
+      "symbol": "AAPL",
+      "units": "1440507",
+      "cost": "5000000"
+    },
+    {
+      "symbol": "MSFT",
+      "units": "9405921",
+      "cost": "49999995"
+    }
+  ],
+  "sequence": 5,
+  "policy": {
+    "perTrade": "25000000",
+    "daily": "100000000",
+    "paused": false,
+    "revision": 1,
+    "allowed": [
+      "AAPL",
+      "MSFT",
+      "NVDA",
+      "AMD",
+      "ADBE",
+      "KO",
+      "JNJ",
+      "XOM",
+      "WMT",
+      "DIS",
+      "SPY",
+      "VTI"
+    ]
+  },
+  "publication": {
+    "digest": "GtWEPwq845cEHQ1NCwviHRFF4GWBgKdPqvW9tHT1JYsu",
+    "gas": {
+      "computationCost": "100000",
+      "storageCost": "50114400",
+      "storageRebate": "0",
+      "nonRefundableStorageFee": "0"
+    }
+  },
+  "totalGasMist": "56108511",
+  "sponsor": "0xd9179e689a530294f6cd0d65b4f243ffdba402dcf04eb3ad722c9f88af18c9a3",
+  "sponsorRemainingMist": "1011891489"
+}

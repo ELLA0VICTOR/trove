@@ -9,29 +9,38 @@ import { api } from "./app-context.tsx";
 import type { ChainStatus } from "../../shared/chain.ts";
 import { WalletConnection } from "./wallet-connection.ts";
 import type { AccountSelector } from "./wallet-connection.ts";
+import type { SuiNetwork } from "../../shared/network.ts";
+import { walletNetwork } from "./network.ts";
 
-const connection = new WalletConnection();
+const connections = new Map<SuiNetwork, WalletConnection>();
+function walletConnection() {
+  const network = walletNetwork();
+  if (!connections.has(network))
+    connections.set(network, new WalletConnection(network));
+  return connections.get(network)!;
+}
 export function availableWallets(): readonly Wallet[] {
   return getWallets()
     .get()
     .filter(
       (wallet) =>
-        wallet.chains.includes("sui:testnet") &&
+        wallet.chains.includes(`sui:${walletNetwork()}`) &&
         isWalletWithRequiredFeatureSet(wallet, ["sui:signPersonalMessage"]) &&
         ("sui:signTransaction" in wallet.features ||
           "sui:signTransactionBlock" in wallet.features),
     );
 }
 export async function connectWallet(wallet: Wallet, expected?: string) {
-  return connection.connect(wallet, expected);
+  return walletConnection().connect(wallet, expected);
 }
 export async function reconnectWallet(wallet: Wallet, expected: string) {
-  return connection.connect(wallet, expected, { fresh: true });
+  return walletConnection().connect(wallet, expected, { fresh: true });
 }
 export async function linkWallet(
   wallet: Wallet,
   selectAccount?: AccountSelector,
 ) {
+  const connection = walletConnection();
   const account = await connection.connect(wallet, undefined, {
     fresh: true,
     selectAccount,
@@ -49,7 +58,7 @@ export async function linkWallet(
     throw new Error("Your wallet connection changed. Reconnect and try again.");
   const signed = await feature.signPersonalMessage({
     account: currentAccount,
-    chain: "sui:testnet",
+    chain: `sui:${walletNetwork()}`,
     message: new TextEncoder().encode(challenge.message),
   });
   const status = await api<ChainStatus>("/chain/link", "POST", {
@@ -70,6 +79,8 @@ export async function chainAction(
   action: Record<string, unknown>,
   expected?: string,
 ) {
+  const network = walletNetwork(),
+    connection = walletConnection();
   if (!expected) throw new Error("Link your practice wallet before signing.");
   const wallets = availableWallets();
   if (!wallets.length)
@@ -82,13 +93,17 @@ export async function chainAction(
     throw new Error("Choose your Sui wallet in Account settings first.");
   await connectWallet(preferred, expected);
   const signingWallet = connection.wallet!;
-  const prepared = await api<{ id: string; bytes: string }>(
-    "/chain/prepare",
-    "POST",
-    action,
-  );
+  const prepared = await api<{
+    id: string;
+    bytes: string;
+    network?: SuiNetwork;
+  }>("/chain/prepare", "POST", action);
   let submitted = false;
   try {
+    if (prepared.network && prepared.network !== network)
+      throw new Error(
+        "The practice network changed. Refresh your account before signing.",
+      );
     const currentAccount = connection.authorized(signingWallet, expected);
     if (!currentAccount)
       throw new Error(
@@ -96,7 +111,7 @@ export async function chainAction(
       );
     const signed = await signTransaction(signingWallet, {
       account: currentAccount,
-      chain: "sui:testnet",
+      chain: `sui:${network}`,
       transaction: Transaction.from(prepared.bytes),
     });
     if (signed.bytes !== prepared.bytes)

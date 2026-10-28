@@ -7,7 +7,7 @@
   "functions": {
     "api/index.ts": {
       "maxDuration": 120,
-      "includeFiles": "contracts/practice/deployment.testnet.json"
+      "includeFiles": "contracts/practice/deployment.*.json"
     }
   },
   "rewrites": [

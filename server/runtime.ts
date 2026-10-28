@@ -14,7 +14,7 @@ import { MarketService } from "./market.ts";
 import { MarketstackGateway } from "./integrations/marketstack.ts";
 import { AlpacaGateway } from "./integrations/alpaca.ts";
 import { ChainService } from "./chain.ts";
-import { chainConfig } from "./chain-config.ts";
+import { chainConfig, configuredNetwork } from "./chain-config.ts";
 import { ResendAccountMail } from "./integrations/account-mail.ts";
 
 export async function createRuntime(
@@ -46,8 +46,11 @@ export async function createRuntime(
     options.database ??
     new Database(
       value("DATABASE_URL")
-        ? { url: value("DATABASE_URL") }
-        : { filename: resolve(dataDir, "local.sqlite") },
+        ? { url: value("DATABASE_URL"), chainNetwork: configuredNetwork() }
+        : {
+            filename: resolve(dataDir, "local.sqlite"),
+            chainNetwork: configuredNetwork(),
+          },
     );
   try {
     await database.ready;

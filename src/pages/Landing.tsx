@@ -324,15 +324,15 @@ export function Landing() {
               ],
               [
                 "What can I try right now?",
-                "The local sample lets you explore companies, make practice orders, save your reasons, revisit decisions, compare allocations, and try a learning exercise. Sample prices are authored for this demo and clearly labelled.",
+                "Explore companies and funds with real market prices, then create a family account to practise buying and selling. Save your reasons, revisit decisions, compare investment mixes, and work through short investing lessons.",
               ],
               [
                 "What does Trove remember?",
-                "The reasons you choose to share, your reflections, corrections, and learning exercises. In this local build, they stay in your sample family’s local storage on the development server. Walrus Mainnet integration needs configuration.",
+                "With parent-enabled remembering, your investment reasons, reflections, corrections, and learning exercises sync to Walrus Memory on Mainnet. Ask Trove uses confirmed saved thoughts to explain ideas in your own context, including when you return in another session.",
               ],
               [
                 "How do parent boundaries work?",
-                "The parent preview can set per-investment and daily practice limits, pause investing, and review a specific request. This is a sample-role preview, not a real family authentication system.",
+                "Parents sign in to their own account to set per-investment and daily limits, pause practice, add funds, and review specific requests. The Sui practice contract enforces those boundaries, while learners use their own sign-ins and wallets.",
               ],
               [
                 "Can I change my mind?",

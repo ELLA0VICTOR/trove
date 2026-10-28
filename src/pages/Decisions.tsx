@@ -148,7 +148,7 @@ export function Decisions() {
               {entry.transactionDigest && (
                 <a
                   aria-label="View adjustment receipt"
-                  href={`https://suiscan.xyz/testnet/tx/${entry.transactionDigest}`}
+                  href={`https://suiscan.xyz/${entry.network ?? "testnet"}/tx/${entry.transactionDigest}`}
                   target="_blank"
                   rel="noreferrer"
                 >
@@ -203,11 +203,13 @@ export function Decisions() {
           {selected.transactionDigest && (
             <p>
               <a
-                href={`https://suiscan.xyz/testnet/tx/${selected.transactionDigest}`}
+                href={`https://suiscan.xyz/${selected.network ?? "testnet"}/tx/${selected.transactionDigest}`}
                 target="_blank"
                 rel="noreferrer"
               >
-                View confirmed Sui Testnet receipt ↗
+                View confirmed Sui{" "}
+                {selected.network === "mainnet" ? "Mainnet" : "Testnet"} receipt
+                ↗
               </a>
             </p>
           )}

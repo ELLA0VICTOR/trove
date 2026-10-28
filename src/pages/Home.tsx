@@ -17,6 +17,7 @@ import { practiceCapital } from "../../shared/funding.ts";
 import { chainAction } from "../lib/wallet.ts";
 import { PracticeSetup } from "../components/PracticeSetup.tsx";
 import { displayedReturn } from "../lib/market-labels.ts";
+import { explorerUrl, networkLabel } from "../../shared/network.ts";
 
 const PortfolioChart = lazy(() =>
   import("../components/PortfolioChart.tsx").then((module) => ({
@@ -70,11 +71,15 @@ export function Home() {
             {state.chain?.account && (
               <a
                 className="portfolio-network"
-                href={`https://suiscan.xyz/testnet/object/${state.chain.account}`}
+                href={explorerUrl(
+                  state.chain.network,
+                  "object",
+                  state.chain.account,
+                )}
                 target="_blank"
                 rel="noreferrer"
               >
-                Sui Testnet <ArrowUpRight size={12} />
+                {networkLabel(state.chain.network)} <ArrowUpRight size={12} />
               </a>
             )}
           </p>

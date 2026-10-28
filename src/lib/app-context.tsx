@@ -14,6 +14,7 @@ import {
   waitingForMemory,
 } from "./memory-progress.ts";
 import type { MemoryProgress } from "./memory-progress.ts";
+import { selectWalletNetwork } from "./network.ts";
 
 class ApiError extends Error {
   readonly status: number;
@@ -93,6 +94,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       try {
         const next = await api<AppSnapshot>("/state");
         if (generation.current !== version) return;
+        selectWalletNetwork(next.chain?.network ?? "testnet");
         setState((previous) => retainMemoryConfirmations(previous, next));
         setError("");
       } catch (e) {
@@ -153,6 +155,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       const next = await api<AppSnapshot>(path, method, body);
       generation.current++;
+      selectWalletNetwork(next.chain?.network ?? "testnet");
       setState((previous) => retainMemoryConfirmations(previous, next));
       return next;
     } catch (e) {

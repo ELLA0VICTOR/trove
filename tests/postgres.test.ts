@@ -54,6 +54,35 @@ after(async () => {
   await database.close();
 });
 
+test("PostgreSQL keeps Mainnet and Testnet chain accounts separate while sharing the same family", async () => {
+  const family = randomUUID();
+  await store.get(family);
+  await database
+    .prepare("INSERT INTO chain_accounts VALUES(?,?,?)", "testnet")
+    .run(family, "0x" + "a".repeat(64), "testnet-digest");
+  await database
+    .prepare("INSERT INTO chain_accounts VALUES(?,?,?)", "mainnet")
+    .run(family, "0x" + "b".repeat(64), "mainnet-digest");
+  assert.equal(
+    (await database
+      .prepare("SELECT object_id FROM chain_accounts WHERE family=?", "testnet")
+      .get(family))!.object_id,
+    "0x" + "a".repeat(64),
+  );
+  assert.equal(
+    (await database
+      .prepare("SELECT object_id FROM chain_accounts WHERE family=?", "mainnet")
+      .get(family))!.object_id,
+    "0x" + "b".repeat(64),
+  );
+  assert.equal(
+    (await database
+      .prepare("SELECT COUNT(*) AS n FROM families WHERE id=?")
+      .get(family))!.n,
+    1,
+  );
+});
+
 test("PostgreSQL email identity and one-use password recovery survive fresh account services", async () => {
   const accounts = new Accounts(store);
   const registered = await accounts.register({

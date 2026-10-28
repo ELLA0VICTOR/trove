@@ -739,7 +739,7 @@ export function createApp(
       marketData: await market.status(await stateFor(c)),
       chain: {
         connected: Boolean(chain.config),
-        network: "testnet",
+        network: chain.network,
         provider: "Tatum",
         packageId: chain.config?.packageId,
         fundingReady: Boolean(chain.config?.fundingReady),

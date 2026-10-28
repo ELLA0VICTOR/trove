@@ -487,12 +487,16 @@ export class MarketService {
       await this.store.db
         .prepare(
           "SELECT 1 FROM chain_intents WHERE family=? AND state IN ('building','prepared','submitting','pending')",
+          state.portfolio.network ?? "testnet",
         )
         .get(family)
     )
       return state;
     const onchain = await this.store.db
-      .prepare("SELECT 1 FROM chain_accounts WHERE family=?")
+      .prepare(
+        "SELECT 1 FROM chain_accounts WHERE family=?",
+        state.portfolio.network ?? "testnet",
+      )
       .get(family);
     const plan = await this.plan(state);
     if (!plan.entries.length) {

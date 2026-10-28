@@ -4,6 +4,26 @@ import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { Pool, types } from "pg";
+import type { SuiNetwork } from "../shared/network.ts";
+
+const chainIdentifiers = new Set([
+  "chain_wallets",
+  "chain_challenges",
+  "chain_accounts",
+  "chain_learner_bindings",
+  "chain_quote_attestations",
+  "chain_dispatch",
+  "chain_intents",
+  "chain_one_active",
+  "corporate_retry",
+]);
+/** Network isolation covers chain records only; identity and consented memory stay shared. */
+export function chainSql(sql: string, network: SuiNetwork) {
+  if (network === "testnet") return sql;
+  return sql.replace(/'(?:''|[^'])*'|\b[a-zA-Z_][a-zA-Z_0-9]*\b/g, (token) =>
+    chainIdentifiers.has(token) ? `mainnet_${token}` : token,
+  );
+}
 
 type Row = Record<string, unknown>;
 export class StateConflict extends Error {
@@ -54,6 +74,14 @@ CREATE INDEX IF NOT EXISTS account_email_tokens_member ON account_email_tokens(m
 CREATE TABLE IF NOT EXISTS account_signups(token_hash TEXT PRIMARY KEY,email TEXT NOT NULL,invitation_hash TEXT,expires_at INTEGER NOT NULL,created_at INTEGER NOT NULL,state TEXT NOT NULL CHECK(state IN ('pending','sent','failed')),salt TEXT,password_hash TEXT);
 CREATE INDEX IF NOT EXISTS account_signups_email ON account_signups(email,created_at);
 `;
+const allSchema =
+  schema +
+  "\n" +
+  schema
+    .split("\n")
+    .filter((line) => chainSql(line, "mainnet") !== line)
+    .map((line) => chainSql(line, "mainnet"))
+    .join("\n");
 
 /** Convert the shared, parameterized SQL dialect; values are always bound separately. */
 export function postgresSql(input: string) {
@@ -96,6 +124,7 @@ types.setTypeParser(20, (value) => {
 /** Async persistence with transaction-scoped connections and bounded pool use. */
 export class Database {
   readonly kind: "sqlite" | "postgres";
+  readonly chainNetwork: SuiNetwork;
   readonly ready: Promise<void>;
   readonly pool?: Pool;
   private readonly namespace?: string;
@@ -111,10 +140,12 @@ export class Database {
     url?: string;
     driver?: DatabaseDriver;
     schema?: string;
+    chainNetwork?: SuiNetwork;
   }) {
     if (input.schema && !/^[a-z][a-z0-9_]{0,55}$/.test(input.schema))
       throw new Error("Invalid database namespace.");
     this.namespace = input.schema;
+    this.chainNetwork = input.chainNetwork ?? "testnet";
     this.kind = input.url || input.driver ? "postgres" : "sqlite";
     if (this.kind === "sqlite") {
       if (input.filename && input.filename !== ":memory:")
@@ -122,7 +153,7 @@ export class Database {
       this.local =
         input.sqlite ?? new DatabaseSync(input.filename ?? ":memory:");
       this.local.exec(
-        "PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;" + schema,
+        "PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;" + allSchema,
       );
       const columns = (table: string) =>
         (
@@ -188,7 +219,7 @@ export class Database {
         await client.query(`CREATE SCHEMA IF NOT EXISTS "${this.namespace}"`);
         await client.query(`SET LOCAL search_path TO "${this.namespace}"`);
       }
-      await client.query(postgresSql(schema));
+      await client.query(postgresSql(allSchema));
       await client.query(
         "ALTER TABLE account_signups ADD COLUMN IF NOT EXISTS salt TEXT, ADD COLUMN IF NOT EXISTS password_hash TEXT",
       );
@@ -251,7 +282,8 @@ export class Database {
       ? this.exclusive(perform)
       : perform();
   }
-  prepare(sql: string) {
+  prepare(input: string, network: SuiNetwork = this.chainNetwork) {
+    const sql = chainSql(input, network);
     return {
       get: async (...parameters: unknown[]) =>
         (await this.query(sql, parameters, "get")) as Row | undefined,
@@ -263,7 +295,8 @@ export class Database {
         },
     };
   }
-  async exec(sql: string): Promise<void> {
+  async exec(input: string): Promise<void> {
+    const sql = chainSql(input, this.chainNetwork);
     await this.ready;
     if (this.namespace && !this.isTransaction)
       return this.transaction(() => this.exec(sql));

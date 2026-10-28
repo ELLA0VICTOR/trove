@@ -64,7 +64,7 @@ The repository already defines API routing, SPA deep links, function duration, t
 
 ## 5. Environment values
 
-The preparation helper fills this list from local settings and the ignored Testnet key file.
+For Mainnet production, run `npm run deploy:prepare -- --mainnet` and follow [Mainnet migration](MAINNET-MIGRATION.md). Import the resulting private `.artifacts/vercel.env` into Vercel. It selects `SUI_NETWORK=mainnet`, `TATUM_MAINNET_API_KEY`, and the four `SUI_MAINNET_...` package and signer variables. The table below also documents the Testnet development settings.
 
 | Variable                  | Source                                                                                  |
 | ------------------------- | --------------------------------------------------------------------------------------- |
@@ -72,9 +72,9 @@ The preparation helper fills this list from local settings and the ignored Testn
 | `RESEND_API_KEY`          | Account verification and password-reset sending key; see [email setup](EMAIL-SETUP.md). |
 | `EMAIL_FROM`              | Verified sender, such as `Trove <accounts@dixmail.xyz>`.                                |
 | `TATUM_API_KEY`           | Existing Tatum Testnet key.                                                             |
-| `ALPACA_API_KEY`          | Alpaca paper key ID; enables the shared one-minute IEX import.                            |
+| `ALPACA_API_KEY`          | Alpaca paper key ID; enables the shared one-minute IEX import.                          |
 | `ALPACA_API_SECRET`       | Matching server-side Alpaca secret.                                                     |
-| `MARKETSTACK_API_KEY`     | Optional daily-close provider when Alpaca is not configured.                             |
+| `MARKETSTACK_API_KEY`     | Optional daily-close provider when Alpaca is not configured.                            |
 | `MEMWAL_ACCOUNT_ID`       | Existing Walrus Memory account.                                                         |
 | `MEMWAL_PRIVATE_KEY`      | Existing memory delegate key.                                                           |
 | `MEMWAL_SERVER_URL`       | Existing relayer URL.                                                                   |
@@ -98,7 +98,7 @@ Vercel supplies its deployment host and production environment. The API derives 
 4. Create a family, invite a learner in a separate session, and sign back in.
 5. Make a practice choice and confirm it remains after a fresh session.
 6. Enable remembering from the guardian account. Save a learner thought, open Saved thoughts, and wait for a confirmed memory.
-7. Link the role-specific wallets to exercise Sui Testnet practice and inspect its confirmed receipt.
+7. Link the role-specific wallets on the configured network and inspect a confirmed practice receipt.
 8. Redeploy once and confirm the saved account and portfolio remain.
 
 ## Request-driven work
@@ -115,7 +115,11 @@ The demo's production URL should be publicly accessible. Test it in a signed-out
 
 Official references: [Neon Free plan](https://neon.com/pricing), [Neon pooled connections](https://neon.com/docs/connect/connection-pooling), [Vercel Hobby](https://vercel.com/docs/plans/hobby), [Vercel function lifecycle](https://vercel.com/docs/functions/functions-api-reference/vercel-functions-package#waituntil).
 
-## Practice-account contract update
+## Mainnet practice accounts
+
+The [Mainnet deployment manifest](../contracts/practice/deployment.mainnet.json) supplies the published package and original type identity. Import the Mainnet environment export, deploy the corresponding code, then reconnect existing family wallets on Mainnet. The guardian activates a new Mainnet portfolio; the learner registers their own wallet. Existing identities and saved learning remain shared, and previous Testnet financial records retain their network identity.
+
+## Testnet development contract
 
 Sui Testnet version 4 lets the parent activate the portfolio before the learner connects. The learner later signs a one-time registration without further parent approval. Parent-signed practice refills and configurable starting capital remain available. The current package is recorded in [the deployment manifest](../contracts/practice/deployment.testnet.json). For an existing Vercel project, set **SUI_PACKAGE_ID** to `0xa5c023912b108572b7be4ca24b99f4999fec532d3d14552568cba298d231e4b3`, publish the latest repository changes, and redeploy. Keep **SUI_ORIGINAL_PACKAGE_ID** unchanged. The ignored `.artifacts/vercel.env` export also includes the current package IDs and configured email settings.
 

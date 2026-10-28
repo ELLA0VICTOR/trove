@@ -73,6 +73,10 @@ const deployment=practiceDeployment();
 assert.equal(deployment.packageId,${JSON.stringify(JSON.parse(readFileSync("contracts/practice/deployment.testnet.json", "utf8")).packageId)});
 assert.equal(deployment.enrollmentReady,true);
 assert.equal(deployment.fundingReady,true);
+const mainnet=practiceDeployment(undefined,undefined,'mainnet');
+assert.equal(mainnet.packageId,${JSON.stringify(JSON.parse(readFileSync("contracts/practice/deployment.mainnet.json", "utf8")).packageId)});
+assert.equal(mainnet.enrollmentReady,true);
+assert.equal(mainnet.fundingReady,true);
 const work=[];
 const handler=createServerlessHandler({
   runtime:()=>createRuntime({database:new Database({filename:':memory:'}),serverless:true}),

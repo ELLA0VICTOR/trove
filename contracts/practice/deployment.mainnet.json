@@ -1,0 +1,27 @@
+{
+  "network": "mainnet",
+  "provider": "Tatum",
+  "status": "published",
+  "packageId": "0x08531dda24e3a97a234b8bb18a770cd0cfba76fbd79a4c1eaba54ef0f2e18ab0",
+  "originalPackageId": "0x08531dda24e3a97a234b8bb18a770cd0cfba76fbd79a4c1eaba54ef0f2e18ab0",
+  "version": 4,
+  "digest": "GtWEPwq845cEHQ1NCwviHRFF4GWBgKdPqvW9tHT1JYsu",
+  "moduleHash": "ca9340f609ccc5a14ec766bf89f717f7fa16db661c57ac87025c9271b1f74c9c",
+  "publishedAt": "2026-10-28T10:48:55.549Z",
+  "toolchain": "testnet-v1.82.2",
+  "eventTypeOrigins": {
+    "Created": "0x08531dda24e3a97a234b8bb18a770cd0cfba76fbd79a4c1eaba54ef0f2e18ab0",
+    "Executed": "0x08531dda24e3a97a234b8bb18a770cd0cfba76fbd79a4c1eaba54ef0f2e18ab0",
+    "Funded": "0x08531dda24e3a97a234b8bb18a770cd0cfba76fbd79a4c1eaba54ef0f2e18ab0",
+    "CorporateApplied": "0x08531dda24e3a97a234b8bb18a770cd0cfba76fbd79a4c1eaba54ef0f2e18ab0",
+    "LearnerEnrolled": "0x08531dda24e3a97a234b8bb18a770cd0cfba76fbd79a4c1eaba54ef0f2e18ab0"
+  },
+  "upgradePolicy": "Upgrade capability retained by the Mainnet deployer.",
+  "gasUsed": {
+    "computationCost": "100000",
+    "storageCost": "50114400",
+    "storageRebate": "0",
+    "nonRefundableStorageFee": "0"
+  },
+  "upgradeCap": "0xf4b7873d7edb25ade0e7cc5f81e44c8f1b6450e3c95b0221b43dc087a02e01ab"
+}

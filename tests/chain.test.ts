@@ -21,10 +21,14 @@ import {
 import { applyAdjustment } from "../shared/corporate-actions.ts";
 import { preview } from "../server/domain.ts";
 import { instruments } from "../shared/fixtures.ts";
+import { Database } from "../server/database.ts";
+import type { SuiNetwork } from "../shared/network.ts";
 const packageId = "0x" + "1".repeat(64),
   objectId = "0x" + "2".repeat(64);
-function setup() {
-  const store = new DemoStore(":memory:"),
+function setup(network: SuiNetwork = "testnet") {
+  const store = new DemoStore(
+      new Database({ filename: ":memory:", chainNetwork: network }),
+    ),
     market = new MarketService(store);
   const parentKey = Ed25519Keypair.generate(),
     learnerKey = Ed25519Keypair.generate(),
@@ -45,7 +49,7 @@ function setup() {
   let submissions = 0;
   const submitted: string[] = [];
   const gateway = {
-    network: "testnet",
+    network,
     client: {
       executeTransaction: async (input: { transaction: Uint8Array }) => {
         submissions++;
@@ -175,201 +179,206 @@ function parentKeyAddress() {
   return Ed25519Keypair.generate().toSuiAddress();
 }
 
-test("parent-only activation reconciles, learner self-enrollment preserves the portfolio and locks both authorities", async () => {
-  const {
-    store,
-    chain,
-    gateway,
-    parent,
-    learner,
-    parentKey,
-    learnerKey,
-    attestor,
-  } = setup();
-  try {
-    chain.config!.enrollmentReady = true;
-    const challenge = await chain.challenge(parent, parentKey.toSuiAddress());
-    await chain.link(
+for (const network of ["testnet", "mainnet"] as const)
+  test(`${network}: parent-only activation reconciles, learner self-enrollment preserves the portfolio and locks both authorities`, async () => {
+    const {
+      store,
+      chain,
+      gateway,
       parent,
-      challenge.id,
-      (await parentKey.signPersonalMessage(Buffer.from(challenge.message)))
-        .signature,
-    );
-    const state = await store.get(parent.family);
-    state.portfolio = {
-      id: randomUUID(),
-      initialCash: "6000000000",
-      datasetId: "market-dataset",
-      startedAt: new Date().toISOString(),
-    };
-    state.policy.paused = true;
-    await store.set(state);
-    const creation = {
-      id: randomUUID(),
-      family: parent.family,
-      member: parent.id,
-      action: "create",
-      payload: JSON.stringify({
-        initialCash: "6000000000",
-        learnerAddress: UNASSIGNED_LEARNER,
-      }),
-      bytes: "AQID",
-      digest: "parent-only-creation",
-      signature: "sig",
-      state: "pending",
-      expires_at: Date.now() + 60000,
-      error: null,
-    };
-    await store.db
-      .prepare("INSERT INTO chain_intents VALUES(?,?,?,?,?,?,?,?,?,?,?)")
-      .run(...Object.values(creation));
-    let chainLearner = UNASSIGNED_LEARNER,
-      sequence = "0",
-      wrongEvent = false,
-      wrongCash = false;
-    gateway.receipt = async (digest) =>
-      ({
-        state: "confirmed",
-        transaction: {
-          digest,
-          events: [
-            {
-              packageId,
-              module: "practice",
-              eventType: `${packageId}::practice::${digest === creation.digest ? "Created" : "LearnerEnrolled"}`,
-              bcs:
-                digest === creation.digest
-                  ? CreatedBcs.serialize({
-                      account: objectId,
-                      guardian: parentKey.toSuiAddress(),
-                      learner: UNASSIGNED_LEARNER,
-                    }).toBytes()
-                  : LearnerEnrolledBcs.serialize({
-                      account: objectId,
-                      learner: wrongEvent
-                        ? parentKey.toSuiAddress()
-                        : learnerKey.toSuiAddress(),
-                      sequence,
-                    }).toBytes(),
-            },
-          ],
-        },
-      }) as never;
-    gateway.object = async () =>
-      ({
-        object: {
-          type: `${packageId}::practice::Account`,
-          content: AccountBcs.serialize({
-            id: objectId,
-            guardian: parentKey.toSuiAddress(),
-            learner: chainLearner,
-            attestor: Array.from(attestor.getPublicKey().toRawBytes()),
-            cash: wrongCash ? "1" : "6000000000",
-            positions: [],
-            per_trade: state.policy.perTrade,
-            daily: state.policy.daily,
-            paused: true,
-            allowed: state.policy.allowed.map((s) =>
-              Array.from(Buffer.from(s)),
-            ),
-            revision: "0",
-            sequence,
-            day_spent: "0",
-            spend_day: "0",
-            approval: [],
-          }).toBytes(),
-        },
-      }) as never;
-    await chain.reconcile(creation);
-    await chain.reconcile(creation);
-    const active = await store.get(parent.family);
-    assert.equal(active.cash, "6000000000");
-    assert.equal(active.holdings.length, 0);
-    assert.equal((await chain.status(parent)).learnerBound, false);
-    assert.equal((await chain.status(parent)).account, objectId);
-    assert.equal(await chain.wallet(parent.family, "learner"), undefined);
-    await assert.rejects(
-      () => chain.challenge(parent, Ed25519Keypair.generate().toSuiAddress()),
-      /fixed wallet/,
-    );
-    await assert.rejects(
-      () => chain.prepare(parent, { action: "enroll" }),
-      /other family role/,
-    );
-    await assert.rejects(
-      () => chain.prepare(learner, { action: "order", quoteId: randomUUID() }),
-      /own practice wallet/,
-    );
-    const link = await chain.challenge(learner, learnerKey.toSuiAddress());
-    const linkStatus = await chain.link(
       learner,
-      link.id,
-      (await learnerKey.signPersonalMessage(Buffer.from(link.message)))
-        .signature,
-    );
-    assert.equal(linkStatus.learnerBound, false);
-    assert.equal(
-      await chain.enrolledLearner(parent.family),
-      UNASSIGNED_LEARNER,
-    );
-    await assert.rejects(
-      () => chain.prepare(learner, { action: "order", quoteId: randomUUID() }),
-      /finish connecting/,
-    );
-    const enrollment = {
-      ...creation,
-      id: randomUUID(),
-      member: learner.id,
-      action: "enroll",
-      digest: "learner-enrollment",
-      payload: JSON.stringify({
+      parentKey,
+      learnerKey,
+      attestor,
+    } = setup(network);
+    try {
+      chain.config!.enrollmentReady = true;
+      const challenge = await chain.challenge(parent, parentKey.toSuiAddress());
+      await chain.link(
+        parent,
+        challenge.id,
+        (await parentKey.signPersonalMessage(Buffer.from(challenge.message)))
+          .signature,
+      );
+      const state = await store.get(parent.family);
+      state.portfolio = {
+        id: randomUUID(),
+        initialCash: "6000000000",
+        datasetId: "market-dataset",
+        startedAt: new Date().toISOString(),
+      };
+      state.policy.paused = true;
+      await store.set(state);
+      const creation = {
+        id: randomUUID(),
+        family: parent.family,
+        member: parent.id,
+        action: "create",
+        payload: JSON.stringify({
+          initialCash: "6000000000",
+          learnerAddress: UNASSIGNED_LEARNER,
+        }),
+        bytes: "AQID",
+        digest: "parent-only-creation",
+        signature: "sig",
+        state: "pending",
+        expires_at: Date.now() + 60000,
+        error: null,
+      };
+      await store.db
+        .prepare("INSERT INTO chain_intents VALUES(?,?,?,?,?,?,?,?,?,?,?)")
+        .run(...Object.values(creation));
+      let chainLearner = UNASSIGNED_LEARNER,
+        sequence = "0",
+        wrongEvent = false,
+        wrongCash = false;
+      gateway.receipt = async (digest) =>
+        ({
+          state: "confirmed",
+          transaction: {
+            digest,
+            events: [
+              {
+                packageId,
+                module: "practice",
+                eventType: `${packageId}::practice::${digest === creation.digest ? "Created" : "LearnerEnrolled"}`,
+                bcs:
+                  digest === creation.digest
+                    ? CreatedBcs.serialize({
+                        account: objectId,
+                        guardian: parentKey.toSuiAddress(),
+                        learner: UNASSIGNED_LEARNER,
+                      }).toBytes()
+                    : LearnerEnrolledBcs.serialize({
+                        account: objectId,
+                        learner: wrongEvent
+                          ? parentKey.toSuiAddress()
+                          : learnerKey.toSuiAddress(),
+                        sequence,
+                      }).toBytes(),
+              },
+            ],
+          },
+        }) as never;
+      gateway.object = async () =>
+        ({
+          object: {
+            type: `${packageId}::practice::Account`,
+            content: AccountBcs.serialize({
+              id: objectId,
+              guardian: parentKey.toSuiAddress(),
+              learner: chainLearner,
+              attestor: Array.from(attestor.getPublicKey().toRawBytes()),
+              cash: wrongCash ? "1" : "6000000000",
+              positions: [],
+              per_trade: state.policy.perTrade,
+              daily: state.policy.daily,
+              paused: true,
+              allowed: state.policy.allowed.map((s) =>
+                Array.from(Buffer.from(s)),
+              ),
+              revision: "0",
+              sequence,
+              day_spent: "0",
+              spend_day: "0",
+              approval: [],
+            }).toBytes(),
+          },
+        }) as never;
+      await chain.reconcile(creation);
+      await chain.reconcile(creation);
+      const active = await store.get(parent.family);
+      assert.equal(active.portfolio?.network, network);
+      assert.equal(active.cash, "6000000000");
+      assert.equal(active.holdings.length, 0);
+      assert.equal((await chain.status(parent)).learnerBound, false);
+      assert.equal((await chain.status(parent)).account, objectId);
+      assert.equal(await chain.wallet(parent.family, "learner"), undefined);
+      await assert.rejects(
+        () => chain.challenge(parent, Ed25519Keypair.generate().toSuiAddress()),
+        /fixed wallet/,
+      );
+      await assert.rejects(
+        () => chain.prepare(parent, { action: "enroll" }),
+        /other family role/,
+      );
+      await assert.rejects(
+        () =>
+          chain.prepare(learner, { action: "order", quoteId: randomUUID() }),
+        /own practice wallet/,
+      );
+      const link = await chain.challenge(learner, learnerKey.toSuiAddress());
+      const linkStatus = await chain.link(
+        learner,
+        link.id,
+        (await learnerKey.signPersonalMessage(Buffer.from(link.message)))
+          .signature,
+      );
+      assert.equal(linkStatus.learnerBound, false);
+      assert.equal(
+        await chain.enrolledLearner(parent.family),
+        UNASSIGNED_LEARNER,
+      );
+      await assert.rejects(
+        () =>
+          chain.prepare(learner, { action: "order", quoteId: randomUUID() }),
+        /finish connecting/,
+      );
+      const enrollment = {
+        ...creation,
+        id: randomUUID(),
+        member: learner.id,
         action: "enroll",
-        learner: learnerKey.toSuiAddress(),
-        sequence: 0,
-        portfolioId: active.portfolio!.id,
-      }),
-    };
-    await store.db
-      .prepare("INSERT INTO chain_intents VALUES(?,?,?,?,?,?,?,?,?,?,?)")
-      .run(...Object.values(enrollment));
-    chainLearner = learnerKey.toSuiAddress();
-    sequence = "1";
-    wrongEvent = true;
-    await assert.rejects(
-      () => chain.reconcile(enrollment),
-      /registration receipt/,
-    );
-    assert.equal(
-      await chain.enrolledLearner(parent.family),
-      UNASSIGNED_LEARNER,
-    );
-    wrongEvent = false;
-    wrongCash = true;
-    await assert.rejects(
-      () => chain.reconcile(enrollment),
-      /registration receipt/,
-    );
-    wrongCash = false;
-    await chain.reconcile(enrollment);
-    await chain.reconcile(enrollment);
-    const after = await store.get(parent.family);
-    assert.equal(after.portfolio!.id, active.portfolio!.id);
-    assert.equal(after.cash, active.cash);
-    assert.deepEqual(after.policy, active.policy);
-    assert.equal(after.sequence, 1);
-    assert.equal((await chain.status(learner)).learnerBound, true);
-    await assert.rejects(
-      () => chain.challenge(learner, Ed25519Keypair.generate().toSuiAddress()),
-      /fixed wallet/,
-    );
-    await assert.rejects(
-      () => chain.prepare(learner, { action: "enroll" }),
-      /not waiting/,
-    );
-  } finally {
-    await store.db.close();
-  }
-});
+        digest: "learner-enrollment",
+        payload: JSON.stringify({
+          action: "enroll",
+          learner: learnerKey.toSuiAddress(),
+          sequence: 0,
+          portfolioId: active.portfolio!.id,
+        }),
+      };
+      await store.db
+        .prepare("INSERT INTO chain_intents VALUES(?,?,?,?,?,?,?,?,?,?,?)")
+        .run(...Object.values(enrollment));
+      chainLearner = learnerKey.toSuiAddress();
+      sequence = "1";
+      wrongEvent = true;
+      await assert.rejects(
+        () => chain.reconcile(enrollment),
+        /registration receipt/,
+      );
+      assert.equal(
+        await chain.enrolledLearner(parent.family),
+        UNASSIGNED_LEARNER,
+      );
+      wrongEvent = false;
+      wrongCash = true;
+      await assert.rejects(
+        () => chain.reconcile(enrollment),
+        /registration receipt/,
+      );
+      wrongCash = false;
+      await chain.reconcile(enrollment);
+      await chain.reconcile(enrollment);
+      const after = await store.get(parent.family);
+      assert.equal(after.portfolio!.id, active.portfolio!.id);
+      assert.equal(after.cash, active.cash);
+      assert.deepEqual(after.policy, active.policy);
+      assert.equal(after.sequence, 1);
+      assert.equal((await chain.status(learner)).learnerBound, true);
+      await assert.rejects(
+        () =>
+          chain.challenge(learner, Ed25519Keypair.generate().toSuiAddress()),
+        /fixed wallet/,
+      );
+      await assert.rejects(
+        () => chain.prepare(learner, { action: "enroll" }),
+        /not waiting/,
+      );
+    } finally {
+      await store.db.close();
+    }
+  });
 
 test("old contracts cannot prepare a parent-only activation", async () => {
   const { store, chain, parent, parentKey } = setup();
@@ -539,6 +548,76 @@ test("upgraded corporate receipts validate date, final balances and original obj
     await store.db.close();
   }
 });
+test("order attestations bound expiry to consensus, retain the exact approved terms, and reject expired signed quotes", async () => {
+  const { store, chain, market, gateway, parent, learner, bind } = setup();
+  try {
+    await bind();
+    await store.db
+      .prepare("INSERT INTO chain_accounts VALUES(?,?,?)")
+      .run(parent.family, objectId, "created");
+    const state = await store.get(parent.family);
+    state.portfolio = {
+      id: randomUUID(),
+      initialCash: state.cash,
+      startedAt: new Date().toISOString(),
+      datasetId: "a".repeat(64),
+    };
+    state.policy.paused = false;
+    await store.set(state);
+    const q = preview(state, {
+      symbol: "AAPL",
+      side: "buy",
+      amount: "10",
+      reason: "Compare expiry against the consensus clock.",
+    });
+    await store.putQuote(state.id, q);
+    market.assertTradable = async () => {};
+    const boundedExpiry = Date.now() + 70000;
+    let clockReads = 0;
+    chain.quoteExpiry = async () => {
+      clockReads++;
+      return boundedExpiry;
+    };
+    Object.assign(gateway.client, {
+      listCoins: async () => {
+        throw new Error(
+          "Stop before transaction building in this attestation test.",
+        );
+      },
+    });
+    const prepare = () =>
+      chain.prepare(learner, { action: "order", quoteId: q.id });
+    await assert.rejects(prepare, /could not prepare/);
+    const first = (await store.db
+      .prepare("SELECT payload FROM chain_quote_attestations WHERE quote_id=?")
+      .get(q.id))!.payload as string;
+    assert.equal(JSON.parse(first).expires_at, String(boundedExpiry));
+    assert.ok(boundedExpiry < q.expiresAt);
+    await assert.rejects(prepare, /could not prepare/);
+    assert.equal(
+      (await store.db
+        .prepare(
+          "SELECT payload FROM chain_quote_attestations WHERE quote_id=?",
+        )
+        .get(q.id))!.payload,
+      first,
+    );
+    assert.equal(clockReads, 1);
+    await store.db
+      .prepare("UPDATE chain_quote_attestations SET payload=? WHERE quote_id=?")
+      .run(
+        JSON.stringify({
+          ...JSON.parse(first),
+          expires_at: String(Date.now() - 1),
+        }),
+        q.id,
+      );
+    await assert.rejects(prepare, /signed quote expired/);
+  } finally {
+    await store.db.close();
+  }
+});
+
 test("quote expiry follows consensus time and refuses an excessive clock skew", async () => {
   const { store, chain, gateway } = setup();
   try {

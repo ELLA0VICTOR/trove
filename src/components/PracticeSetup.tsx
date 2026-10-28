@@ -2,6 +2,7 @@ import { Check, Circle, ShieldCheck, Wallet } from "lucide-react";
 import { useApp } from "../lib/app-context.tsx";
 import { Button } from "./UI.tsx";
 import { ChainAccount } from "./ChainAccount.tsx";
+import { networkLabel } from "../../shared/network.ts";
 
 export function PracticeSetup({ onAccount }: { onAccount: () => void }) {
   const { state } = useApp();
@@ -40,7 +41,7 @@ export function PracticeSetup({ onAccount }: { onAccount: () => void }) {
           </p>
         </div>
         <span className="practice-network">
-          <ShieldCheck size={14} /> Sui Testnet
+          <ShieldCheck size={14} /> {networkLabel(state.chain?.network)}
         </span>
       </header>
       <ol className="practice-setup-steps" aria-label="Setup progress">

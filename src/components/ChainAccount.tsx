@@ -9,6 +9,7 @@ import {
 } from "../lib/wallet.ts";
 import { useApp } from "../lib/app-context.tsx";
 import { Button } from "./UI.tsx";
+import { explorerUrl } from "../../shared/network.ts";
 
 export function ChainAccount({ setup = false }: { setup?: boolean }) {
   const { state, refresh, update } = useApp();
@@ -34,13 +35,15 @@ export function ChainAccount({ setup = false }: { setup?: boolean }) {
   useEffect(() => {
     const registry = getWallets(),
       updateWallets = () => setWallets(availableWallets());
+    // oxlint-disable-next-line react/set-state-in-effect -- Re-read the external registry when the configured network changes.
+    updateWallets();
     const a = registry.on("register", updateWallets),
       b = registry.on("unregister", updateWallets);
     return () => {
       a();
       b();
     };
-  }, []);
+  }, [state?.chain?.network]);
   if (!state?.chain?.ready)
     return setup ? (
       <p className="practice-setup-unavailable" role="status">
@@ -82,7 +85,7 @@ export function ChainAccount({ setup = false }: { setup?: boolean }) {
           {state.role === "parent"
             ? "Connect your parent wallet."
             : "Connect your learner wallet."}{" "}
-          Practice funds are simulated. Testnet gas is sponsored.
+          Practice funds are simulated. Transaction gas is sponsored.
         </p>
       )}
       {wallets.map((wallet) => (
@@ -137,7 +140,11 @@ export function ChainAccount({ setup = false }: { setup?: boolean }) {
       )}
       {!wallets.length && (
         <div className="practice-wallet-install">
-          <p>Install Slush, select Testnet, then return here to connect.</p>
+          <p>
+            Install Slush, select{" "}
+            {chain.network === "mainnet" ? "Mainnet" : "Testnet"}, then return
+            here to connect.
+          </p>
           <a
             className="button button-secondary"
             href="https://slush.app/get-started"
@@ -151,7 +158,7 @@ export function ChainAccount({ setup = false }: { setup?: boolean }) {
       {chain.account ? (
         <p>
           <a
-            href={`https://suiscan.xyz/testnet/object/${chain.account}`}
+            href={explorerUrl(chain.network, "object", chain.account)}
             target="_blank"
             rel="noreferrer"
           >

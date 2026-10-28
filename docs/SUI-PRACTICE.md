@@ -1,12 +1,14 @@
 # Sui practice accounts
 
-The [deployment manifest](../contracts/practice/deployment.testnet.json) records the current package, original type identity, deployment receipt, bytecode hash, upgrade capability, and compiler release. Accounts track simulated USD and share quantities on Sui Testnet.
+The [Mainnet deployment manifest](../contracts/practice/deployment.mainnet.json) records the package, original type identity, deployment receipt, bytecode hash, and compiler release. Accounts track simulated USD and share quantities on Sui Mainnet. The [Testnet manifest](../contracts/practice/deployment.testnet.json) supports development. See [Mainnet migration](MAINNET-MIGRATION.md) for separate keys, gas funding, environment settings, and existing-family activation.
 
 ## Authority
 
 Each shared `Account` fixes a guardian address and an Ed25519 attestor public key. The guardian can activate it before the learner connects, with the learner address initially unassigned. The authenticated learner then proves wallet ownership and signs a one-time `enroll` transaction. Its attested terms bind the original package, account, guardian, learner address, nonce, and a maximum two-minute expiry. Enrollment preserves funds and policy and permanently fixes the learner address. Accounts created with both addresses already linked retain their original fixed authorities. The guardian controls limits and pause/resume and signs exact one-time exceptions. The learner signs orders.
 
 Wallet-link challenges establish control of the configured addresses. Family membership is self-service; each role uses separate credentials and a separate wallet.
+
+The [Mainnet verification record](evidence/sui-mainnet.json) contains confirmed activation, refill, policy, registration, buy, approval, and sale receipts from a separate integration-test family. It also records the unchanged ledger after replaying an already-confirmed submission.
 
 The operator's attestor signs bounded market and corporate-event terms. The deployment retains a compatible-upgrade capability held by its deployer.
 

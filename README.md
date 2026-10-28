@@ -59,7 +59,7 @@
 
 ## Overview
 
-Trove gives learners a $1,000 simulated portfolio, real daily market observations, and space to explain their choices. A guardian sets the boundaries. The learner explores companies, practises buying and selling, revisits decisions, and works through short investing exercises.
+Trove gives learners a $1,000 simulated portfolio, real market prices, and space to explain their choices. A guardian sets the boundaries. The learner explores companies, practises buying and selling, revisits decisions, and works through short investing exercises.
 
 The learning guide carries context across sessions through Walrus Memory. It connects new questions to the learner's earlier reasons, reflections, corrections, and concept checks, with references to the saved evidence.
 
@@ -67,26 +67,26 @@ The learning guide carries context across sessions through Walrus Memory. It con
 | ------------------ | --------------------------------------------------------------------------------------------------------- |
 | Portfolio          | Tracks cash, positions, cost basis, returns, and dated portfolio values.                                  |
 | Explore            | Searches twelve companies and broad-market funds, with official brand assets and interactive charts.      |
-| Practice orders    | Reviews a dated quote and executes a wallet-signed simulated buy or sale on Sui Testnet.                  |
+| Practice orders    | Reviews a dated quote and executes a wallet-signed simulated buy or sale on Sui Mainnet.                  |
 | Guardian controls  | Sets per-trade and daily limits, pauses activity, and approves an exact one-time exception.               |
 | Decision journal   | Keeps original reasons alongside reflections, corrections, corporate actions, and transaction receipts.   |
 | Replay             | Compares allocations using the same starting capital and adjusted market observations.                    |
 | Learning           | Adapts foundation and transfer exercises across eight investing concepts.                                 |
 | Remembered guide   | Uses confirmed, active Walrus memories to explain ideas in the learner's own context.                     |
 | Corporate actions  | Applies forward and reverse splits, dividend credits, and share-precision cash remainders automatically.  |
-| Wallet enforcement | Uses separate guardian and learner signatures, sponsored Sui Testnet execution, and Tatum reconciliation. |
+| Wallet enforcement | Uses separate guardian and learner signatures, sponsored Sui Mainnet execution, and Tatum reconciliation. |
 
 ## How Trove works
 
 1. **Create a family.** The guardian creates an account and generates a single-use learner invitation.
 2. **Join separately.** The learner accepts the invitation with their own credentials.
-3. **Activate the portfolio.** Both members connect separate wallets from Home. The guardian sets starting limits and signs activation of the shared Sui Testnet portfolio.
+3. **Activate the portfolio.** The guardian connects a wallet, sets starting limits, and signs activation of the shared Sui Mainnet portfolio. The learner connects their own wallet when ready to practise.
 4. **Make a choice.** The learner explores an instrument, enters an amount and a reason, reviews the quote, and signs the practice trade with their wallet.
 5. **Ask at the boundary.** The guardian signs approval of an exact above-limit order, then the learner signs its execution.
 6. **Learn from it.** The learner reviews the decision, compares alternatives, records a reflection, and completes a concept check.
 7. **Carry understanding forward.** With remembering enabled, the guide retrieves confirmed learning records in later sessions.
 
-Wallet setup is part of onboarding on Home. The guardian can activate the portfolio before the learner connects. The learner later links their own wallet and signs a one-time registration authorized for their family. The guardian signs controls, the learner signs orders, and the server sponsors Testnet gas. Existing families activate a fresh contract-backed portfolio with their supplied practice capital; earlier activity is archived and learning history stays with the family.
+Wallet setup is part of onboarding on Home. The guardian can activate the portfolio before the learner connects. The learner later links their own wallet and signs a one-time registration authorized for their family. The guardian signs controls, the learner signs orders, and the server sponsors transaction gas. Existing families activate a fresh contract-backed portfolio with their supplied practice capital; earlier activity is archived and learning history stays with the family.
 
 ## Architecture
 
@@ -99,7 +99,7 @@ flowchart LR
     API --> Store[("PostgreSQL state and durable jobs")]
     API --> Market["Alpaca IEX prices / Marketstack daily observations"]
     API --> Tatum["Tatum native gRPC"]
-    Tatum --> Sui["Sui Testnet practice contract"]
+    Tatum --> Sui["Sui Mainnet practice contract"]
     Store --> Worker["Memory and reconciliation workers"]
     Worker --> Walrus["Walrus Memory · Mainnet"]
     Worker --> Tatum
@@ -123,20 +123,20 @@ The hosted application serves its compiled frontend and API from one Vercel proj
 
 ## Technology stack
 
-| Area                | Technology                                                                       |
-| ------------------- | -------------------------------------------------------------------------------- |
-| Application         | TypeScript 6, React 19, React Router 7, Vite 8                                   |
-| Styling             | Tailwind CSS 4, custom CSS, SVG and Canvas, IBM Plex Mono                        |
-| Charts              | TradingView Lightweight Charts 5                                                 |
-| Backend             | Node.js 24, Hono, Zod                                                            |
-| Persistence         | PostgreSQL on Neon, transaction-scoped connections, SQLite for local development |
-| Blockchain          | Sui Move, Mysten Sui SDK, Wallet Standard                                        |
-| Chain transport     | Tatum native TLS gRPC, protobuf-ts, grpc-js                                      |
-| Memory              | Walrus Memory SDK and managed Mainnet relayer                                    |
-| AI                  | OpenAI Responses API with structured output                                      |
+| Area                | Technology                                                                                    |
+| ------------------- | --------------------------------------------------------------------------------------------- |
+| Application         | TypeScript 6, React 19, React Router 7, Vite 8                                                |
+| Styling             | Tailwind CSS 4, custom CSS, SVG and Canvas, IBM Plex Mono                                     |
+| Charts              | TradingView Lightweight Charts 5                                                              |
+| Backend             | Node.js 24, Hono, Zod                                                                         |
+| Persistence         | PostgreSQL on Neon, transaction-scoped connections, SQLite for local development              |
+| Blockchain          | Sui Move, Mysten Sui SDK, Wallet Standard                                                     |
+| Chain transport     | Tatum native TLS gRPC, protobuf-ts, grpc-js                                                   |
+| Memory              | Walrus Memory SDK and managed Mainnet relayer                                                 |
+| AI                  | OpenAI Responses API with structured output                                                   |
 | Market observations | Alpaca IEX prices, adjusted history, splits, and dividends; optional Marketstack daily closes |
-| Validation          | Node test runner, Move tests, Playwright, TypeScript, Oxlint                     |
-| Delivery            | Vercel Node functions and CDN, Neon PostgreSQL                                   |
+| Validation          | Node test runner, Move tests, Playwright, TypeScript, Oxlint                                  |
+| Delivery            | Vercel Node functions and CDN, Neon PostgreSQL                                                |
 
 ## Getting started
 
@@ -176,27 +176,33 @@ npm run dev
 
 All provider credentials belong on the server. Local development loads `.env.local`; production reads the host's environment.
 
-| Variable                  | Purpose                                                                                |
-| ------------------------- | -------------------------------------------------------------------------------------- |
-| `TATUM_API_KEY`           | Tatum Sui Testnet reads, execution, and reconciliation.                                |
-| `DATABASE_URL`            | Neon pooled PostgreSQL URI for hosted storage.                                         |
-| `ALPACA_API_KEY`          | Alpaca paper key ID for IEX prices and market history.                                  |
-| `ALPACA_API_SECRET`       | Server-side Alpaca secret; both Alpaca variables select this provider.                  |
-| `MARKETSTACK_API_KEY`     | Optional daily-close provider when Alpaca is not configured.                            |
-| `MEMWAL_ACCOUNT_ID`       | Walrus Memory account identifier.                                                      |
-| `MEMWAL_PRIVATE_KEY`      | Memory delegate signing key.                                                           |
-| `MEMWAL_SERVER_URL`       | Relayer URL; defaults to `https://relayer.memory.walrus.xyz`.                          |
-| `OPENAI_API_KEY`          | Learning-guide generation.                                                             |
-| `COACH_MODEL`             | Configured model; default `gpt-6-luna`.                                                |
-| `COACH_BUDGET_USD`        | Persistent estimated usage allowance; local default `1.00`.                            |
-| `SUI_PACKAGE_ID`          | Current callable package; defaults to the checked-in deployment manifest.              |
-| `SUI_ORIGINAL_PACKAGE_ID` | Original account type identity; resolved from the manifest for the bundled deployment. |
-| `SUI_TESTNET_SPONSOR_KEY` | Testnet transaction sponsor.                                                           |
-| `SUI_QUOTE_ATTESTOR_KEY`  | Ed25519 signer for price and corporate-action attestations.                            |
-| `TROVE_DATA_DIR`          | Local SQLite directory when DATABASE_URL is absent; defaults to `.trove`.              |
-| `PUBLIC_ORIGIN`           | Trusted public origin; Vercel deployment URLs are detected automatically.              |
-| `PORT`                    | HTTP port; defaults to `3001`.                                                         |
-| `TROVE_LIVE_SERVICES`     | Set to `0` for deterministic offline development.                                      |
+| Variable                          | Purpose                                                                                |
+| --------------------------------- | -------------------------------------------------------------------------------------- |
+| `TATUM_API_KEY`                   | Tatum Sui Testnet reads, execution, and reconciliation.                                |
+| `SUI_NETWORK`                     | `testnet` for local development or `mainnet` for production.                           |
+| `TATUM_MAINNET_API_KEY`           | Tatum Sui Mainnet reads, execution, and reconciliation.                                |
+| `SUI_MAINNET_PACKAGE_ID`          | Mainnet callable package; resolved from the Mainnet deployment manifest.               |
+| `SUI_MAINNET_ORIGINAL_PACKAGE_ID` | Mainnet account and event type identity.                                               |
+| `SUI_MAINNET_SPONSOR_KEY`         | Mainnet transaction sponsor, funded with SUI for gas.                                  |
+| `SUI_MAINNET_QUOTE_ATTESTOR_KEY`  | Separate Mainnet quote and corporate-action attestor.                                  |
+| `DATABASE_URL`                    | Neon pooled PostgreSQL URI for hosted storage.                                         |
+| `ALPACA_API_KEY`                  | Alpaca paper key ID for IEX prices and market history.                                 |
+| `ALPACA_API_SECRET`               | Server-side Alpaca secret; both Alpaca variables select this provider.                 |
+| `MARKETSTACK_API_KEY`             | Optional daily-close provider when Alpaca is not configured.                           |
+| `MEMWAL_ACCOUNT_ID`               | Walrus Memory account identifier.                                                      |
+| `MEMWAL_PRIVATE_KEY`              | Memory delegate signing key.                                                           |
+| `MEMWAL_SERVER_URL`               | Relayer URL; defaults to `https://relayer.memory.walrus.xyz`.                          |
+| `OPENAI_API_KEY`                  | Learning-guide generation.                                                             |
+| `COACH_MODEL`                     | Configured model; default `gpt-6-luna`.                                                |
+| `COACH_BUDGET_USD`                | Persistent estimated usage allowance; local default `1.00`.                            |
+| `SUI_PACKAGE_ID`                  | Current callable package; defaults to the checked-in deployment manifest.              |
+| `SUI_ORIGINAL_PACKAGE_ID`         | Original account type identity; resolved from the manifest for the bundled deployment. |
+| `SUI_TESTNET_SPONSOR_KEY`         | Testnet transaction sponsor.                                                           |
+| `SUI_QUOTE_ATTESTOR_KEY`          | Ed25519 signer for price and corporate-action attestations.                            |
+| `TROVE_DATA_DIR`                  | Local SQLite directory when DATABASE_URL is absent; defaults to `.trove`.              |
+| `PUBLIC_ORIGIN`                   | Trusted public origin; Vercel deployment URLs are detected automatically.              |
+| `PORT`                            | HTTP port; defaults to `3001`.                                                         |
+| `TROVE_LIVE_SERVICES`             | Set to `0` for deterministic offline development.                                      |
 
 The local setup helper stores generated Testnet keys in ignored `.trove/sui-testnet-keys.json`. Hosted services use environment variables. The bundled manifest resolves the current package and original type identity automatically.
 
@@ -224,7 +230,7 @@ The optional Marketstack daily-close source retains its four-day cadence, boundi
 
 ## Sui practice accounts
 
-The [public deployment manifest](contracts/practice/deployment.testnet.json) records the package, original type identity, upgrade receipt, bytecode hash, and compiler release.
+The [Mainnet deployment manifest](contracts/practice/deployment.mainnet.json) records the package, original type identity, publication receipt, bytecode hash, and compiler release. The [Testnet manifest](contracts/practice/deployment.testnet.json) supports local development. Network-specific wallet links and receipts keep their original chain identity while family accounts and learning records remain shared. See [Mainnet migration](docs/MAINNET-MIGRATION.md) for publication and Vercel configuration.
 
 Each account fixes a guardian, learner, and price-attestor public key. Signed quotes bind the account, amounts, integer units, market date, dataset hash, expiry, revision, sequence, nonce, and a salted reasoning commitment.
 
@@ -238,7 +244,7 @@ npm run sui:build
 npm run sui:upgrade
 ```
 
-`sui:upgrade` applies a compatible upgrade to the configured deployment and retains existing account objects. See [contract and reconciliation](docs/SUI-PRACTICE.md) for signer setup, publication, upgrade behavior, and authority details.
+`sui:upgrade` applies a compatible upgrade to the Testnet deployment and retains existing account objects. Mainnet publication uses `npm run sui:mainnet:publish` and a dedicated sponsor. See [contract and reconciliation](docs/SUI-PRACTICE.md) for signer setup, publication, upgrade behavior, and authority details.
 
 ## Memory and learning
 

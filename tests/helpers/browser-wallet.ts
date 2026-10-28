@@ -4,6 +4,7 @@ import { Transaction } from "@mysten/sui/transactions";
 import { DemoStore } from "../../server/store.ts";
 import { execute, preview } from "../../server/domain.ts";
 import { applyFunding, fundingAmount } from "../../shared/funding.ts";
+import type { SuiNetwork } from "../../shared/network.ts";
 
 // Browser fixtures simulate the wallet/provider boundary, while using the real
 // isolated SQLite ledger for saved decisions. Production never imports this.
@@ -42,6 +43,7 @@ export async function installBrowserWallet(
   learnerReady = true,
   linkedInitially = active,
   authorization: "own" | "other" | "both" = "own",
+  network: SuiNetwork = "testnet",
 ) {
   const original = await (await page.request.get("/api/state")).json();
   const role = original.role;
@@ -69,20 +71,22 @@ export async function installBrowserWallet(
     linkedAddresses: string[] = [];
   await page.exposeFunction(
     "signTestTroveTransaction",
-    async (signer: string) => {
+    async (signer: string, signingChain: string) => {
       if (signer !== address)
         throw new Error("The wrong family wallet was asked to sign.");
+      if (signingChain !== `sui:${network}`)
+        throw new Error("The wallet was asked to sign on the wrong network.");
       signedAddresses.push(signer);
       signatures++;
       return { bytes, signature: "synthetic-browser-wallet-signature" };
     },
   );
   await page.addInitScript(
-    ({ address, guardian, learner, authorization }) => {
+    ({ address, guardian, learner, authorization, network }) => {
       const account = {
         address,
         publicKey: new Uint8Array(32),
-        chains: ["sui:testnet"],
+        chains: [`sui:${network}`],
         features: ["sui:signTransaction", "sui:signPersonalMessage"],
       };
       const other = {
@@ -123,7 +127,7 @@ export async function installBrowserWallet(
         name: "Test Sui Wallet",
         version: "1.0.0",
         icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg'/>",
-        chains: ["sui:testnet"],
+        chains: [`sui:${network}`],
         get accounts() {
           return accounts;
         },
@@ -165,14 +169,18 @@ export async function installBrowserWallet(
           },
           "sui:signTransaction": {
             version: "2.0.0",
-            signTransaction: async (input: { account: { address: string } }) =>
+            signTransaction: async (input: {
+              account: { address: string };
+              chain: string;
+            }) =>
               (
                 window as unknown as {
                   signTestTroveTransaction: (
                     address: string,
+                    chain: string,
                   ) => Promise<unknown>;
                 }
-              ).signTestTroveTransaction(input.account.address),
+              ).signTestTroveTransaction(input.account.address, input.chain),
           },
         },
       };
@@ -187,14 +195,14 @@ export async function installBrowserWallet(
         }),
       );
     },
-    { address, guardian, learner, authorization },
+    { address, guardian, learner, authorization, network },
   );
   const chain = () => ({
     ready: true,
     fundingReady: true,
     enrollmentReady: true,
     learnerBound,
-    network: "testnet",
+    network,
     account,
     guardian: role === "parent" && !linked ? undefined : guardian,
     learner:
@@ -229,7 +237,7 @@ export async function installBrowserWallet(
   await page.route("**/api/chain/prepare", async (route) => {
     const id = crypto.randomUUID();
     actions.set(id, route.request().postDataJSON());
-    await route.fulfill({ json: { id, bytes } });
+    await route.fulfill({ json: { id, bytes, network } });
   });
   await page.route("**/api/approvals", async (route) => {
     const store = fixtureStore();

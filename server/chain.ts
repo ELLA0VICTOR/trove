@@ -35,6 +35,7 @@ import { AccessError, Accounts } from "./auth.ts";
 import type { Member } from "./auth.ts";
 import { DomainError } from "./domain.ts";
 import { applyAdjustment } from "../shared/corporate-actions.ts";
+import { networkLabel } from "../shared/network.ts";
 const hex = (bytes: Uint8Array) => Buffer.from(bytes).toString("hex");
 const bytes = (text: string) => Array.from(Buffer.from(text));
 const hash = (text: string) => createHash("sha256").update(text).digest();
@@ -83,7 +84,7 @@ export type ChainConfig = {
   attestorKey: string;
   gateway: TatumSuiGateway;
 };
-/** Only fixed, server-built Testnet calls can be sponsored. Wallet signatures remain mandatory. */
+/** Only fixed, server-built practice calls can be sponsored. Wallet signatures remain mandatory. */
 export class ChainService {
   readonly store: DemoStore;
   readonly market: MarketService;
@@ -100,11 +101,14 @@ export class ChainService {
       address.parse(config.packageId);
       for (const origin of Object.values(config.eventTypeOrigins ?? {}))
         address.parse(origin);
-      if (config.gateway.network !== "testnet")
-        throw new Error("Practice execution only supports Sui Testnet.");
+      if (config.gateway.network !== store.db.chainNetwork)
+        throw new Error("The chain provider and storage network must match.");
       this.sponsor = Ed25519Keypair.fromSecretKey(config.sponsorKey);
       this.attestor = Ed25519Keypair.fromSecretKey(config.attestorKey);
     }
+  }
+  get network() {
+    return this.config?.gateway.network ?? this.store.db.chainNetwork;
   }
   async account(family: string) {
     return (await this.store.db
@@ -159,7 +163,7 @@ export class ChainService {
         account &&
         (await this.enrolledLearner(member.family)) !== UNASSIGNED_LEARNER,
       ),
-      network: "testnet",
+      network: this.network,
       account,
       wallet: await this.wallet(member.family, member.role),
       guardian: await this.wallet(member.family, "parent"),
@@ -186,7 +190,7 @@ export class ChainService {
       );
     const id = randomUUID(),
       expires = Date.now() + 300000;
-    const message = `Trove Testnet wallet link\nMember: ${member.id}\nFamily: ${member.family}\nRole: ${member.role}\nWallet: ${wallet}\nNonce: ${randomBytes(32).toString("hex")}\nExpires: ${expires}\nThis links a practice wallet; it does not prove adulthood or a legal relationship.`;
+    const message = `Trove ${networkLabel(this.network)} wallet link\nMember: ${member.id}\nFamily: ${member.family}\nRole: ${member.role}\nWallet: ${wallet}\nNonce: ${randomBytes(32).toString("hex")}\nExpires: ${expires}\nThis links a practice wallet; it does not prove adulthood or a legal relationship.`;
     await this.store.db
       .prepare("INSERT INTO chain_challenges VALUES(?,?,?,?,?,0)")
       .run(id, member.id, message, wallet, expires);
@@ -248,7 +252,7 @@ export class ChainService {
   private requireReady() {
     if (!this.config)
       throw new DomainError(
-        "Sui Testnet is not configured on this server yet.",
+        `${networkLabel(this.network)} is not configured on this server yet.`,
       );
   }
   async assertLocal(family: string) {
@@ -328,6 +332,24 @@ export class ChainService {
     }
     const state = await this.store.get(member.family),
       account = await this.account(member.family);
+    const ledgerNetwork = state.portfolio?.network ?? "testnet";
+    if (input.action !== "create" && ledgerNetwork !== this.network)
+      throw new DomainError(
+        `Activate your ${networkLabel(this.network)} practice portfolio before continuing.`,
+      );
+    const otherNetwork = this.network === "mainnet" ? "testnet" : "mainnet";
+    if (
+      input.action === "create" &&
+      (await this.store.db
+        .prepare(
+          "SELECT 1 FROM chain_intents WHERE family=? AND state IN ('building','prepared','submitting','pending')",
+          otherNetwork,
+        )
+        .get(member.family))
+    )
+      throw new DomainError(
+        "Finish your pending transaction on the previous network before activating this portfolio.",
+      );
     if (input.action === "create" ? Boolean(account) : !account)
       throw new DomainError(
         "This action does not match the Sui practice account status.",
@@ -413,11 +435,11 @@ export class ChainService {
     const consensusExpiry = ["corporate", "enroll"].includes(input.action)
       ? await this.quoteExpiry()
       : undefined;
-    const id = randomUUID(),
-      expires = Math.min(
-        consensusExpiry ?? quote?.expiresAt ?? Date.now() + 120000,
-        Date.now() + 120000,
-      );
+    const id = randomUUID();
+    let expires = Math.min(
+      consensusExpiry ?? quote?.expiresAt ?? Date.now() + 120000,
+      Date.now() + 120000,
+    );
     await this.store.atomic(async () => {
       await this.store.db.lock(`chain-authority:${member.family}`);
       const current = await this.store.get(member.family);
@@ -638,7 +660,7 @@ export class ChainService {
             amount: q.amount,
             units: q.units,
             price: q.price,
-            expires_at: String(q.expiresAt),
+            expires_at: String(Math.min(q.expiresAt, await this.quoteExpiry())),
             revision: String(q.revision),
             sequence: String(q.sequence),
             market_day: String(
@@ -657,6 +679,11 @@ export class ChainService {
         const data = QuoteBcs.parse(
           QuoteBcs.serialize(JSON.parse(attested.payload)).toBytes(),
         );
+        expires = Math.min(expires, Number(data.expires_at));
+        if (expires <= Date.now())
+          throw new DomainError(
+            "This signed quote expired. Review a fresh order.",
+          );
         preparationStage = "quote-signing";
         const sig = await this.attestor!.sign(
           QuoteBcs.serialize(data).toBytes(),
@@ -710,22 +737,24 @@ export class ChainService {
         ]);
       else
         throw new DomainError(
-          "The Testnet gas sponsor needs free faucet SUI before continuing.",
+          this.network === "testnet"
+            ? "The Testnet gas sponsor needs free faucet SUI before continuing."
+            : "The Mainnet gas sponsor needs SUI before continuing.",
         );
       preparationStage = "transaction-build";
       const built = await tx.build({ client: this.config!.gateway.client }),
         digest = await tx.getDigest();
       await this.store.db
         .prepare(
-          "UPDATE chain_intents SET payload=?,bytes=?,digest=?,state='prepared' WHERE id=? AND state='building'",
+          "UPDATE chain_intents SET payload=?,bytes=?,digest=?,expires_at=?,state='prepared' WHERE id=? AND state='building'",
         )
-        .run(JSON.stringify(payload), toBase64(built), digest, id);
+        .run(JSON.stringify(payload), toBase64(built), digest, expires, id);
       return {
         id,
         bytes: toBase64(built),
         digest,
         expiresAt: expires,
-        network: "testnet",
+        network: this.network,
         action: input.action,
       };
     } catch (error) {
@@ -749,7 +778,7 @@ export class ChainService {
         .run(id);
       if (error instanceof DomainError) throw error;
       throw new DomainError(
-        "Tatum could not prepare this Testnet action. No transaction was submitted.",
+        `Tatum could not prepare this ${networkLabel(this.network)} action. No transaction was submitted.`,
       );
     }
   }
@@ -935,6 +964,13 @@ export class ChainService {
         throw new DomainError(
           "The transaction is not awaiting reconciliation.",
         );
+      if (
+        intent.action !== "create" &&
+        (state.portfolio?.network ?? "testnet") !== this.network
+      )
+        throw new DomainError(
+          "This receipt belongs to a different network from the active portfolio.",
+        );
       if (intent.action === "create") {
         if (
           onchain.cash !== (payload.initialCash ?? "1000000000") ||
@@ -967,6 +1003,7 @@ export class ChainService {
           );
         state.portfolio = {
           ...state.portfolio!,
+          network: this.network,
           id: randomUUID(),
           startedAt: new Date().toISOString(),
           initialCash: payload.initialCash ?? "1000000000",
@@ -1115,6 +1152,7 @@ export class ChainService {
             Number(transaction.timestampMs ?? Date.now()),
           ).toISOString();
           state.decisions.unshift({
+            network: this.network,
             ...q,
             id: q.id,
             recordedAt: now,
@@ -1222,7 +1260,11 @@ export class ChainService {
         state.adjustments = [
           ...entries
             .filter((e) => !existing.has(`${e.portfolioId}:${e.id}`))
-            .map((e) => ({ ...e, transactionDigest: intent.digest })),
+            .map((e) => ({
+              ...e,
+              network: this.network,
+              transactionDigest: intent.digest,
+            })),
           ...(state.adjustments ?? []),
         ];
         state.portfolio!.datasetId = payload.to;

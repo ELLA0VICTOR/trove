@@ -440,7 +440,9 @@ export function OrderDialog({
               : "You can add a reflection when you’re ready."}
           </p>
           <p className="fine-print">
-            Confirmed on Sui Testnet through Tatum. Practice funds only.
+            Confirmed on{" "}
+            {state.chain?.network === "mainnet" ? "Sui Mainnet" : "Sui Testnet"}{" "}
+            through Tatum. Practice funds only.
           </p>
           <Button onClick={onClose}>
             Keep growing <ArrowRight size={17} />

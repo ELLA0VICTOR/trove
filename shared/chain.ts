@@ -125,7 +125,7 @@ export type ChainStatus = {
   fundingReady?: boolean;
   enrollmentReady?: boolean;
   learnerBound?: boolean;
-  network: "testnet";
+  network: import("./network.ts").SuiNetwork;
   account?: string;
   wallet?: string;
   guardian?: string;
