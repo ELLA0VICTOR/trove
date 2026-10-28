@@ -22,7 +22,7 @@ Walrus Memory is on Mainnet, with more than ten confirmed learning records. The 
 - [Deployment manifest](../contracts/practice/deployment.mainnet.json)
 - [Migration and Vercel instructions](MAINNET-MIGRATION.md)
 
-Before sending the entry, deploy the Mainnet application settings, activate the existing family on Mainnet, and capture updated Mainnet transaction footage for the video. Account identities and Walrus records remain unchanged.
+The hosted Mainnet settings have been deployed and checked. Existing family members reconnect their wallets on Mainnet and activate the new practice portfolio. Account identities and Walrus records remain unchanged. Keep the recorded demo; the deployment manifest and verification record document the subsequent Mainnet release.
 
 ## Project description
 

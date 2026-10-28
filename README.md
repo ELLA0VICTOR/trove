@@ -27,7 +27,7 @@
   <img src="https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=06B6D4&labelColor=20232A" alt="Tailwind CSS 4" />
 </p>
 <p align="center">
-  <img src="https://img.shields.io/badge/Sui-Move-4DA2FF?style=for-the-badge&logo=sui&logoColor=4DA2FF&labelColor=20232A" alt="Sui Move" />
+  <img src="https://img.shields.io/badge/Sui-Mainnet-4DA2FF?style=for-the-badge&logo=sui&logoColor=4DA2FF&labelColor=20232A" alt="Sui Mainnet" />
   <img src="https://img.shields.io/badge/Tatum-gRPC-13794D?style=for-the-badge&labelColor=20232A" alt="Tatum gRPC" />
   <img src="https://img.shields.io/badge/Walrus-Memory-76E0C2?style=for-the-badge&labelColor=20232A" alt="Walrus Memory" />
   <img src="https://img.shields.io/badge/OpenAI-Responses_API-10A37F?style=for-the-badge&labelColor=20232A" alt="OpenAI Responses API" />
@@ -62,6 +62,8 @@
 Trove gives learners a $1,000 simulated portfolio, real market prices, and space to explain their choices. A guardian sets the boundaries. The learner explores companies, practises buying and selling, revisits decisions, and works through short investing exercises.
 
 The learning guide carries context across sessions through Walrus Memory. It connects new questions to the learner's earlier reasons, reflections, corrections, and concept checks, with references to the saved evidence.
+
+Practice transactions execute on **Sui Mainnet through Tatum**. Learning records are stored through **Walrus Memory on Mainnet**, and Trove sponsors transaction gas for family members.
 
 | Capability         | What it does                                                                                              |
 | ------------------ | --------------------------------------------------------------------------------------------------------- |
@@ -145,7 +147,7 @@ The hosted application serves its compiled frontend and API from one Vercel proj
 - A patched **Node.js 24** release with npm.
 - Git.
 - Chromium for browser tests.
-- The pinned **Sui testnet-v1.82.2** CLI for contract development.
+- The pinned **Sui CLI release `testnet-v1.82.2`** for reproducible contract builds. This compiler release builds the published Mainnet bytecode.
 
 ### Install and run
 
@@ -170,41 +172,38 @@ npm run sui:setup
 npm run dev
 ```
 
-`setup:check` validates configuration without printing secret values. `sui:setup` prepares local Testnet signers and reports the sponsor's funding status.
+`setup:check` validates configuration without printing secret values. The commands above prepare an isolated Testnet development environment. To use the published Mainnet deployment, set `SUI_NETWORK=mainnet`, configure the Mainnet variables below, and use `npm run sui:mainnet:setup` to check the dedicated sponsor. See [Mainnet configuration](docs/MAINNET-MIGRATION.md).
 
 ## Configuration
 
 All provider credentials belong on the server. Local development loads `.env.local`; production reads the host's environment.
 
-| Variable                          | Purpose                                                                                |
-| --------------------------------- | -------------------------------------------------------------------------------------- |
-| `TATUM_API_KEY`                   | Tatum Sui Testnet reads, execution, and reconciliation.                                |
-| `SUI_NETWORK`                     | `testnet` for local development or `mainnet` for production.                           |
-| `TATUM_MAINNET_API_KEY`           | Tatum Sui Mainnet reads, execution, and reconciliation.                                |
-| `SUI_MAINNET_PACKAGE_ID`          | Mainnet callable package; resolved from the Mainnet deployment manifest.               |
-| `SUI_MAINNET_ORIGINAL_PACKAGE_ID` | Mainnet account and event type identity.                                               |
-| `SUI_MAINNET_SPONSOR_KEY`         | Mainnet transaction sponsor, funded with SUI for gas.                                  |
-| `SUI_MAINNET_QUOTE_ATTESTOR_KEY`  | Separate Mainnet quote and corporate-action attestor.                                  |
-| `DATABASE_URL`                    | Neon pooled PostgreSQL URI for hosted storage.                                         |
-| `ALPACA_API_KEY`                  | Alpaca paper key ID for IEX prices and market history.                                 |
-| `ALPACA_API_SECRET`               | Server-side Alpaca secret; both Alpaca variables select this provider.                 |
-| `MARKETSTACK_API_KEY`             | Optional daily-close provider when Alpaca is not configured.                           |
-| `MEMWAL_ACCOUNT_ID`               | Walrus Memory account identifier.                                                      |
-| `MEMWAL_PRIVATE_KEY`              | Memory delegate signing key.                                                           |
-| `MEMWAL_SERVER_URL`               | Relayer URL; defaults to `https://relayer.memory.walrus.xyz`.                          |
-| `OPENAI_API_KEY`                  | Learning-guide generation.                                                             |
-| `COACH_MODEL`                     | Configured model; default `gpt-6-luna`.                                                |
-| `COACH_BUDGET_USD`                | Persistent estimated usage allowance; local default `1.00`.                            |
-| `SUI_PACKAGE_ID`                  | Current callable package; defaults to the checked-in deployment manifest.              |
-| `SUI_ORIGINAL_PACKAGE_ID`         | Original account type identity; resolved from the manifest for the bundled deployment. |
-| `SUI_TESTNET_SPONSOR_KEY`         | Testnet transaction sponsor.                                                           |
-| `SUI_QUOTE_ATTESTOR_KEY`          | Ed25519 signer for price and corporate-action attestations.                            |
-| `TROVE_DATA_DIR`                  | Local SQLite directory when DATABASE_URL is absent; defaults to `.trove`.              |
-| `PUBLIC_ORIGIN`                   | Trusted public origin; Vercel deployment URLs are detected automatically.              |
-| `PORT`                            | HTTP port; defaults to `3001`.                                                         |
-| `TROVE_LIVE_SERVICES`             | Set to `0` for deterministic offline development.                                      |
+| Variable                          | Purpose                                                                   |
+| --------------------------------- | ------------------------------------------------------------------------- |
+| `SUI_NETWORK`                     | `mainnet` for the deployed product; `testnet` for isolated development.   |
+| `TATUM_MAINNET_API_KEY`           | Tatum Sui Mainnet reads, execution, and reconciliation.                   |
+| `SUI_MAINNET_PACKAGE_ID`          | Mainnet callable package; resolved from the Mainnet deployment manifest.  |
+| `SUI_MAINNET_ORIGINAL_PACKAGE_ID` | Mainnet account and event type identity.                                  |
+| `SUI_MAINNET_SPONSOR_KEY`         | Mainnet transaction sponsor, funded with SUI for gas.                     |
+| `SUI_MAINNET_QUOTE_ATTESTOR_KEY`  | Separate Mainnet quote and corporate-action attestor.                     |
+| `DATABASE_URL`                    | Neon pooled PostgreSQL URI for hosted storage.                            |
+| `ALPACA_API_KEY`                  | Alpaca paper key ID for IEX prices and market history.                    |
+| `ALPACA_API_SECRET`               | Server-side Alpaca secret; both Alpaca variables select this provider.    |
+| `MARKETSTACK_API_KEY`             | Optional daily-close provider when Alpaca is not configured.              |
+| `MEMWAL_ACCOUNT_ID`               | Walrus Memory account identifier.                                         |
+| `MEMWAL_PRIVATE_KEY`              | Memory delegate signing key.                                              |
+| `MEMWAL_SERVER_URL`               | Relayer URL; defaults to `https://relayer.memory.walrus.xyz`.             |
+| `OPENAI_API_KEY`                  | Learning-guide generation.                                                |
+| `COACH_MODEL`                     | Configured model; default `gpt-6-luna`.                                   |
+| `COACH_BUDGET_USD`                | Persistent estimated usage allowance; local default `1.00`.               |
+| `TROVE_DATA_DIR`                  | Local SQLite directory when DATABASE_URL is absent; defaults to `.trove`. |
+| `PUBLIC_ORIGIN`                   | Trusted public origin; Vercel deployment URLs are detected automatically. |
+| `PORT`                            | HTTP port; defaults to `3001`.                                            |
+| `TROVE_LIVE_SERVICES`             | Set to `0` for deterministic offline development.                         |
 
-The local setup helper stores generated Testnet keys in ignored `.trove/sui-testnet-keys.json`. Hosted services use environment variables. The bundled manifest resolves the current package and original type identity automatically.
+Mainnet signer keys are generated in ignored `.trove/sui-mainnet-keys.json`; hosted services use the corresponding server environment variables. The Mainnet manifest resolves the current package and original type identity automatically.
+
+Isolated Testnet development uses `TATUM_API_KEY`, `SUI_PACKAGE_ID`, `SUI_ORIGINAL_PACKAGE_ID`, `SUI_TESTNET_SPONSOR_KEY`, and `SUI_QUOTE_ATTESTOR_KEY`. Its generated keys remain separate in ignored `.trove/sui-testnet-keys.json`.
 
 ## Market data and accounting
 
@@ -231,6 +230,12 @@ The optional Marketstack daily-close source retains its four-day cadence, boundi
 ## Sui practice accounts
 
 The [Mainnet deployment manifest](contracts/practice/deployment.mainnet.json) records the package, original type identity, publication receipt, bytecode hash, and compiler release. The [Testnet manifest](contracts/practice/deployment.testnet.json) supports local development. Network-specific wallet links and receipts keep their original chain identity while family accounts and learning records remain shared. See [Mainnet migration](docs/MAINNET-MIGRATION.md) for publication and Vercel configuration.
+
+| Mainnet deployment       | Reference                                                                                                                  |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| Practice package         | [Published package](https://suiscan.xyz/mainnet/object/0x08531dda24e3a97a234b8bb18a770cd0cfba76fbd79a4c1eaba54ef0f2e18ab0) |
+| Publication              | [Confirmed transaction](https://suiscan.xyz/mainnet/tx/GtWEPwq845cEHQ1NCwviHRFF4GWBgKdPqvW9tHT1JYsu)                       |
+| Integration verification | [Eight confirmed Mainnet actions and duplicate-receipt checks](docs/evidence/sui-mainnet.json)                             |
 
 Each account fixes a guardian, learner, and price-attestor public key. Signed quotes bind the account, amounts, integer units, market date, dataset hash, expiry, revision, sequence, nonce, and a salted reasoning commitment.
 
@@ -318,7 +323,7 @@ Set `PLAYWRIGHT_CHROMIUM_PATH` to use an existing compatible Chromium installati
 
 Trove deploys to **Vercel** with **Neon PostgreSQL**. The frontend and API share an origin. Persistent application state and durable jobs live in the database; request-driven maintenance coordinates memory publication, market imports, and Tatum reconciliation across function instances.
 
-Follow the [Vercel and Neon deployment guide](docs/VERCEL-DEPLOY.md). After adding DATABASE_URL locally, `npm run check:database` verifies isolated concurrent PostgreSQL operations, and `npm run deploy:prepare` initializes hosted storage and generates an ignored environment file for the Vercel dashboard.
+Follow the [Vercel and Neon deployment guide](docs/VERCEL-DEPLOY.md). After adding DATABASE_URL locally, `npm run check:database` verifies isolated concurrent PostgreSQL operations. Run `npm run deploy:prepare -- --mainnet` to initialize hosted storage and generate the private `.artifacts/vercel.env` file for the Vercel dashboard. This selects Mainnet credentials while preserving existing identities, learning records, and network-specific transaction history.
 
 ## Repository structure
 

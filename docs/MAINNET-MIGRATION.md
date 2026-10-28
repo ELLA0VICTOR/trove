@@ -61,4 +61,4 @@ Wallet messages and transaction requests must show Sui Mainnet. A wallet securit
 
 ## 5. Update submission evidence
 
-Use the actual confirmed Mainnet receipt and object links in the blog and submission. Replace the recorded Testnet activation/receipt shots with Mainnet footage, or add a short Mainnet update segment that clearly shows the migration. Keep the full demo within the event's video limit.
+Use the confirmed Mainnet deployment and verification links in the blog and submission. Keep the recorded product demo; its transaction scenes show the development deployment before the Mainnet release. The written materials identify the current Mainnet deployment.
