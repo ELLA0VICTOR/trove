@@ -81,6 +81,9 @@ export function preview(
     sequence: state.sequence,
     violations: [],
     marketDate: point.date,
+    ...(point.sourceTimestamp
+      ? { marketTimestamp: point.sourceTimestamp }
+      : {}),
     datasetId: state.portfolio?.datasetId,
     portfolioId: state.portfolio?.id,
   };
@@ -126,7 +129,7 @@ export async function execute(
       Date.now() - Date.parse(quote.marketDate + "T21:00:00Z") > 5 * 86400000
     )
       throw new DomainError(
-        "Prices are stale. Review a fresh daily close before continuing.",
+        "Prices are stale. Review a fresh price before continuing.",
       );
     nonBypassable(state, quote);
     const approval = state.approvals.find(
@@ -170,6 +173,9 @@ export async function execute(
       reason: quote.reason,
       recordedAt: now,
       marketDate: quote.marketDate,
+      ...(quote.marketTimestamp
+        ? { marketTimestamp: quote.marketTimestamp }
+        : {}),
       origin: "local",
       memoryStatus: "local",
       portfolioId: quote.portfolioId,

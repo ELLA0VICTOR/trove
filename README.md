@@ -97,7 +97,7 @@ flowchart LR
     UI --> Wallet["Sui wallet signatures"]
     Wallet --> API
     API --> Store[("PostgreSQL state and durable jobs")]
-    API --> Market["Marketstack daily observations"]
+    API --> Market["Alpaca IEX prices / Marketstack daily observations"]
     API --> Tatum["Tatum native gRPC"]
     Tatum --> Sui["Sui Testnet practice contract"]
     Store --> Worker["Memory and reconciliation workers"]
@@ -134,7 +134,7 @@ The hosted application serves its compiled frontend and API from one Vercel proj
 | Chain transport     | Tatum native TLS gRPC, protobuf-ts, grpc-js                                      |
 | Memory              | Walrus Memory SDK and managed Mainnet relayer                                    |
 | AI                  | OpenAI Responses API with structured output                                      |
-| Market observations | Marketstack daily closes and corporate-action fields                             |
+| Market observations | Alpaca IEX prices, adjusted history, splits, and dividends; optional Marketstack daily closes |
 | Validation          | Node test runner, Move tests, Playwright, TypeScript, Oxlint                     |
 | Delivery            | Vercel Node functions and CDN, Neon PostgreSQL                                   |
 
@@ -158,7 +158,7 @@ npm run dev
 
 Open **http://127.0.0.1:5173**. Vite runs on port 5173 and proxies API requests to the Node server on port 3001. On Windows, use `npm.cmd` if PowerShell execution policy blocks `npm.ps1`.
 
-Visitors can browse market prices and complete investing lessons. Family sign-in opens the portfolio, practice investing, saved decisions, and parent controls. Ask Trove requires a signed-in learner; parent-enabled remembering connects the guide to saved learning. Each family shares a learner portfolio starting with $1,000 in practice cash and real daily closing prices from a fresh Marketstack snapshot. Parents can add simulated funds while preserving learning history, holdings, and spending controls. Investment returns exclude supplied capital. Earlier example portfolios are archived before switching price basis. Offline development uses authored market history.
+Visitors can browse market prices and complete investing lessons. Family sign-in opens the portfolio, practice investing, saved decisions, and parent controls. Ask Trove requires a signed-in learner; parent-enabled remembering connects the guide to saved learning. Each family shares a learner portfolio starting with $1,000 in practice cash and real market prices. Parents can add simulated funds while preserving learning history, holdings, and spending controls. Investment returns exclude supplied capital. Earlier example portfolios are archived before switching price basis. Offline development uses authored market history.
 
 ### Connect services
 
@@ -180,7 +180,9 @@ All provider credentials belong on the server. Local development loads `.env.loc
 | ------------------------- | -------------------------------------------------------------------------------------- |
 | `TATUM_API_KEY`           | Tatum Sui Testnet reads, execution, and reconciliation.                                |
 | `DATABASE_URL`            | Neon pooled PostgreSQL URI for hosted storage.                                         |
-| `MARKETSTACK_API_KEY`     | Shared market-history imports.                                                         |
+| `ALPACA_API_KEY`          | Alpaca paper key ID for IEX prices and market history.                                  |
+| `ALPACA_API_SECRET`       | Server-side Alpaca secret; both Alpaca variables select this provider.                  |
+| `MARKETSTACK_API_KEY`     | Optional daily-close provider when Alpaca is not configured.                            |
 | `MEMWAL_ACCOUNT_ID`       | Walrus Memory account identifier.                                                      |
 | `MEMWAL_PRIVATE_KEY`      | Memory delegate signing key.                                                           |
 | `MEMWAL_SERVER_URL`       | Relayer URL; defaults to `https://relayer.memory.walrus.xyz`.                          |
@@ -200,7 +202,7 @@ The local setup helper stores generated Testnet keys in ignored `.trove/sui-test
 
 ## Market data and accounting
 
-Trove imports validated USD observations into immutable, hashed snapshots. Every order binds its portfolio, dataset, symbol, price, policy revision, sequence, and expiration. Market charts and replay use provider-adjusted closes; practice fills use the displayed raw closing price.
+Trove imports validated USD observations into immutable, hashed snapshots. Every order binds its portfolio, dataset, symbol, price, policy revision, sequence, and expiration. Historical comparisons use adjusted prices; practice fills use the displayed raw price and retain its source timestamp.
 
 Money uses **six decimal places** and share quantities use **eight decimal places**. Ledger calculations use integer arithmetic in TypeScript and Move. Sales release cost basis proportionally; residual cash remains explicit.
 
@@ -216,7 +218,9 @@ A snapshot transition processes corporate events in date order, with splits befo
 
 Corporate entries retain before/after quantities, cash credits, cost releases, snapshot references, and confirmation digests. Recorded portfolio observations preserve the value seen before later share adjustments.
 
-The importer shares one cache across families and reserves its refresh interval before network requests. Its four-day cadence bounds twelve symbols to roughly 96 symbol-requests per 31 days. Orders require a snapshot within the configured five-day freshness window.
+Alpaca IEX imports share a one-minute cache across families. Visible screens poll every thirty seconds; portfolio observations record actual valuations from the opening balance onward, including the first day. A reviewed quote stays fixed during its short signing window. Exchange status and source timestamps distinguish fresh prices from a closed market, and stale prices pause new orders. IEX prices reflect one exchange. See [Alpaca setup](docs/ALPACA-SETUP.md).
+
+The optional Marketstack daily-close source retains its four-day cadence, bounding twelve symbols to roughly 96 symbol-requests per 31 days. Imports reserve their interval before network requests, including after process restarts.
 
 ## Sui practice accounts
 
@@ -319,7 +323,7 @@ trove/
 ├── public/               Sapling logo, brand assets, and third-party notices
 ├── scripts/              Setup, contract tools, integration checks, and evaluation
 ├── server/
-│   ├── integrations/     Tatum, Walrus, Marketstack, and OpenAI adapters
+│   ├── integrations/     Tatum, Walrus, Alpaca, Marketstack, and OpenAI adapters
 │   ├── jobs/             Durable memory work and model-usage accounting
 │   ├── app.ts            HTTP routes and request authority
 │   ├── chain.ts          Signing, sponsorship, and receipt reconciliation

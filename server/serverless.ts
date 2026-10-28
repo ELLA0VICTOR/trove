@@ -80,7 +80,11 @@ export function createServerlessHandler(
         // The first visitor waits for an initial price import rather than an old example.
         if (url.pathname.startsWith("/api/")) {
           const latest = await runtime.market.latest();
-          if (!latest || marketStale(latest.asOf))
+          if (
+            !latest ||
+            marketStale(latest.asOf) ||
+            runtime.market.gateway?.source
+          )
             await runtime.market.refresh();
         }
         return await app.fetch(new Request(url, request));

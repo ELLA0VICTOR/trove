@@ -1252,6 +1252,94 @@ test("parent practice refills update the shared portfolio without manufacturing 
   ).toBe(true);
 });
 
+test("IEX prices show their source and refresh automatically on a visible asset screen", async ({
+  page,
+}) => {
+  let price = "120000000";
+  await page.route("**/api/state", async (route) => {
+    const response = await route.fetch(),
+      state = await response.json();
+    state.market = {
+      mode: "market",
+      provider: "Alpaca IEX",
+      quoteMode: "intraday",
+      asOf: "2026-10-27",
+      quoteAt: "2026-10-27T19:59:59Z",
+      stale: false,
+      marketOpen: false,
+      status: "Market closed · last available IEX prices",
+    };
+    state.chain = { ready: false };
+    const current = state.instruments
+      .find((i: { symbol: string }) => i.symbol === "AAPL")
+      .prices.at(-1);
+    current.price = price;
+    current.sourceTimestamp = "2026-10-27T19:59:59Z";
+    await route.fulfill({ response, json: state });
+  });
+  await page.clock.install();
+  await page.goto("/app/explore/AAPL");
+  await expect(page.locator(".company-price")).toContainText("$120.00");
+  await expect(page.locator(".company-price")).toContainText("IEX price");
+  await expect(page.locator(".company-price")).toContainText("Oct 27");
+  price = "121000000";
+  await page.clock.fastForward(31000);
+  await expect(page.locator(".company-price")).toContainText("$121.00");
+});
+
+test("a first-day portfolio draws immediately and new observations update its value without counting refills as profit", async ({
+  page,
+}) => {
+  await createPortfolioAccount(page);
+  const start = new Date(Date.now() - 3600000).toISOString();
+  let current = 1000,
+    capital = 1000;
+  await page.route("**/api/state", async (route) => {
+    const response = await route.fetch(),
+      state = await response.json();
+    state.portfolio = {
+      id: "chart-fixture",
+      startedAt: start,
+      initialCash: "1000000000",
+      datasetId: "chart-prices",
+    };
+    state.portfolioHistory = [{ date: start.slice(0, 10), value: current }];
+    state.portfolioObservations = [
+      { date: start, value: 1000, capital: 1000 },
+      {
+        date: new Date().toISOString().replace(/\.\d{3}Z$/, ".000Z"),
+        value: current,
+        capital,
+      },
+    ];
+    await route.fulfill({ response, json: state });
+  });
+  await page.goto("/app");
+  await expect(
+    page.locator(".portfolio-chart-canvas canvas").first(),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "1D", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".chart-reading")).toContainText("$1,000.00");
+  current = 1010;
+  await page.reload();
+  await expect(page.locator(".chart-reading")).toContainText("+$10.00");
+  capital = 1500;
+  current = 1510;
+  await page.reload();
+  await expect(page.locator(".chart-reading")).toContainText("$1,510.00");
+  await expect(page.locator(".chart-reading")).toContainText("+$10.00");
+  await expect(page.locator(".chart-reading")).not.toContainText("+$510.00");
+  await page
+    .getByRole("img", {
+      name: /Practice portfolio value over the selected period/,
+    })
+    .focus();
+  await page.keyboard.press("ArrowLeft");
+  await expect(page.locator(".chart-reading")).toContainText("$1,000.00");
+});
+
 async function walletAuthorization(
   page: Page,
   mode: "own" | "other" | "both",

@@ -225,7 +225,7 @@ export function Replay() {
       </section>
       <p className="data-note">
         {state.market?.mode === "market"
-          ? "Marketstack historical daily closes."
+          ? `${state.market.provider} historical prices.`
           : "Authored sample prices."}{" "}
         Moving this timeline changes the comparison, not your actual practice
         balance or saved decisions.

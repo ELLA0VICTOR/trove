@@ -59,6 +59,7 @@ export function createApp(
     return { ...state, role: c.get("member")?.role ?? state.role };
   };
   const marketState = async (state: DemoState) => {
+    if (market.gateway?.source) await market.refresh();
     const currentMarket = await market.latest();
     if (!state.portfolio && !currentMarket && market.gateway)
       throw new DomainError(
@@ -94,6 +95,9 @@ export function createApp(
       instruments: await market.instruments(state),
       market: await market.status(state),
       portfolioHistory: member ? await market.history(state) : undefined,
+      portfolioObservations: member
+        ? await market.observations(state)
+        : undefined,
       chain: member ? await chain.status(member) : undefined,
       session: {
         mode: member ? ("account" as const) : ("sample" as const),

@@ -14,6 +14,8 @@ const settings = [
   ["Walrus account", "MEMWAL_ACCOUNT_ID"],
   ["Walrus delegate", "MEMWAL_PRIVATE_KEY"],
   ["Market data", "MARKETSTACK_API_KEY"],
+  ["Alpaca Key ID", "ALPACA_API_KEY"],
+  ["Alpaca secret", "ALPACA_API_SECRET"],
   ["AI coach", "OPENAI_API_KEY"],
   ["Coach model", "COACH_MODEL"],
   ["Coach allowance", "COACH_BUDGET_USD"],

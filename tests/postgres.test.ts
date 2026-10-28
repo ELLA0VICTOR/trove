@@ -489,15 +489,32 @@ test("PostgreSQL real-price snapshots and passive adjustments retain their share
   );
   assert.equal((await market.status(state)).mode, "market");
   assert.equal((await market.history(state))!.at(-1)!.value, 1000);
+  const quote = preview(
+    state,
+    { symbol: "AAPL", side: "buy", amount: "25", reason: "Compare companies" },
+    await market.instruments(state),
+  );
+  await store.putQuote(family, quote);
   const next = structuredClone((await market.latest())!);
   next.id = randomUUID();
   next.receivedAt = new Date(Date.now() + 1000).toISOString();
   await database
     .prepare("INSERT INTO market_snapshots VALUES(?,?,?,?)")
     .run(next.id, next.asOf, next.receivedAt, JSON.stringify(next));
+  assert.equal(
+    (await market.advance(family)).portfolio!.datasetId,
+    state.portfolio!.datasetId,
+  );
+  quote.expiresAt = Date.now() - 1;
+  await database
+    .prepare("UPDATE quotes SET payload=? WHERE id=?")
+    .run(JSON.stringify(quote), quote.id);
   const advanced = await market.advance(family);
   assert.equal(advanced.portfolio!.datasetId, next.id);
   assert.equal(advanced.sequence, state.sequence + 1);
+  const observations = await market.observations(advanced, Date.now() + 10000);
+  assert.equal(observations!.at(-1)!.value, 1000);
+  assert.equal(observations!.at(-1)!.capital, 1000);
 });
 
 test("PostgreSQL email signup creates one verified account and retains renamed sessions across stores", async () => {

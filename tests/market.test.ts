@@ -183,6 +183,76 @@ test("one persisted market import is shared across callers and archived sample t
     await store.db.close();
   }
 });
+test("first-day observations begin at the opening balance, keep price changes, and separate added capital", async () => {
+  const { store, market } = setup();
+  try {
+    await market.refresh();
+    const state = await market.enroll(randomUUID(), true);
+    state.portfolio!.startedAt = new Date(Date.now() - 3600000).toISOString();
+    const now = Date.now();
+    const initial = await market.observations(state, now);
+    assert.equal(initial!.length, 2);
+    assert.equal(initial![0].value, 1000);
+    assert.equal(initial!.at(-1)!.value, 1000);
+    const count = () =>
+      store.db
+        .prepare("SELECT COUNT(*) AS n FROM portfolio_observations")
+        .get();
+    const before = (await count())!.n;
+    await market.observations(state, now + 30000);
+    assert.equal((await count())!.n, before);
+    state.holdings = [
+      { symbol: "AAPL", units: "100000000", cost: "103000000" },
+    ];
+    state.cash = "897000000";
+    state.sequence++;
+    await market.observations(state, now + 60000);
+    const data = await market.dataset(state.portfolio!.datasetId);
+    const changed = structuredClone(data);
+    changed.id = randomUUID();
+    changed.receivedAt = new Date(now + 120000).toISOString();
+    changed.instruments.find((i) => i.symbol === "AAPL")!.prices.at(-1)!.price =
+      "113000000";
+    await store.db
+      .prepare("INSERT INTO market_snapshots VALUES(?,?,?,?)")
+      .run(
+        changed.id,
+        changed.asOf,
+        changed.receivedAt,
+        JSON.stringify(changed),
+      );
+    state.portfolio!.datasetId = changed.id;
+    const gained = await market.observations(state, now + 120000);
+    assert.equal(gained!.at(-1)!.value, 1010);
+    assert.equal(gained!.at(-1)!.capital, 1000);
+    state.cash = String(BigInt(state.cash) + 500000000n);
+    state.funding = [
+      {
+        id: randomUUID(),
+        portfolioId: state.portfolio!.id,
+        amount: "500000000",
+        recordedAt: new Date(now + 150000).toISOString(),
+      },
+    ];
+    state.sequence++;
+    const funded = await new MarketService(store).observations(
+      state,
+      now + 180000,
+    );
+    assert.equal(funded!.at(-1)!.value, 1510);
+    assert.equal(funded!.at(-1)!.capital, 1500);
+    assert.equal(funded![0].value, 1000);
+    assert.equal(
+      funded!.at(-1)!.value -
+        funded![0].value -
+        (funded!.at(-1)!.capital - funded![0].capital),
+      10,
+    );
+  } finally {
+    await store.db.close();
+  }
+});
+
 test("reviewed real-price orders bind the snapshot and account history uses actual decisions", async () => {
   const { store, market } = setup();
   try {

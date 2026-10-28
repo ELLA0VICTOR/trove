@@ -10,6 +10,7 @@ export interface Instrument {
     adjustedPrice?: string;
     splitFactor?: number | null;
     dividend?: number | null;
+    sourceTimestamp?: string;
   }[];
 }
 export interface Holding {
@@ -48,6 +49,7 @@ export interface Decision {
   reason: string;
   recordedAt: string;
   marketDate: string;
+  marketTimestamp?: string;
   origin: "sample" | "local";
   memoryStatus: "local" | "queued" | "confirmed";
   portfolioId?: string;
@@ -87,6 +89,7 @@ export interface Quote {
   sequence: number;
   violations: string[];
   marketDate: string;
+  marketTimestamp?: string;
   datasetId?: string;
   portfolioId?: string;
 }
@@ -142,12 +145,16 @@ export interface AppSnapshot extends DemoState {
     provider: string;
     asOf: string;
     receivedAt?: string;
+    quoteMode?: "close" | "intraday";
+    quoteAt?: string;
+    marketOpen?: boolean;
     datasetId?: string;
     stale: boolean;
     blocked?: boolean;
     status: string;
   };
   portfolioHistory?: { date: string; value: number }[];
+  portfolioObservations?: { date: string; value: number; capital: number }[];
   session?: {
     mode: "sample" | "account";
     username?: string;

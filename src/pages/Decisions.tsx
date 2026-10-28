@@ -7,6 +7,7 @@ import { Button, Modal } from "../components/UI.tsx";
 import { PixelIcon } from "../components/Brand.tsx";
 import { MemoryDialog } from "./Learning.tsx";
 import { CompanyLogo } from "../components/CompanyLogo.tsx";
+import { priceTime } from "../lib/market-labels.ts";
 
 export function Decisions() {
   const { state } = useApp(),
@@ -182,9 +183,15 @@ export function Decisions() {
           </div>
           <div className="detail-fact">
             <span>
-              {selected.datasetId ? "Market close date" : "Sample market date"}
+              {selected.marketTimestamp
+                ? "Price timestamp"
+                : selected.datasetId
+                  ? "Market close date"
+                  : "Sample market date"}
             </span>
-            <strong>{selected.marketDate}</strong>
+            <strong>
+              {priceTime(selected.marketTimestamp ?? selected.marketDate)}
+            </strong>
           </div>
           <div className="detail-fact">
             <span>Recorded</span>

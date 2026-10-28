@@ -5,6 +5,7 @@ import {
   checkCoachModelAccess,
 } from "../server/integrations/coach.ts";
 import { MarketstackGateway } from "../server/integrations/marketstack.ts";
+import { AlpacaGateway } from "../server/integrations/alpaca.ts";
 import { randomUUID } from "node:crypto";
 import { configuredValue } from "../server/config.ts";
 import { CoachBudget, COACH_MODEL } from "../server/jobs/coach-budget.ts";
@@ -76,7 +77,25 @@ else if (selected("tatum"))
     status: "not configured",
     detail: "Set TATUM_MAINNET_API_KEY for Mainnet evidence reads.",
   });
-if (selected("market") && key("MARKETSTACK_API_KEY"))
+if (selected("market") && key("ALPACA_API_KEY") && key("ALPACA_API_SECRET"))
+  await check("Alpaca IEX data", async () => {
+    const [history] = await new AlpacaGateway(
+      key("ALPACA_API_KEY")!,
+      key("ALPACA_API_SECRET")!,
+    ).histories(
+      ["AAPL"],
+      new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10),
+      new Date().toISOString().slice(0, 10),
+    );
+    return {
+      symbol: history.symbol,
+      bars: history.prices.length,
+      provider: history.provider,
+      quoteAt: history.quoteAt,
+      marketOpen: history.marketOpen,
+    };
+  });
+else if (selected("market") && key("MARKETSTACK_API_KEY"))
   await check("Marketstack history", async () => {
     const history = await new MarketstackGateway(
       key("MARKETSTACK_API_KEY")!,

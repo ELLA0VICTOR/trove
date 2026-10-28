@@ -211,7 +211,7 @@ export function AccountDialog({
               <h3>Market-price practice</h3>
               <p>
                 Start with {money(practiceCapital(state))} in practice capital
-                and real daily closes. Your earlier sample activity stays in
+                and real market prices. Your earlier sample activity stays in
                 your journal and an archived portfolio.
               </p>
               <Button

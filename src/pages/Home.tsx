@@ -26,23 +26,30 @@ const PortfolioChart = lazy(() =>
 export function Home() {
   const { openAccount } = useOutletContext<{ openAccount: () => void }>();
   const { state, refresh, notify } = useApp(),
-    [period, setPeriod] = useState(Infinity),
+    [period, setPeriod] = useState<number | null>(null),
     [signing, setSigning] = useState(false),
     [now, setNow] = useState(Date.now);
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
-  const series = useMemo(
-    () =>
-      state
-        ? (
-            state.portfolioHistory ??
-            portfolioSeries(state.holdings, state.cash, state.instruments)
-          ).slice(-period)
-        : [],
-    [state, period],
-  );
+  const selectedPeriod =
+    period ?? (state?.portfolioObservations?.length ? 0 : Infinity);
+  const series = useMemo(() => {
+    if (!state) return [];
+    if (selectedPeriod === 0 && state.portfolioObservations?.length) {
+      const cutoff =
+        Date.parse(state.portfolioObservations.at(-1)!.date) - 86400000;
+      const recent = state.portfolioObservations.filter(
+        (point) => Date.parse(point.date) >= cutoff,
+      );
+      return recent.length ? recent : state.portfolioObservations.slice(-1);
+    }
+    return (
+      state.portfolioHistory ??
+      portfolioSeries(state.holdings, state.cash, state.instruments)
+    ).slice(selectedPeriod === 0 ? -1 : -selectedPeriod);
+  }, [state, selectedPeriod]);
   if (!state) return null;
   const value = portfolioValue(state, state.instruments),
     cash = BigInt(state.cash),
@@ -169,6 +176,7 @@ export function Home() {
           <h2>Value over time</h2>
           <div className="performance-periods" aria-label="Chart period">
             {[
+              ...(state.portfolio ? [[0, "1D"]] : []),
               [5, "1W"],
               [20, "1M"],
               [40, "2M"],
@@ -176,8 +184,8 @@ export function Home() {
             ].map(([amount, label]) => (
               <button
                 key={label}
-                aria-pressed={period === amount}
-                className={period === amount ? "active" : ""}
+                aria-pressed={selectedPeriod === amount}
+                className={selectedPeriod === amount ? "active" : ""}
                 onClick={() => setPeriod(Number(amount))}
               >
                 {label}
@@ -202,7 +210,7 @@ export function Home() {
         </Suspense>
         <p className="performance-note">
           {state.market?.mode === "market"
-            ? `Your account history · ${state.market.provider} · close ${state.market.asOf}`
+            ? `Your account history · ${state.market.provider} · ${state.market.quoteMode === "intraday" ? (state.market.marketOpen ? "Market open" : "Market closed") : "close " + state.market.asOf}`
             : hasLocalDecisions
               ? "Current holdings valued across sample history; this is not your transaction history."
               : "Sample price history · Jul 06 – Sep 25, 2026"}

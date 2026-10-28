@@ -100,19 +100,31 @@ export function AppLayout() {
       state?.session?.mode === "account" &&
       state.chain?.ready &&
       (!state.chain.account || state.chain.learnerBound === false);
+    const fastPrices = state?.market?.quoteMode === "intraday";
     if (
       !state?.market?.blocked &&
       !state?.chain?.pending?.length &&
       !waitingForParent &&
-      !setupPending
+      !setupPending &&
+      !fastPrices
     )
       return;
-    const timer = setInterval(() => {
-      if (!document.hidden) void refresh();
-    }, 3000);
+    const timer = setInterval(
+      () => {
+        if (!document.hidden) void refresh();
+      },
+      fastPrices &&
+        !state?.market?.blocked &&
+        !state?.chain?.pending?.length &&
+        !waitingForParent &&
+        !setupPending
+        ? 30000
+        : 3000,
+    );
     return () => clearInterval(timer);
   }, [
     state?.market?.blocked,
+    state?.market?.quoteMode,
     state?.chain?.pending?.length,
     state?.approvals,
     state?.chain?.ready,

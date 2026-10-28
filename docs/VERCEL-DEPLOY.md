@@ -72,7 +72,9 @@ The preparation helper fills this list from local settings and the ignored Testn
 | `RESEND_API_KEY`          | Account verification and password-reset sending key; see [email setup](EMAIL-SETUP.md). |
 | `EMAIL_FROM`              | Verified sender, such as `Trove <accounts@dixmail.xyz>`.                                |
 | `TATUM_API_KEY`           | Existing Tatum Testnet key.                                                             |
-| `MARKETSTACK_API_KEY`     | Existing market-data key.                                                               |
+| `ALPACA_API_KEY`          | Alpaca paper key ID; enables the shared one-minute IEX import.                            |
+| `ALPACA_API_SECRET`       | Matching server-side Alpaca secret.                                                     |
+| `MARKETSTACK_API_KEY`     | Optional daily-close provider when Alpaca is not configured.                             |
 | `MEMWAL_ACCOUNT_ID`       | Existing Walrus Memory account.                                                         |
 | `MEMWAL_PRIVATE_KEY`      | Existing memory delegate key.                                                           |
 | `MEMWAL_SERVER_URL`       | Existing relayer URL.                                                                   |

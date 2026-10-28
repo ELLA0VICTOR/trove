@@ -16,6 +16,7 @@ import type {
   MouseEventParams,
   IRange,
   Time,
+  UTCTimestamp,
 } from "lightweight-charts";
 import type { ChartPoint } from "./Chart.tsx";
 
@@ -29,15 +30,30 @@ function dateKey(time: Time) {
   if (typeof time === "string") return time;
   if (isBusinessDay(time))
     return `${time.year}-${String(time.month).padStart(2, "0")}-${String(time.day).padStart(2, "0")}`;
-  return new Date(time * 1000).toISOString().slice(0, 10);
+  return new Date(time * 1000).toISOString();
 }
+const chartTime = (date: string): Time =>
+  date.includes("T")
+    ? (Math.floor(Date.parse(date) / 1000) as UTCTimestamp)
+    : date;
 const dateLabel = (date: string) =>
-  new Date(`${date}T12:00:00Z`).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    timeZone: "UTC",
-  });
+  new Date(date.includes("T") ? date : `${date}T12:00:00Z`).toLocaleString(
+    "en-US",
+    {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      timeZone: "UTC",
+      ...(date.includes("T")
+        ? {
+            hour: "2-digit" as const,
+            minute: "2-digit" as const,
+            second: "2-digit" as const,
+            timeZoneName: "short" as const,
+          }
+        : {}),
+    },
+  );
 type Engine = {
   chart: IChartApi;
   series: ISeriesApi<"Area">;
@@ -58,7 +74,8 @@ export function PortfolioChart({
   const [selected, setSelected] = useState<ChartPoint | null>(null),
     [style, setStyle] = useState<"area" | "line">("area");
   const [windowDates, setWindowDates] = useState<[string, string] | null>(null);
-  const sufficient = points.length >= 2;
+  const sufficient = points.length >= 1;
+  const intraday = points.some((point) => point.date.includes("T"));
 
   useEffect(() => {
     if (!host.current || !sufficient) return;
@@ -96,8 +113,8 @@ export function PortfolioChart({
       timeScale: {
         borderColor: "#dce6df",
         rightOffset: 2,
-        timeVisible: false,
-        secondsVisible: false,
+        timeVisible: intraday,
+        secondsVisible: intraday,
         minBarSpacing: 3,
         lockVisibleTimeRangeOnResize: true,
       },
@@ -166,18 +183,25 @@ export function PortfolioChart({
       engine.current = null;
     };
     // The engine owns its canvas and resize observer; data is updated separately.
-  }, [sufficient]);
+  }, [sufficient, intraday]);
 
   useEffect(() => {
     const current = engine.current;
     if (!current || !sufficient) return;
-    lookup.current = new Map(points.map((point) => [point.date, point]));
+    const previousFirst = lookup.current.keys().next().value;
+    lookup.current = new Map(
+      points.map((point) => [dateKey(chartTime(point.date)), point]),
+    );
     current.series.setData(
-      points.map((point) => ({ time: point.date, value: point.value })),
+      points.map((point) => ({
+        time: chartTime(point.date),
+        value: point.value,
+      })),
     );
     current.baseline.applyOptions({ price: points[0].value });
     current.chart.priceScale("right").applyOptions({ autoScale: true });
-    current.chart.timeScale().fitContent();
+    if (!previousFirst || previousFirst !== dateKey(chartTime(points[0].date)))
+      current.chart.timeScale().fitContent();
     current.chart.clearCrosshairPosition();
     keyboardIndex.current = null;
     setSelected(null);
@@ -231,28 +255,34 @@ export function PortfolioChart({
       ),
     );
     const point = points[index];
-    current.chart.setCrosshairPosition(point.value, point.date, current.series);
+    current.chart.setCrosshairPosition(
+      point.value,
+      chartTime(point.date),
+      current.series,
+    );
     keyboardIndex.current = index;
     setSelected(point);
   }
 
   if (!sufficient)
-    return (
-      <p>
-        Your portfolio history starts today. More observations will appear as
-        you practise.
-      </p>
-    );
+    return <p>Your portfolio chart starts with your opening balance.</p>;
   const reading = selected ?? points.at(-1)!,
     first = points[0];
-  const contributed = funding
-    .filter(
-      (entry) =>
-        entry.recordedAt.slice(0, 10) > first.date &&
-        entry.recordedAt.slice(0, 10) <= reading.date,
-    )
-    .reduce((sum, entry) => sum + Number(BigInt(entry.amount)) / 1_000_000, 0);
-  const change = reading.value - first.value - contributed,
+  const contributed =
+    reading.capital !== undefined && first.capital !== undefined
+      ? reading.capital - first.capital
+      : funding
+          .filter(
+            (entry) =>
+              entry.recordedAt.slice(0, 10) > first.date &&
+              entry.recordedAt.slice(0, 10) <= reading.date,
+          )
+          .reduce(
+            (sum, entry) => sum + Number(BigInt(entry.amount)) / 1_000_000,
+            0,
+          );
+  const rawChange = reading.value - first.value - contributed;
+  const change = Math.abs(rawChange) < 0.005 ? 0 : rawChange,
     percentage = first.value > 0 ? (change / first.value) * 100 : null;
   const dates = windowDates ?? [first.date, points.at(-1)!.date];
   return (

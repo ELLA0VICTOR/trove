@@ -17,6 +17,7 @@ import { Chart } from "../components/Chart.tsx";
 import { CompanyLogo } from "../components/CompanyLogo.tsx";
 import { Sparkline } from "../components/Sparkline.tsx";
 import { chainAction } from "../lib/wallet.ts";
+import { priceLabel, priceTime } from "../lib/market-labels.ts";
 
 export function Explore() {
   const { state } = useApp(),
@@ -90,7 +91,11 @@ export function Explore() {
             ))}
           </div>
           <span className="catalog-period">
-            {state.market?.mode === "market" ? "Daily closes" : "Sample period"}{" "}
+            {state.market?.quoteMode === "intraday"
+              ? "IEX prices"
+              : state.market?.mode === "market"
+                ? "Daily closes"
+                : "Sample period"}{" "}
             <span>
               {state.instruments[0].prices[0].date} –{" "}
               {state.instruments[0].prices.at(-1)!.date}
@@ -168,7 +173,7 @@ export function Explore() {
       )}
       <p className="catalog-note">
         {state.market?.mode === "market"
-          ? `${state.market.status}. Source: Marketstack; USD closing prices. Trends and period returns use adjusted closes.`
+          ? `${state.market.status}. Source: ${state.market.provider}.`
           : "Practice prices and chart movements are authored sample data, not live quotes."}
       </p>
     </section>
@@ -241,8 +246,12 @@ export function Company() {
           <div className="company-price">
             {money(current.price)}
             <span>
-              {state.market?.mode === "market" ? "Daily close" : "Sample price"}{" "}
-              · {current.date}
+              {priceLabel(state.market)} ·{" "}
+              {priceTime(
+                state.market?.quoteMode === "intraday"
+                  ? (current.sourceTimestamp ?? current.date)
+                  : current.date,
+              )}
             </span>
           </div>
           <div className="period-tabs">
@@ -265,12 +274,11 @@ export function Company() {
               date: p.date,
               value: Number(p.adjustedPrice ?? p.price) / Number(USD_SCALE),
             }))}
-            label={`${instrument.name} ${state.market?.mode === "market" ? "adjusted closing" : "sample"} prices`}
+            label={`${instrument.name} ${state.market?.mode === "market" ? "adjusted historical" : "sample"} prices`}
           />
           <p className="fine-print">
             {state.market?.mode === "market"
-              ? state.market.status +
-                ". Source: Marketstack. Chart uses adjusted closes; practice orders use the displayed daily close."
+              ? `${state.market.status}. Source: ${state.market.provider}.`
               : "Illustrative sample price history. Sign in to use market prices in a separate practice portfolio."}
           </p>
         </section>
@@ -472,11 +480,10 @@ export function OrderDialog({
             </strong>
           </div>
           <div className="detail-fact">
-            <span>
-              {state.market?.mode === "market" ? "Daily close" : "Sample price"}
-            </span>
+            <span>{priceLabel(state.market)}</span>
             <strong>
-              {money(quote.price)} · {quote.marketDate}
+              {money(quote.price)} ·{" "}
+              {priceTime(quote.marketTimestamp ?? quote.marketDate)}
             </strong>
           </div>
           {reason && <blockquote>“{reason}”</blockquote>}

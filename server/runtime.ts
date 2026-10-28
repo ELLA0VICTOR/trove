@@ -12,6 +12,7 @@ import { LearningService, LearningUnavailable } from "./learning-service.ts";
 import type { LiveLearning } from "./learning-service.ts";
 import { MarketService } from "./market.ts";
 import { MarketstackGateway } from "./integrations/marketstack.ts";
+import { AlpacaGateway } from "./integrations/alpaca.ts";
 import { ChainService } from "./chain.ts";
 import { chainConfig } from "./chain-config.ts";
 import { ResendAccountMail } from "./integrations/account-mail.ts";
@@ -57,9 +58,11 @@ export async function createRuntime(
   const store = new DemoStore(database, { liveMemory: memoryReady });
   const market = new MarketService(
     store,
-    enabled && value("MARKETSTACK_API_KEY")
-      ? new MarketstackGateway(value("MARKETSTACK_API_KEY")!)
-      : undefined,
+    enabled && value("ALPACA_API_KEY") && value("ALPACA_API_SECRET")
+      ? new AlpacaGateway(value("ALPACA_API_KEY")!, value("ALPACA_API_SECRET")!)
+      : enabled && value("MARKETSTACK_API_KEY")
+        ? new MarketstackGateway(value("MARKETSTACK_API_KEY")!)
+        : undefined,
   );
   const chain = new ChainService(
     store,

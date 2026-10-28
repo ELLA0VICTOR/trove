@@ -1,6 +1,6 @@
 # Architecture
 
-Trove runs a React application and a Hono API backed by PostgreSQL, with SQLite available locally, durable workers, Sui Testnet practice accounts, Walrus Mainnet memory, Marketstack observations, and an OpenAI learning guide.
+Trove runs a React application and a Hono API backed by PostgreSQL, with SQLite available locally, durable workers, Sui Testnet practice accounts, Walrus Mainnet memory, Alpaca IEX prices, optional Marketstack daily observations, and an OpenAI learning guide.
 
 ## Runtime
 
@@ -14,7 +14,7 @@ flowchart LR
   UI --> WALLET[Role-specific wallet]
   WALLET --> API
   API --> DB[(PostgreSQL)]
-  API --> DATA[Marketstack]
+  API --> DATA[Alpaca IEX / Marketstack]
   API --> TATUM[Tatum native gRPC]
   TATUM --> SUI[Sui Testnet]
   DB --> JOBS[Durable workers]
@@ -65,6 +65,10 @@ Each quote binds a portfolio, immutable dataset, symbol, side, amount, units, pr
 The contract is authoritative for a linked onchain account. Tatum execution events and BCS object contents are verified before the local projection changes. Local order and policy routes enforce the same boundary by requiring the chain path for linked accounts.
 
 ## Corporate actions
+
+The Alpaca data adapter imports raw and adjusted histories, the latest IEX trade timestamps, corporate actions, and exchange-session status. A persisted provider reservation shares one import per minute across server instances. The UI polls every thirty seconds while visible. Active reviewed quotes temporarily retain their dataset during signing; corporate adjustments invalidate an incompatible price basis. Failed imports retain cached prices with a stale status. Unsupported corporate events pause affected portfolios.
+
+The portfolio records timestamped values and contributed capital separately from daily marks. Intraday charts can start on the first day, and cash refills do not count as investment gains. Identical observations extend the visible flat line without adding database rows; detailed observations retain one week plus the opening point.
 
 Raw USD observations retain split factors and per-share dividends independently of chart-calendar alignment. Stable event identities combine provider, instrument, event type, and event date. Archived snapshots preserve older events.
 

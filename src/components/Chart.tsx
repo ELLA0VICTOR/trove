@@ -1,5 +1,5 @@
 import { useId, useState } from "react";
-export type ChartPoint = { date: string; value: number };
+export type ChartPoint = { date: string; value: number; capital?: number };
 export function Chart({
   points,
   comparison,

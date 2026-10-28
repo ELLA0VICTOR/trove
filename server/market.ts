@@ -12,7 +12,7 @@ import {
   decimalRatio,
 } from "../shared/corporate-actions.ts";
 import { instruments as samples } from "../shared/fixtures.ts";
-import { MarketstackGateway } from "./integrations/marketstack.ts";
+import type { MarketGateway } from "./integrations/market-data.ts";
 import { DomainError } from "./domain.ts";
 import { portfolioValue } from "../shared/model.ts";
 export interface Dataset {
@@ -23,6 +23,13 @@ export interface Dataset {
   excluded?: number;
   actions?: CorporateAction[];
   rawInstruments?: Instrument[];
+  provider?: string;
+  quoteMode?: "close" | "intraday";
+  quoteAt?: string;
+  marketOpen?: boolean;
+  nextOpen?: string;
+  nextClose?: string;
+  unsupportedActions?: { symbol: string; date: string }[];
 }
 // Marketstack counts each symbol against the monthly allowance, including batches.
 // A four-day import cadence keeps 12 symbols below 100 symbol-requests/month.
@@ -33,11 +40,8 @@ export const marketStale = (asOf: string, now = Date.now()) =>
 export class MarketService {
   private active?: Promise<void>;
   readonly store: DemoStore;
-  readonly gateway?: Pick<MarketstackGateway, "histories">;
-  constructor(
-    store: DemoStore,
-    gateway?: Pick<MarketstackGateway, "histories">,
-  ) {
+  readonly gateway?: MarketGateway;
+  constructor(store: DemoStore, gateway?: MarketGateway) {
     this.store = store;
     this.gateway = gateway;
   }
@@ -80,24 +84,60 @@ export class MarketService {
       };
     const data = await this.dataset(state.portfolio.datasetId);
     const current = await this.latest(),
+      needsReview = Boolean(
+        current && this.unsupportedPending(state, data, current),
+      ),
       actionPending = Boolean(
         current &&
         current.id !== data.id &&
         (await this.hasCorporateAction(state, data, current)),
       );
+    const now = Date.now();
+    const sessionOpen =
+      data.quoteMode === "intraday" &&
+      (data.marketOpen
+        ? now < Date.parse(data.nextClose ?? "")
+        : now >= Date.parse(data.nextOpen ?? "") &&
+          now < Date.parse(data.nextClose ?? ""));
+    const providerRefresh =
+      data.quoteMode === "intraday"
+        ? await this.store.db
+            .prepare(
+              "SELECT status FROM market_provider_refresh WHERE provider=?",
+            )
+            .get("alpaca-iex")
+        : undefined;
+    const stale =
+      marketStale(data.asOf) ||
+      providerRefresh?.status === "failed" ||
+      Boolean(
+        sessionOpen &&
+        (now - Date.parse(data.receivedAt) > 5 * 60000 ||
+          now - Date.parse(data.quoteAt ?? "") > 10 * 60000),
+      );
     return {
       mode: "market" as const,
-      provider: "Marketstack daily close",
+      provider: data.provider ?? "Marketstack daily close",
       asOf: data.asOf,
       receivedAt: data.receivedAt,
       datasetId: data.id,
-      stale: marketStale(data.asOf),
-      blocked: actionPending,
-      status: actionPending
-        ? "Applying automatic split and dividend entries."
-        : marketStale(data.asOf)
-          ? "Prices are stale. New practice orders are paused."
-          : "Daily closing prices, not real-time quotes",
+      stale,
+      quoteMode: data.quoteMode ?? "close",
+      quoteAt: data.quoteAt,
+      marketOpen:
+        data.quoteMode === "intraday" ? Boolean(sessionOpen) : undefined,
+      blocked: actionPending || needsReview,
+      status: needsReview
+        ? "A corporate action needs review before practice continues."
+        : actionPending
+          ? "Applying automatic split and dividend entries."
+          : stale
+            ? "Prices are stale. New practice orders are paused."
+            : data.quoteMode === "intraday"
+              ? sessionOpen
+                ? "IEX prices refreshed about once a minute"
+                : "Market closed · last available IEX prices"
+              : "Daily closing prices, not real-time quotes",
     };
   }
   async instruments(state: DemoState) {
@@ -166,6 +206,86 @@ export class MarketService {
       }[]
     ).map((p) => ({ date: p.date, value: Number(p.value) / 1000000 }));
   }
+  async observations(state: DemoState, now = Date.now()) {
+    if (!state.portfolio) return undefined;
+    const portfolio = state.portfolio;
+    const stamp = (time: number) =>
+      new Date(Math.floor(time / 1000) * 1000).toISOString();
+    const initialAt = stamp(Date.parse(portfolio.startedAt));
+    const observedAt = stamp(Math.max(now, Date.parse(portfolio.startedAt)));
+    const value = String(portfolioValue(state, await this.instruments(state)));
+    const capital = String(practiceCapital(state));
+    await this.store.atomic(async () => {
+      await this.store.db.lock(
+        `portfolio-observations:${state.id}:${portfolio.id}`,
+      );
+      // The initial cash is an actual opening balance, even before the first trade.
+      await this.store.db
+        .prepare(
+          "INSERT OR IGNORE INTO portfolio_observations VALUES(?,?,?,?,?,?,?)",
+        )
+        .run(
+          state.id,
+          portfolio.id,
+          initialAt,
+          portfolio.initialCash,
+          portfolio.initialCash,
+          portfolio.datasetId,
+          0,
+        );
+      const last = await this.store.db
+        .prepare(
+          "SELECT * FROM portfolio_observations WHERE family=? AND portfolio=? ORDER BY observed_at DESC LIMIT 1",
+        )
+        .get(state.id, portfolio.id);
+      if (
+        !last ||
+        (observedAt >= String(last.observed_at) &&
+          (last.value !== value ||
+            last.capital !== capital ||
+            last.dataset !== portfolio.datasetId ||
+            Number(last.sequence) !== state.sequence))
+      ) {
+        await this.store.db
+          .prepare(
+            "INSERT INTO portfolio_observations VALUES(?,?,?,?,?,?,?) ON CONFLICT(family,portfolio,observed_at) DO UPDATE SET value=excluded.value,capital=excluded.capital,dataset=excluded.dataset,sequence=excluded.sequence",
+          )
+          .run(
+            state.id,
+            portfolio.id,
+            observedAt,
+            value,
+            capital,
+            portfolio.datasetId,
+            state.sequence,
+          );
+      }
+      // Daily marks preserve long-term history; retain one week of detailed samples.
+      await this.store.db
+        .prepare(
+          "DELETE FROM portfolio_observations WHERE family=? AND portfolio=? AND observed_at<? AND observed_at<>?",
+        )
+        .run(state.id, portfolio.id, stamp(now - 7 * 86400000), initialAt);
+    });
+    const records = await this.store.db
+      .prepare(
+        "SELECT observed_at,value,capital FROM portfolio_observations WHERE family=? AND portfolio=? ORDER BY observed_at",
+      )
+      .all(state.id, portfolio.id);
+    const points = records.map((row) => ({
+      date: String(row.observed_at),
+      value: Number(row.value) / 1000000,
+      capital: Number(row.capital) / 1000000,
+    }));
+    // A current valuation can extend a flat line without writing identical rows on every refresh.
+    if (points.at(-1)!.date < observedAt)
+      points.push({
+        date: observedAt,
+        value: Number(value) / 1000000,
+        capital: Number(capital) / 1000000,
+      });
+    return points;
+  }
   async refresh() {
     if (!this.gateway) return;
     if (this.active) return this.active;
@@ -175,22 +295,36 @@ export class MarketService {
     return this.active;
   }
   private async import() {
+    const provider = this.gateway!.source;
     const claimed = await this.store.atomic(async () => {
       await this.store.db.lock("market-import");
-      const row = (await this.store.db
-        .prepare("SELECT next_at FROM market_refresh WHERE id=1")
-        .get()) as
+      const row = (await (provider
+        ? this.store.db
+            .prepare(
+              "SELECT next_at FROM market_provider_refresh WHERE provider=?",
+            )
+            .get(provider)
+        : this.store.db
+            .prepare("SELECT next_at FROM market_refresh WHERE id=1")
+            .get())) as
         | {
             next_at: number;
           }
         | undefined;
       if (row && row.next_at > Date.now()) return false;
       // Reserve before network I/O; restarts cannot consume the provider quota in a loop.
-      await this.store.db
-        .prepare(
-          "INSERT INTO market_refresh VALUES(1,?,'loading') ON CONFLICT(id) DO UPDATE SET next_at=excluded.next_at,status='loading'",
-        )
-        .run(Date.now() + TTL);
+      if (provider)
+        await this.store.db
+          .prepare(
+            "INSERT INTO market_provider_refresh VALUES(?,?,'loading') ON CONFLICT(provider) DO UPDATE SET next_at=excluded.next_at,status='loading'",
+          )
+          .run(provider, Date.now() + (this.gateway!.refreshMs ?? TTL));
+      else
+        await this.store.db
+          .prepare(
+            "INSERT INTO market_refresh VALUES(1,?,'loading') ON CONFLICT(id) DO UPDATE SET next_at=excluded.next_at,status='loading'",
+          )
+          .run(Date.now() + TTL);
       return true;
     });
     if (!claimed) return;
@@ -226,7 +360,20 @@ export class MarketService {
         throw new Error("The provider returned stale market history.");
       const receivedAt = new Date().toISOString(),
         id = createHash("sha256")
-          .update(JSON.stringify(rawInstruments))
+          .update(
+            JSON.stringify(
+              provider
+                ? [
+                    provider,
+                    rawInstruments,
+                    results.flatMap((r) => r.unsupportedActions ?? []),
+                    results[0].marketOpen,
+                    results[0].nextOpen,
+                    results[0].nextClose,
+                  ]
+                : rawInstruments,
+            ),
+          )
           .digest("hex");
       const data: Dataset = {
         id,
@@ -236,17 +383,47 @@ export class MarketService {
         rawInstruments,
         actions: corporateActions(rawInstruments),
         excluded: results.reduce((sum, r) => sum + (r.excluded ?? 0), 0),
+        ...(provider
+          ? {
+              provider: results[0].provider,
+              quoteMode: "intraday" as const,
+              quoteAt: results
+                .map((r) => r.quoteAt)
+                .filter((v): v is string => Boolean(v))
+                .sort()[0],
+              marketOpen: results[0].marketOpen,
+              nextOpen: results[0].nextOpen,
+              nextClose: results[0].nextClose,
+              unsupportedActions: results.flatMap(
+                (r) => r.unsupportedActions ?? [],
+              ),
+            }
+          : {}),
       };
       await this.store.db
         .prepare("INSERT OR IGNORE INTO market_snapshots VALUES(?,?,?,?)")
         .run(id, asOf, receivedAt, JSON.stringify(data));
-      await this.store.db
-        .prepare("UPDATE market_refresh SET status='ready' WHERE id=1")
-        .run();
+      if (provider)
+        await this.store.db
+          .prepare(
+            "UPDATE market_provider_refresh SET status='ready' WHERE provider=?",
+          )
+          .run(provider);
+      else
+        await this.store.db
+          .prepare("UPDATE market_refresh SET status='ready' WHERE id=1")
+          .run();
     } catch {
-      await this.store.db
-        .prepare("UPDATE market_refresh SET status='failed' WHERE id=1")
-        .run();
+      if (provider)
+        await this.store.db
+          .prepare(
+            "UPDATE market_provider_refresh SET status='failed' WHERE provider=?",
+          )
+          .run(provider);
+      else
+        await this.store.db
+          .prepare("UPDATE market_refresh SET status='failed' WHERE id=1")
+          .run();
       console.error(
         "[trove] Market import failed; cached prices remain labelled and stale prices cannot execute.",
       );
@@ -299,6 +476,14 @@ export class MarketService {
     if (!data || !state.portfolio || state.portfolio.datasetId === data.id)
       return state;
     if (
+      this.unsupportedPending(
+        state,
+        await this.dataset(state.portfolio.datasetId),
+        data,
+      )
+    )
+      return state;
+    if (
       await this.store.db
         .prepare(
           "SELECT 1 FROM chain_intents WHERE family=? AND state IN ('building','prepared','submitting','pending')",
@@ -310,6 +495,21 @@ export class MarketService {
       .prepare("SELECT 1 FROM chain_accounts WHERE family=?")
       .get(family);
     const plan = await this.plan(state);
+    if (!plan.entries.length) {
+      // Keep an already reviewed price stable through its short signing window.
+      const activeQuote = await this.store.db
+        .prepare(
+          "SELECT 1 FROM quotes WHERE family=? AND decision IS NULL AND json_extract(payload,'$.datasetId')=? AND CAST(json_extract(payload,'$.expiresAt') AS BIGINT)>? AND CAST(json_extract(payload,'$.sequence') AS BIGINT)=? AND CAST(json_extract(payload,'$.revision') AS BIGINT)=? LIMIT 1",
+        )
+        .get(
+          family,
+          state.portfolio.datasetId,
+          Date.now(),
+          state.sequence,
+          state.policy.revision,
+        );
+      if (activeQuote) return state;
+    }
     if (onchain && plan.entries.length) return state;
     return await this.store.atomic(async () => {
       for (const entry of plan.entries)
@@ -326,6 +526,8 @@ export class MarketService {
         state.portfolio && (await this.dataset(state.portfolio.datasetId));
     const projected = structuredClone(state);
     const entries = [] as import("../shared/model.ts").Adjustment[];
+    if (target && before && this.unsupportedPending(state, before, target))
+      return { from: before, target, entries, projected };
     if (target && before && target.id !== before.id) {
       const actions = await this.actionsBetween(before, target);
       for (const action of actions.filter(
@@ -346,6 +548,16 @@ export class MarketService {
       (a) =>
         a.date > old.asOf &&
         a.date <= data.asOf &&
+        state.holdings.some(
+          (h) => h.symbol === a.symbol && BigInt(h.units) > 0n,
+        ),
+    );
+  }
+  private unsupportedPending(state: DemoState, old: Dataset, target: Dataset) {
+    return (target.unsupportedActions ?? []).some(
+      (a) =>
+        a.date > old.asOf &&
+        a.date <= target.asOf &&
         state.holdings.some(
           (h) => h.symbol === a.symbol && BigInt(h.units) > 0n,
         ),
@@ -381,7 +593,7 @@ export class MarketService {
       );
     if (state.portfolio && (await this.status(state)).stale)
       throw new DomainError(
-        "Prices are stale. Wait for a fresh daily close before making a practice order.",
+        "Prices are stale. Wait for a fresh price before making a practice order.",
       );
   }
 }

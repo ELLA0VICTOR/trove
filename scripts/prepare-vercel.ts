@@ -27,7 +27,6 @@ const manifest = JSON.parse(
 const env: Record<string, string | undefined> = {
   DATABASE_URL: url,
   TATUM_API_KEY: value("TATUM_API_KEY"),
-  MARKETSTACK_API_KEY: value("MARKETSTACK_API_KEY"),
   MEMWAL_ACCOUNT_ID: value("MEMWAL_ACCOUNT_ID"),
   MEMWAL_PRIVATE_KEY: value("MEMWAL_PRIVATE_KEY"),
   MEMWAL_SERVER_URL:
@@ -50,6 +49,14 @@ if (value("RESEND_API_KEY") && value("EMAIL_FROM")) {
   env.RESEND_API_KEY = value("RESEND_API_KEY");
   env.EMAIL_FROM = value("EMAIL_FROM");
 }
+if (value("ALPACA_API_KEY") && value("ALPACA_API_SECRET")) {
+  env.ALPACA_API_KEY = value("ALPACA_API_KEY");
+  env.ALPACA_API_SECRET = value("ALPACA_API_SECRET");
+}
+if (value("MARKETSTACK_API_KEY"))
+  env.MARKETSTACK_API_KEY = value("MARKETSTACK_API_KEY");
+if (!env.ALPACA_API_KEY && !env.MARKETSTACK_API_KEY)
+  missing.push("ALPACA_API_KEY + ALPACA_API_SECRET (or MARKETSTACK_API_KEY)");
 if (missing.length)
   throw new Error(
     `Complete these local settings first: ${missing.join(", ")}. Secret values were not printed.`,
