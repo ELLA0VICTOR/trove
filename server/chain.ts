@@ -76,6 +76,7 @@ type Intent = {
 export type ChainConfig = {
   packageId: string;
   originalPackageId?: string;
+  eventTypeOrigins?: Readonly<Record<string, string>>;
   fundingReady?: boolean;
   enrollmentReady?: boolean;
   sponsorKey: string;
@@ -97,6 +98,8 @@ export class ChainService {
     this.accounts = new Accounts(store);
     if (config) {
       address.parse(config.packageId);
+      for (const origin of Object.values(config.eventTypeOrigins ?? {}))
+        address.parse(origin);
       if (config.gateway.network !== "testnet")
         throw new Error("Practice execution only supports Sui Testnet.");
       this.sponsor = Ed25519Keypair.fromSecretKey(config.sponsorKey);
@@ -869,17 +872,23 @@ export class ChainService {
       throw new DomainError("The provider returned a different transaction.");
     const packageIds = new Set([this.typePackage, this.config!.packageId]);
     const events = transaction.events.filter(
-      (e) =>
-        packageIds.has(e.packageId) &&
-        e.module === "practice" &&
-        packageIds.has(e.eventType.split("::")[0]),
+      (e) => packageIds.has(e.packageId) && e.module === "practice",
     );
     const isType = (
       event: {
         eventType: string;
       },
       name: string,
-    ) => event.eventType.endsWith(`::practice::${name}`);
+    ) => {
+      // A type introduced by an intermediate upgrade retains that package's
+      // identity even when the transaction executes the latest package.
+      const origin = this.config!.eventTypeOrigins?.[name];
+      return origin
+        ? event.eventType === `${origin}::practice::${name}`
+        : [...packageIds].some(
+            (id) => event.eventType === `${id}::practice::${name}`,
+          );
+    };
     const payload = JSON.parse(intent.payload);
     const created = events.find((e) => isType(e, "Created"));
     const objectId =

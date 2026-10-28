@@ -852,6 +852,9 @@ test("Tatum funding reconciliation checks the exact event, cash, holdings and un
     });
     let wrongAmount = true,
       wrongSpending = false;
+    const fundingOrigin = "0x" + "3".repeat(64);
+    chain.config!.eventTypeOrigins = { Funded: fundingOrigin };
+    let eventOrigin = "0x" + "4".repeat(64);
     gateway.receipt = async () =>
       ({
         state: "confirmed",
@@ -862,7 +865,7 @@ test("Tatum funding reconciliation checks the exact event, cash, holdings and un
             {
               packageId,
               module: "practice",
-              eventType: `${packageId}::practice::Funded`,
+              eventType: `${eventOrigin}::practice::Funded`,
               bcs: FundedBcs.serialize({
                 account: objectId,
                 id: Array.from(
@@ -905,6 +908,11 @@ test("Tatum funding reconciliation checks the exact event, cash, holdings and un
           }).toBytes(),
         },
       }) as never;
+    await assert.rejects(
+      () => chain.reconcile(intent),
+      /funding receipt does not match/,
+    );
+    eventOrigin = fundingOrigin;
     await assert.rejects(
       () => chain.reconcile(intent),
       /funding receipt failed/,

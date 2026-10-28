@@ -34,7 +34,7 @@ The API constructs fixed practice calls and persists the exact bytes and digest 
 
 A durable dispatcher uses leases, cooldowns, and bounded retries of identical signed bytes. Uncertain outcomes remain pending until reconciled. Confirmed duplicate receipts leave balances, decisions, and memories unchanged.
 
-Tatum supplies execution receipts and BCS objects over native TLS gRPC. The reconciler checks the current/original package identities, family authorities, attestor, quote or corporate terms, and counters before recording state. Active Sui accounts use chain execution for financial changes. Unsigned previews can be cancelled; submitted transactions are rechecked through reconciliation.
+Tatum supplies execution receipts and BCS objects over native TLS gRPC. The reconciler checks the current/original package identities, family authorities, attestor, quote or corporate terms, and counters before recording state. Events introduced by intermediate upgrades retain their defining package identity; the deployment manifest records these event-specific origins. Funding receipts accept only the configured `Funded` origin while retaining the executing-package, account, amount, balance, sequence, and policy checks. Active Sui accounts use chain execution for financial changes. Unsigned previews can be cancelled; submitted transactions are rechecked through reconciliation.
 
 ## Build and setup
 

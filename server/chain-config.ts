@@ -45,6 +45,11 @@ export function chainConfig(dataDir: string): ChainConfig | undefined {
   if (!sponsorKey || !attestorKey || !value("TATUM_API_KEY")) return undefined;
   return {
     ...deployment,
+    eventTypeOrigins:
+      deployment.packageId === manifest.packageId &&
+      deployment.originalPackageId === manifest.originalPackageId
+        ? manifest.eventTypeOrigins
+        : undefined,
     sponsorKey,
     attestorKey,
     gateway: new TatumSuiGateway(value("TATUM_API_KEY")!, "testnet"),
