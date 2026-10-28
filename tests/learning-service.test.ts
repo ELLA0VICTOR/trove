@@ -123,7 +123,11 @@ test("a pending correction blocks older explanations and its confirmed version t
         state.memories.unshift(correction);
         await fixture.store.set(state);
         const service = new LearningService(fixture.store, fixture.source, fixture.coach);
-        await assert.rejects(service.explain(fixture.family, "Explain risk"), /still syncing/);
+        await assert.rejects(service.explain(fixture.family, "Explain risk"), (error) => {
+            assert.match(String(error), /still syncing/);
+            assert.equal((error as {code?: string}).code, "MEMORY_SYNC_PENDING");
+            return true;
+        });
         assert.equal(fixture.count(), 0);
         await fixture.confirm();
         const reply = await service.explain(fixture.family, "Explain risk");

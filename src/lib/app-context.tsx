@@ -8,12 +8,20 @@ import {
 } from "react";
 import type { ReactNode } from "react";
 import type { AppSnapshot } from "../../shared/model.ts";
+import {
+  applyMemoryProgress,
+  retainMemoryConfirmations,
+  waitingForMemory,
+} from "./memory-progress.ts";
+import type { MemoryProgress } from "./memory-progress.ts";
 
 class ApiError extends Error {
   readonly status: number;
-  constructor(message: string, status: number) {
+  readonly code?: string;
+  constructor(message: string, status: number, code?: string) {
     super(message);
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -35,6 +43,7 @@ export async function api<T>(
     throw new ApiError(
       data.error ?? "This action could not be completed.",
       response.status,
+      data.code,
     );
   return data;
 }
@@ -84,7 +93,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       try {
         const next = await api<AppSnapshot>("/state");
         if (generation.current !== version) return;
-        setState(next);
+        setState((previous) => retainMemoryConfirmations(previous, next));
         setError("");
       } catch (e) {
         if (generation.current !== version) return;
@@ -99,6 +108,41 @@ export function AppProvider({ children }: { children: ReactNode }) {
     })();
     return refreshPending.current;
   }, []);
+  const memoryPending = waitingForMemory(state);
+  const memoryFamily = state?.id;
+  useEffect(() => {
+    if (!memoryPending || !memoryFamily) return;
+    let cancelled = false,
+      running = false;
+    const poll = async () => {
+      if (running || document.hidden || cancelled) return;
+      running = true;
+      const version = generation.current;
+      try {
+        const progress = await api<MemoryProgress>("/memory/status");
+        if (!cancelled && generation.current === version)
+          setState((current) =>
+            current?.id === memoryFamily
+              ? applyMemoryProgress(current, progress)
+              : current,
+          );
+      } catch {
+        // A transient connection problem resumes on the next visible poll.
+      } finally {
+        running = false;
+      }
+    };
+    void poll();
+    const interval = setInterval(() => void poll(), 2000);
+    window.addEventListener("focus", poll);
+    document.addEventListener("visibilitychange", poll);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      window.removeEventListener("focus", poll);
+      document.removeEventListener("visibilitychange", poll);
+    };
+  }, [memoryPending, memoryFamily]);
   function notify(message: string) {
     clearTimeout(timer.current);
     setToast(message);
@@ -109,7 +153,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       const next = await api<AppSnapshot>(path, method, body);
       generation.current++;
-      setState(next);
+      setState((previous) => retainMemoryConfirmations(previous, next));
       return next;
     } catch (e) {
       if (

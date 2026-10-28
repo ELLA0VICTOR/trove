@@ -147,9 +147,17 @@ export async function createRuntime(
         .get(token, now + 120_000, now);
       if (!claimed) return;
       try {
-        await market.refresh();
-        if (chain.config) await chain.reconcilePending(2);
-        if (memoryReady) await store.memoryOutbox.processOne(memory);
+        // Independent workers must not hold up a memory confirmation behind
+        // a stock-data import or a slow chain receipt.
+        const outcomes = await Promise.allSettled([
+          market.refresh(),
+          chain.config ? chain.reconcilePending(2) : undefined,
+          memoryReady ? store.memoryOutbox.processOne(memory) : undefined,
+        ]);
+        if (outcomes.some((result) => result.status === "rejected"))
+          console.error(
+            "[trove] A background worker will retry from persisted state.",
+          );
       } catch {
         console.error(
           "[trove] A maintenance cycle will resume from its persisted state.",

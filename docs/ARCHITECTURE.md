@@ -6,6 +6,8 @@ Trove runs a React application and a Hono API backed by PostgreSQL, with SQLite 
 
 The optional production Node process serves `dist/`, same-origin `/api` routes, and `/health`. PostgreSQL deployments schedule bounded memory publication, chain reconciliation, and shared market-import work after requests. Local SQLite development uses an interval. Shutdown waits for active work before closing storage and transports.
 
+An initial market import waits for usable data. Once a snapshot exists, market refresh runs outside the API response path; independent memory and chain workers continue alongside it. Snapshot reads run concurrently where independent. Navigation uses cached application state and resets the scroll position before paint.
+
 Vercel serves the built frontend and bounded Node API functions. A pooled DATABASE_URL connects each instance to Neon PostgreSQL. Without that setting, local development uses SQLite in TROVE_DATA_DIR. Both adapters expose asynchronous operations with transaction-scoped connections.
 
 ```mermaid
@@ -91,6 +93,8 @@ Corporate maintenance has a separate rate allowance and persisted exponential ba
 Guardian consent gates publication. Eligible local learning events become immutable journal records with stable operation keys. The outbox persists acceptance IDs, polling state, leases, cooldowns, and confirmed blob evidence.
 
 Recall is scoped to the authenticated family and cross-checked against the active journal, record identity, content, and blob confirmation. Corrections supersede earlier records. Pending corrections hold back explanations based on stale context. Withdrawal removes a record from the active learning context; published data follows Walrus retention semantics.
+
+While publication is pending, the visible app polls lightweight memory progress every two seconds, including after Saved thoughts is closed. A question entered during synchronization stays queued and sends once after confirmation. The conversation remains in place, and failed publication exposes a review action. Cancellation or a changed account discards queued work. Polling never calls the model.
 
 ## Learning and costs
 

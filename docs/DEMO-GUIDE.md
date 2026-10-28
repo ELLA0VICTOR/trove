@@ -124,7 +124,7 @@ Pass when at least ten meaningful learning records have actual Mainnet confirmat
 5. Enter: I now understand that different company names can share the same industry risk. I need to look at what the companies have in common.
 6. Select Save correction and wait for the replacement to show MAINNET CONFIRMED.
 7. Ask: What do you remember about how I think about spreading risk?
-8. Expect the guide to use the updated understanding. The earlier belief should not be treated as the learner's current view.
+8. Expect the guide to use the updated understanding. The earlier thesis should not be treated as the learner's current view.
 
 Use two or three purposeful questions for this rehearsal. The shared AI allowance and request limits remain active. An unchanged question and context can return a cached explanation.
 

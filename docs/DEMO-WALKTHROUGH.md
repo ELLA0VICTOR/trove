@@ -2,7 +2,7 @@
 
 **About six to seven minutes**, with room to show each interaction. Edward is the parent and Eddie Junior is the learner. The spoken sections below form one continuous script. Screen directions are for recording.
 
-Use [the recording setup and paste-ready text](DEMO-SCRIPT.md) to prepare the existing accounts. The [three-minute voiceover](DEMO-VOICEOVER.txt) is the shorter cut of the same story.
+Use [the recording setup and paste-ready text](DEMO-SCRIPT.md) to prepare the existing accounts. The [main demo voiceover](DEMO-VOICEOVER.txt) is the shorter cut of the same story.
 
 ## 1. Why Trove exists
 
@@ -100,7 +100,7 @@ If Shared risk is already completed, open its review and move directly to Replay
 
 ## 9. Ask Trove connects the explanation to Eddie
 
-**Screen:** Learn → Saved thoughts. Show the original Apple-and-Microsoft belief and MAINNET CONFIRMED. Close it, choose Ask Trove, and send the first question from the recording guide. Show the answer and its saved-thought references.
+**Screen:** Learn → Saved thoughts. Show the original Apple-and-Microsoft thesis and MAINNET CONFIRMED. Close it, choose Ask Trove, and send the first question from the recording guide. Show the answer and its saved-thought references.
 
 **Voiceover:**
 
@@ -112,7 +112,7 @@ He asks, ‘Have I really spread my risk?’ The guide uses his own saved thinki
 
 ## 10. A correction changes the next explanation
 
-**Screen:** Open Saved thoughts. Find the original belief, choose Correct this thought, paste the correction, and save. Cut forward to the replacement's confirmation. Ask the follow-up question and show the response. For the next shot, sign into Eddie's account again off camera and ask the later-session question.
+**Screen:** Open Saved thoughts. Find the original thesis, choose Correct this thought, paste the correction, and save. Cut forward to the replacement's confirmation. Ask the follow-up question and show the response. For the next shot, sign into Eddie's account again off camera and ask the later-session question.
 
 **Voiceover:**
 

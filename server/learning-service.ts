@@ -5,9 +5,15 @@ import type { MemoryReader } from "./integrations/walrus.ts";
 import { AccessError } from "./auth.ts";
 export class LearningUnavailable extends Error {
   readonly status: 409 | 503;
-  constructor(message: string, status: 409 | 503 = 503) {
+  readonly code?: "MEMORY_SYNC_PENDING";
+  constructor(
+    message: string,
+    status: 409 | 503 = 503,
+    code?: "MEMORY_SYNC_PENDING",
+  ) {
     super(message);
     this.status = status;
+    this.code = code;
   }
 }
 export interface LiveLearning {
@@ -69,8 +75,9 @@ export class LearningService implements LiveLearning {
     );
     if (active.some((record) => !record.blobId))
       throw new LearningUnavailable(
-        "Your latest thoughts are still syncing. Check Saved thoughts, then try again.",
+        "Your latest thoughts are still syncing.",
         409,
+        "MEMORY_SYNC_PENDING",
       );
     const fingerprint = await this.fingerprint(family);
     const cacheKey = createHash("sha256")

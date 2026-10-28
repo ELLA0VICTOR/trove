@@ -17,7 +17,12 @@ const day = (ago: number) =>
   new Date(Date.now() - ago * 86400000).toISOString().slice(0, 10);
 
 test("configured market outages never return example prices as connected data", async () => {
-  const { store, market } = setup();
+  const { store } = setup();
+  const market = new MarketService(store, {
+    histories: async () => {
+      throw new Error("Provider unavailable");
+    },
+  });
   try {
     const response = await createApp(store, { market }).request("/api/state");
     assert.equal(response.status, 409);
@@ -96,6 +101,30 @@ function setup() {
     calls: () => calls,
   };
 }
+
+test("cached prices let app requests finish without waiting for an unrelated market-provider import", async () => {
+  const { store, market } = setup();
+  try {
+    await market.refresh();
+    let imports = 0;
+    const fast = new MarketService(store, {
+      source: "alpaca-iex",
+      refreshMs: 60000,
+      histories: async () => {
+        imports++;
+        throw new Error("Provider is unavailable");
+      },
+    });
+    const response = await createApp(store, { market: fast }).request(
+      "/api/state",
+    );
+    assert.equal(response.status, 200);
+    assert.equal(imports, 0);
+    assert.equal((await response.json()).instruments.length, 12);
+  } finally {
+    await store.db.close();
+  }
+});
 test("market adapter excludes foreign/unknown currencies and rejects conflicting USD observations", async () => {
   const bar = (date: string, currency: string | null = "USD") => ({
     symbol: "AAPL",
@@ -183,6 +212,53 @@ test("one persisted market import is shared across callers and archived sample t
     await store.db.close();
   }
 });
+test("new price snapshots revalue a wallet-backed portfolio and its API chart in both directions without changing shares or cash", async () => {
+  const { store, market } = setup();
+  try {
+    await market.refresh();
+    const { family, learner } = await seededFamily(store);
+    const initial = await market.enroll(family, true, true);
+    initial.cash = "897000000";
+    initial.holdings = [
+      { symbol: "AAPL", units: "100000000", cost: "103000000" },
+    ];
+    initial.portfolio!.startedAt = new Date(Date.now() - 3600000).toISOString();
+    await store.set(initial);
+    await store.db
+      .prepare("INSERT INTO chain_accounts VALUES(?,?,?)")
+      .run(family, "0x" + "1".repeat(64), "test-fixture");
+    const app = createApp(store, { market });
+    const base = await market.dataset(initial.portfolio!.datasetId);
+    for (const [index, price, expected] of [
+      [1, 113, 1010],
+      [2, 93, 990],
+    ] as const) {
+      const next = structuredClone(base);
+      next.id = randomUUID();
+      next.receivedAt = new Date(Date.now() + index * 1000).toISOString();
+      next.instruments.find((i) => i.symbol === "AAPL")!.prices.at(-1)!.price =
+        String(price * 1000000);
+      await store.db
+        .prepare("INSERT INTO market_snapshots VALUES(?,?,?,?)")
+        .run(next.id, next.asOf, next.receivedAt, JSON.stringify(next));
+      const response = await app.request("/api/state", {
+        headers: { Cookie: `trove_session=${learner.token}` },
+      });
+      assert.equal(response.status, 200);
+      const result = await response.json();
+      assert.equal(result.portfolio.datasetId, next.id);
+      assert.equal(result.portfolioObservations.at(-1).value, expected);
+      assert.equal(result.portfolioObservations.at(-1).capital, 1000);
+      assert.equal(result.portfolioHistory.at(-1).value, expected);
+      assert.equal(result.cash, initial.cash);
+      assert.deepEqual(result.holdings, initial.holdings);
+      assert.equal(result.sequence, initial.sequence);
+    }
+  } finally {
+    await store.db.close();
+  }
+});
+
 test("first-day observations begin at the opening balance, keep price changes, and separate added capital", async () => {
   const { store, market } = setup();
   try {

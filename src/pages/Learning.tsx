@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { AccountRequired } from "../components/AccountRequired.tsx";
 import {
@@ -21,6 +21,7 @@ import { exercises, nextExercise } from "../../shared/learning.ts";
 import type { GuideReply } from "../../shared/model.ts";
 import { Button, Modal } from "../components/UI.tsx";
 import { Sapling } from "../components/Brand.tsx";
+import { waitingForMemory } from "../lib/memory-progress.ts";
 
 const lessons = [
   {
@@ -162,15 +163,120 @@ export function Guide() {
   const { openAccount } = useOutletContext<{
     openAccount: (mode?: "login" | "register") => void;
   }>();
-  const { state } = useApp(),
+  const { state, refresh } = useApp(),
     [tab, setTab] = useState<"lessons" | "guide">("lessons"),
     [question, setQuestion] = useState(""),
     [messages, setMessages] = useState<Message[]>([]),
     [busy, setBusy] = useState(false),
+    [waitingMemory, setWaitingMemory] = useState(false),
     [memories, setMemories] = useState(false),
     [exercise, setExercise] = useState(false),
     [selectedLesson, setSelectedLesson] = useState<LessonId | null>(null);
   const conversation = useRef<HTMLDivElement>(null);
+  const queuedQuestion = useRef<string | null>(null);
+  const questionTurn = useRef(0);
+  const syncRetries = useRef(0);
+  const mounted = useRef(true);
+  const memoryPending = waitingForMemory(state);
+  const guideScope = `${state?.id}:${state?.session?.mode}:${state?.role}`;
+  const currentScope = useRef(guideScope);
+  useEffect(() => {
+    if (currentScope.current === guideScope) return;
+    currentScope.current = guideScope;
+    questionTurn.current++;
+    queuedQuestion.current = null;
+    // oxlint-disable-next-line react/set-state-in-effect -- A changed authenticated identity must discard the previous conversation.
+    setMessages([]);
+    setBusy(false);
+    setWaitingMemory(false);
+  }, [guideScope]);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      queuedQuestion.current = null;
+    };
+  }, []);
+  const sendQuestion = useCallback(
+    async (text: string) => {
+      const scope = currentScope.current;
+      const turn = questionTurn.current;
+      try {
+        const result = await api<GuideReply>("/guide", "POST", {
+          question: text,
+        });
+        if (
+          !mounted.current ||
+          currentScope.current !== scope ||
+          questionTurn.current !== turn
+        )
+          return;
+        setMessages((previous) => [
+          ...previous,
+          {
+            role: "guide",
+            text: result.text,
+            sources: result.sources,
+            mode: result.mode,
+            cached: result.cached,
+          },
+        ]);
+      } catch (error) {
+        if (
+          !mounted.current ||
+          currentScope.current !== scope ||
+          questionTurn.current !== turn
+        )
+          return;
+        if (
+          error instanceof Error &&
+          "code" in error &&
+          error.code === "MEMORY_SYNC_PENDING" &&
+          syncRetries.current++ < 2
+        ) {
+          queuedQuestion.current = text;
+          await refresh();
+          if (
+            mounted.current &&
+            currentScope.current === scope &&
+            questionTurn.current === turn &&
+            queuedQuestion.current === text
+          )
+            setWaitingMemory(true);
+          return;
+        }
+        setMessages((previous) => [
+          ...previous,
+          { role: "guide", text: (error as Error).message },
+        ]);
+      } finally {
+        if (
+          mounted.current &&
+          currentScope.current === scope &&
+          questionTurn.current === turn &&
+          !queuedQuestion.current
+        )
+          setBusy(false);
+      }
+    },
+    [refresh],
+  );
+  useEffect(() => {
+    if (
+      !waitingMemory ||
+      memoryPending ||
+      !queuedQuestion.current ||
+      state?.memories.some(
+        (memory) => memory.active && memory.syncStatus === "failed",
+      )
+    )
+      return;
+    const text = queuedQuestion.current;
+    queuedQuestion.current = null;
+    // oxlint-disable-next-line react/set-state-in-effect -- Resume one explicit user question after external confirmation.
+    setWaitingMemory(false);
+    void sendQuestion(text);
+  }, [waitingMemory, memoryPending, sendQuestion, state?.memories]);
   useEffect(() => {
     if (tab !== "guide") return;
     conversation.current?.scrollTo({
@@ -194,31 +300,17 @@ export function Guide() {
   const next = nextExercise(state);
   async function ask(text: string) {
     if (!canAsk || !text.trim() || busy) return;
+    questionTurn.current++;
+    syncRetries.current = 0;
     setQuestion("");
     setMessages((previous) => [...previous, { role: "you", text }]);
     setBusy(true);
-    try {
-      const result = await api<GuideReply>("/guide", "POST", {
-        question: text,
-      });
-      setMessages((previous) => [
-        ...previous,
-        {
-          role: "guide",
-          text: result.text,
-          sources: result.sources,
-          mode: result.mode,
-          cached: result.cached,
-        },
-      ]);
-    } catch (error) {
-      setMessages((previous) => [
-        ...previous,
-        { role: "guide", text: (error as Error).message },
-      ]);
-    } finally {
-      setBusy(false);
+    if (memoryPending) {
+      queuedQuestion.current = text;
+      setWaitingMemory(true);
+      return;
     }
+    await sendQuestion(text);
   }
   return (
     <div className="learn-page">
@@ -450,7 +542,40 @@ export function Guide() {
                   <i />
                   <i />
                 </span>
-                Trove is thinking
+                {waitingMemory
+                  ? state.memories.some(
+                      (memory) =>
+                        memory.active && memory.syncStatus === "failed",
+                    )
+                    ? "A saved thought needs attention."
+                    : "Updating your saved thoughts…"
+                  : "Trove is thinking"}
+                {waitingMemory &&
+                  state.memories.some(
+                    (memory) => memory.active && memory.syncStatus === "failed",
+                  ) && (
+                    <button
+                      type="button"
+                      className="text-link"
+                      onClick={() => setMemories(true)}
+                    >
+                      Saved thoughts
+                    </button>
+                  )}
+                {waitingMemory && (
+                  <button
+                    type="button"
+                    className="text-link"
+                    onClick={() => {
+                      questionTurn.current++;
+                      queuedQuestion.current = null;
+                      setWaitingMemory(false);
+                      setBusy(false);
+                    }}
+                  >
+                    Cancel
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -532,15 +657,10 @@ export function MemoryDialog({
   onClose: () => void;
   decisionId?: string;
 }) {
-  const { state, update, busy, notify, refresh } = useApp(),
+  const { state, update, busy, notify } = useApp(),
     [text, setText] = useState(""),
     [correcting, setCorrecting] = useState<string | null>(null),
     [confirmDelete, setConfirmDelete] = useState<string | null>(null);
-  useEffect(() => {
-    if (!state?.session?.memoryEnabled) return;
-    const timer = setInterval(() => void refresh(), 4000);
-    return () => clearInterval(timer);
-  }, [state?.session?.memoryEnabled, state?.id, refresh]);
   if (!state) return null;
   async function save(event: React.FormEvent) {
     event.preventDefault();

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import {
   ArrowRight,
@@ -154,8 +154,10 @@ export function AppLayout() {
       /* View preference is optional. */
     }
   }, [sidebarHidden]);
+  useLayoutEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, [location.pathname]);
   useEffect(() => {
-    window.scrollTo(0, 0);
     // oxlint-disable-next-line react/set-state-in-effect -- A route transition dismisses the external navigation overlay.
     setMenuOpen(false);
   }, [location.pathname]);

@@ -1,4 +1,10 @@
-Children hear about investing long before they know how to make a thoughtful choice. Trove gives them a place to practise, with a parent or guardian beside them.
+Children hear about investing long before they understand how it works. They recognise companies like Apple and Microsoft. But how do they learn what makes a good choice, what could go wrong, or how to handle a loss?
+
+Parents want to help. They also need a way to give their children room to try, with clear limits along the way.
+
+That's why we built Trove.
+
+A place where children practise investing with real market prices, while a parent or guardian guides them. They explain their choices, learn from the results, and build a learning history that Trove remembers as they grow.
 
 This is Edward, the parent, and Eddie Junior, the learner. A parent signs up by email, verifies it, and invites their child. The learner joins with the invitation code.
 
@@ -14,11 +20,11 @@ Next, he wants seventy-five dollars of Microsoft. This goes above Edward's limit
 
 Lessons help Eddie understand ideas such as shared risk. In Replay, he can compare different investment mixes over the same period.
 
-But his learning has a history, too. Eddie saves a thought: owning Apple and Microsoft means he has spread his risk.
+But his learning has a history, too. Eddie saves his thesis: owning Apple and Microsoft means he has spread his risk.
 
 He asks Trove, "Have I really spread my risk?" The guide uses his saved thinking to explain what these companies might have in common.
 
-Eddie then corrects his thought: different company names can still share the same risks. When he asks again, Trove uses that new understanding, even when he returns in another session.
+Eddie then corrects his thesis: different company names can still share the same risks. When he asks again, Trove uses that new understanding, even when he returns in another session.
 
 Walrus Memory saves this learning on Mainnet. Sui records the signed practice actions and enforces the family's trading rules. Tatum checks the confirmed results before Trove updates the portfolio.
 

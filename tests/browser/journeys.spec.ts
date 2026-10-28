@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import type { Page, APIRequestContext } from "@playwright/test";
+import type { AppSnapshot, Memory } from "../../shared/model.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
@@ -1252,6 +1253,168 @@ test("parent practice refills update the shared portfolio without manufacturing 
   ).toBe(true);
 });
 
+test("a corrected thought confirms after closing Saved thoughts and the queued chat continues once automatically", async ({
+  page,
+}) => {
+  await createLearnerAccount(page);
+  const original: Memory = {
+    id: "original-thesis",
+    kind: "reflection",
+    text: "Different company names spread my risk.",
+    recordedAt: new Date().toISOString(),
+    active: true,
+    origin: "local",
+    blobId: "original-blob",
+    syncStatus: "confirmed",
+  };
+  let corrected = false,
+    confirmed = false,
+    generations = 0,
+    polls = 0;
+  let snapshot: AppSnapshot;
+  const memories = (): Memory[] =>
+    corrected
+      ? [
+          { ...original, active: false },
+          {
+            ...original,
+            id: "new-correction",
+            kind: "correction",
+            text: "Different names can share industry risk.",
+            supersedes: original.id,
+            blobId: confirmed ? "correction-blob" : undefined,
+            syncStatus: confirmed ? "confirmed" : "accepted",
+          },
+        ]
+      : [original];
+  await page.route("**/api/state", async (route) => {
+    const response = await route.fetch();
+    snapshot = await response.json();
+    snapshot.session!.memoryEnabled = true;
+    snapshot.session!.servicesReady = true;
+    snapshot.memories = memories();
+    snapshot.chain = { ready: false, network: "testnet" };
+    await route.fulfill({ response, json: snapshot });
+  });
+  await page.route("**/api/memories", async (route) => {
+    expect(route.request().postDataJSON().supersedes).toBe(original.id);
+    corrected = true;
+    await route.fulfill({ json: { ...snapshot, memories: memories() } });
+  });
+  await page.route("**/api/memory/status", async (route) => {
+    polls++;
+    await route.fulfill({
+      json: {
+        records: [
+          {
+            id: "new-correction",
+            status: confirmed ? "confirmed" : "accepted",
+            blobId: confirmed ? "correction-blob" : undefined,
+            withdrawn: false,
+          },
+        ],
+      },
+    });
+  });
+  await page.route("**/api/guide", async (route) => {
+    generations++;
+    if (corrected) expect(confirmed).toBe(true);
+    await route.fulfill({
+      json: {
+        text: corrected
+          ? "Your corrected thesis now considers shared industry risks."
+          : "Let's compare the risks behind your company choices.",
+        sources: [corrected ? "new-correction" : original.id],
+        mode: "live",
+        concept: "concentration",
+      },
+    });
+  });
+  await page.clock.install();
+  await page.goto("/app/guide");
+  await page.getByRole("tab", { name: "Ask Trove" }).click();
+  await page
+    .getByRole("textbox", { name: "Ask your learning guide" })
+    .fill("Have I spread my risk?");
+  await page.getByRole("button", { name: "Send question" }).click();
+  await expect(page.getByRole("log")).toContainText("Let's compare the risks");
+  await page
+    .getByRole("button", { name: "Saved thoughts", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog", { name: "SAVED THOUGHTS" });
+  await dialog.getByRole("button", { name: "Correct this thought" }).click();
+  await dialog
+    .getByLabel("Correction", { exact: true })
+    .fill("Different names can share industry risk.");
+  await dialog.getByRole("button", { name: "Save correction" }).click();
+  await expect(
+    dialog.getByRole("button", { name: "Save reflection" }),
+  ).toBeVisible();
+  await dialog.getByRole("button", { name: "Close dialog" }).click();
+  const question = "What changed in my understanding?";
+  await page
+    .getByRole("textbox", { name: "Ask your learning guide" })
+    .fill(question);
+  await page.getByRole("button", { name: "Send question" }).click();
+  await expect(page.locator(".guide-thinking")).toContainText(
+    "Updating your saved thoughts",
+  );
+  expect(generations).toBe(1);
+  await expect.poll(() => polls).toBeGreaterThan(0);
+  confirmed = true;
+  await page.clock.runFor(2500);
+  await expect(page.getByRole("log")).toContainText(
+    "Your corrected thesis now considers shared industry risks.",
+  );
+  expect(generations).toBe(2);
+  await expect(page.getByRole("log")).toContainText("Let's compare the risks");
+  await expect(
+    page.getByRole("log").getByText(question, { exact: true }),
+  ).toHaveCount(1);
+  await page
+    .getByRole("button", { name: "Saved thoughts", exact: true })
+    .click();
+  await expect(dialog).toContainText("MAINNET CONFIRMED");
+});
+
+test("cached app navigation reaches the top immediately while a background state request is waiting", async ({
+  page,
+}) => {
+  await createPortfolioAccount(page);
+  await page.goto("/app/explore");
+  await expect(
+    page.getByRole("heading", { name: "Explore", exact: true }),
+  ).toBeVisible();
+  await page.evaluate(() =>
+    window.scrollTo({ top: document.body.scrollHeight, behavior: "instant" }),
+  );
+  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(200);
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let waiting = false;
+  await page.route("**/api/state", async (route) => {
+    waiting = true;
+    await gate;
+    await route.continue();
+  });
+  try {
+    await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await expect.poll(() => waiting).toBe(true);
+    await page
+      .getByRole("navigation", { name: "Your Trove" })
+      .getByRole("link", { name: "Home", exact: true })
+      .click();
+    await expect(
+      page.getByRole("heading", { name: "Your portfolio", exact: true }),
+    ).toBeVisible();
+    expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  } finally {
+    release();
+  }
+});
+
 test("IEX prices show their source and refresh automatically on a visible asset screen", async ({
   page,
 }) => {
@@ -1285,6 +1448,69 @@ test("IEX prices show their source and refresh automatically on a visible asset 
   price = "121000000";
   await page.clock.fastForward(31000);
   await expect(page.locator(".company-price")).toContainText("$121.00");
+});
+
+test("price polling moves holding returns, total returns and the chart through gains and losses without a reload", async ({
+  page,
+}) => {
+  await createPortfolioAccount(page);
+  const start = new Date(Date.now() - 3600000).toISOString();
+  let price = 100;
+  await page.route("**/api/state", async (route) => {
+    const response = await route.fetch(),
+      state = await response.json();
+    state.cash = "899999999";
+    state.holdings = [
+      { symbol: "AAPL", units: "100000000", cost: "100000001" },
+    ];
+    state.funding = [];
+    state.portfolio = {
+      id: "return-fixture",
+      startedAt: start,
+      initialCash: "1000000000",
+      datasetId: "price-fixture",
+    };
+    state.market = {
+      mode: "market",
+      provider: "Alpaca IEX",
+      quoteMode: "intraday",
+      asOf: start.slice(0, 10),
+      stale: false,
+      marketOpen: true,
+      status: "IEX prices refreshed about once a minute",
+    };
+    state.chain = { ready: false, network: "testnet" };
+    state.instruments
+      .find((i: { symbol: string }) => i.symbol === "AAPL")
+      .prices.at(-1).price = String(price * 1000000);
+    state.portfolioObservations = [
+      { date: start, value: 1000, capital: 1000 },
+      {
+        date: new Date().toISOString(),
+        value: 899.999999 + price,
+        capital: 1000,
+      },
+    ];
+    await route.fulfill({ response, json: state });
+  });
+  await page.clock.install();
+  await page.goto("/app");
+  const total = page.locator(".account-metrics > div").last();
+  await expect(total).toContainText("+$0.00");
+  await expect(total).not.toContainText("-$0.00");
+  await expect(
+    page.locator(".portfolio-chart-canvas canvas").first(),
+  ).toBeVisible();
+  price = 110;
+  await page.clock.fastForward(31000);
+  await expect(total).toContainText("+$10.00");
+  await expect(page.locator(".holding-row .gain")).toContainText("+$10.00");
+  await expect(page.locator(".chart-reading")).toContainText("+$10.00");
+  price = 90;
+  await page.clock.fastForward(31000);
+  await expect(total).toContainText("-$10.00");
+  await expect(page.locator(".holding-row .loss")).toContainText("-$10.00");
+  await expect(page.locator(".chart-reading")).toContainText("-$10.00");
 });
 
 test("a first-day portfolio draws immediately and new observations update its value without counting refills as profit", async ({

@@ -16,6 +16,7 @@ import { Sparkline } from "../components/Sparkline.tsx";
 import { practiceCapital } from "../../shared/funding.ts";
 import { chainAction } from "../lib/wallet.ts";
 import { PracticeSetup } from "../components/PracticeSetup.tsx";
+import { displayedReturn } from "../lib/market-labels.ts";
 
 const PortfolioChart = lazy(() =>
   import("../components/PortfolioChart.tsx").then((module) => ({
@@ -55,7 +56,7 @@ export function Home() {
     cash = BigInt(state.cash),
     invested = value - cash;
   const capital = practiceCapital(state),
-    gain = value - capital;
+    gain = displayedReturn(value - capital);
   const hasLocalDecisions = state.decisions.some(
     (decision) => decision.origin === "local",
   );
@@ -241,7 +242,7 @@ export function Home() {
                 (item) => item.symbol === holding.symbol,
               )!,
               current = valueOf(holding, latest(instrument).price),
-              difference = current - BigInt(holding.cost);
+              difference = displayedReturn(current - BigInt(holding.cost));
             return (
               <Link
                 className="holding-row"

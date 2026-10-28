@@ -1,7 +1,6 @@
 import { waitUntil, attachDatabasePool } from "@vercel/functions";
 import { createApp } from "./app.ts";
 import { createRuntime } from "./runtime.ts";
-import { marketStale } from "./market.ts";
 
 type Runtime = Awaited<ReturnType<typeof createRuntime>>;
 export function configuredOrigin(env = process.env) {
@@ -62,7 +61,7 @@ export function createServerlessHandler(
   return {
     async fetch(request: Request) {
       try {
-        const { app, runtime } = await initialize();
+        const { app } = await initialize();
         const url = new URL(request.url),
           path = url.searchParams.get("__trove_path");
         if (url.searchParams.get("__trove_health") === "1")
@@ -77,16 +76,6 @@ export function createServerlessHandler(
         }
         url.searchParams.delete("__trove_path");
         url.searchParams.delete("__trove_health");
-        // The first visitor waits for an initial price import rather than an old example.
-        if (url.pathname.startsWith("/api/")) {
-          const latest = await runtime.market.latest();
-          if (
-            !latest ||
-            marketStale(latest.asOf) ||
-            runtime.market.gateway?.source
-          )
-            await runtime.market.refresh();
-        }
         return await app.fetch(new Request(url, request));
       } catch {
         console.error(

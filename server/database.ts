@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS account_sessions(token_hash TEXT PRIMARY KEY,member T
 CREATE TABLE IF NOT EXISTS account_invites(token_hash TEXT PRIMARY KEY,family TEXT NOT NULL,expires_at INTEGER NOT NULL,consumed INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS request_limits(key TEXT PRIMARY KEY,count INTEGER NOT NULL,until_at INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS market_snapshots(id TEXT PRIMARY KEY,as_of TEXT NOT NULL,received_at TEXT NOT NULL,payload TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS market_snapshots_latest ON market_snapshots(received_at DESC);
 CREATE TABLE IF NOT EXISTS market_refresh(id INTEGER PRIMARY KEY CHECK(id=1),next_at INTEGER NOT NULL,status TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS market_provider_refresh(provider TEXT PRIMARY KEY,next_at INTEGER NOT NULL,status TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS portfolio_archives(id TEXT PRIMARY KEY,family TEXT NOT NULL,payload TEXT NOT NULL,recorded_at TEXT NOT NULL);

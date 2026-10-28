@@ -59,8 +59,13 @@ export function createApp(
     return { ...state, role: c.get("member")?.role ?? state.role };
   };
   const marketState = async (state: DemoState) => {
-    if (market.gateway?.source) await market.refresh();
-    const currentMarket = await market.latest();
+    let currentMarket = await market.latest();
+    // Only the initial import blocks a response. Existing prices remain labelled
+    // while request-driven maintenance refreshes them outside the response path.
+    if (!currentMarket && market.gateway) {
+      await market.refresh();
+      currentMarket = await market.latest();
+    }
     if (!state.portfolio && !currentMarket && market.gateway)
       throw new DomainError(
         "Market prices are temporarily unavailable. Please try again shortly.",
@@ -78,6 +83,23 @@ export function createApp(
     member = c.get("member"),
   ) => {
     state = await marketState(state);
+    const [
+      instruments,
+      marketStatus,
+      portfolioHistory,
+      portfolioObservations,
+      chainStatus,
+      profile,
+      recoveryStatus,
+    ] = await Promise.all([
+      market.instruments(state),
+      market.status(state),
+      member ? market.history(state) : undefined,
+      member ? market.observations(state) : undefined,
+      member ? chain.status(member) : undefined,
+      store.profile(state.id),
+      member ? recovery.status(member) : { ready: recovery.ready },
+    ]);
     return {
       ...state,
       ...(!member
@@ -92,24 +114,20 @@ export function createApp(
           }
         : {}),
       role: member?.role ?? state.role,
-      instruments: await market.instruments(state),
-      market: await market.status(state),
-      portfolioHistory: member ? await market.history(state) : undefined,
-      portfolioObservations: member
-        ? await market.observations(state)
-        : undefined,
-      chain: member ? await chain.status(member) : undefined,
+      instruments,
+      market: marketStatus,
+      portfolioHistory,
+      portfolioObservations,
+      chain: chainStatus,
       session: {
         mode: member ? ("account" as const) : ("sample" as const),
         role: member?.role ?? state.role,
         username: member?.username,
-        memoryEnabled: (await store.profile(state.id))?.memory_enabled === 1,
+        memoryEnabled: profile?.memory_enabled === 1,
         servicesReady: Boolean(
           options.learning?.ready && options.learning?.coachReady,
         ),
-        recovery: member
-          ? await recovery.status(member)
-          : { ready: recovery.ready },
+        recovery: recoveryStatus,
       },
     };
   };
@@ -231,7 +249,12 @@ export function createApp(
         },
         409,
       );
-    if (error instanceof AccessError || error instanceof LearningUnavailable)
+    if (error instanceof LearningUnavailable)
+      return c.json(
+        { error: error.message, ...(error.code ? { code: error.code } : {}) },
+        error.status,
+      );
+    if (error instanceof AccessError)
       return c.json({ error: error.message }, error.status);
     if (error instanceof InputError)
       return c.json({ error: error.message }, 400);
